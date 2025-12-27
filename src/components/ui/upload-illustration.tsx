@@ -29,9 +29,9 @@ export function UploadIllustration({ className, isActive = false }: UploadIllust
           animate={isActive ? { y: -5 } : { y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Larger, better proportioned cloud */}
+          {/* Larger, better proportioned cloud - optically centered (slightly up-left) */}
           <path
-            d="M60 115 Q60 92 82 92 Q82 70 105 70 Q128 70 128 92 Q150 92 150 115 Q150 138 128 138 L82 138 Q60 138 60 115"
+            d="M52 96 Q52 73 74 73 Q74 51 97 51 Q120 51 120 73 Q142 73 142 96 Q142 119 120 119 L74 119 Q52 119 52 96"
             fill="#3ECF8E"
             opacity="0.15"
           />
@@ -41,19 +41,19 @@ export function UploadIllustration({ className, isActive = false }: UploadIllust
             animate={isActive ? { y: [0, -8, 0] } : { y: 0 }}
             transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
           >
-            {/* Arrow line - thicker and better positioned */}
+            {/* Arrow line - optically centered */}
             <line
-              x1="105"
-              y1="130"
-              x2="105"
-              y2="88"
+              x1="97"
+              y1="111"
+              x2="97"
+              y2="69"
               stroke="#3ECF8E"
               strokeWidth="5"
               strokeLinecap="round"
             />
-            {/* Arrow head - larger */}
+            {/* Arrow head - optically centered */}
             <polyline
-              points="92,100 105,88 118,100"
+              points="84,81 97,69 110,81"
               stroke="#3ECF8E"
               strokeWidth="5"
               strokeLinecap="round"

@@ -37,13 +37,13 @@ export function HamburgerMenu() {
               className="fixed inset-0 bg-black/80 z-40"
             />
 
-            {/* Optimized Menu Panel - No Backdrop Filter */}
+            {/* Optimized Menu Panel - Solid Black Background */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 bg-card border-l border-border z-50 p-6 md:p-7"
+              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 bg-black border-l border-border z-50 p-6 md:p-7"
               style={{ willChange: 'transform' }}
             >
               <div className="flex flex-col gap-5 mt-16">
