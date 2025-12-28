@@ -495,17 +495,35 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       return
     }
     setStatus('connecting')
-    
+
     // Normalize code input to ID
     const targetId = `sr-warp-${targetCode.trim().toLowerCase()}`
-    
+
     const conn = peer.connect(targetId)
-    
+
+    // Add 15-second timeout for connection attempt
+    let connectionTimeout: NodeJS.Timeout | null = null
+    let hasConnected = false
+
+    connectionTimeout = setTimeout(() => {
+      if (!hasConnected && conn.open === false) {
+        conn.close()
+        setStatus('failed')
+        toast.error('Connection Timeout', {
+          description: 'Could not reach the other peer. Make sure they are online and try again.',
+          duration: 6000
+        })
+      }
+    }, 15000)
+
     conn.on('open', () => {
+        hasConnected = true
+        if (connectionTimeout) clearTimeout(connectionTimeout)
         handleConnection(conn)
     })
-    
+
     conn.on('error', (err) => {
+      if (connectionTimeout) clearTimeout(connectionTimeout)
       setStatus('failed')
       const errorInfo = formatErrorForToast(err, 'peer-unavailable')
       toast.error(errorInfo.title, {
