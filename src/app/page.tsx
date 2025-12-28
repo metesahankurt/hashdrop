@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MinimalHeader } from '@/components/layout/minimal-header'
 import { SignatureBadge } from '@/components/ui/signature-badge'
@@ -9,11 +9,26 @@ import { ConnectionManager } from '@/components/transfer/connection-manager'
 import { TransferStatus } from '@/components/transfer/transfer-status'
 import { TextShare } from '@/components/transfer/text-share'
 import { InfoSection } from '@/components/ui/info-section'
+import { TransferHistory } from '@/components/ui/transfer-history'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 
 export default function Home() {
   const { status, file } = useWarpStore()
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Keyboard shortcut: CMD+K (Mac) or Ctrl+K (Windows/Linux)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowHistory(prev => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   return (
     <>
@@ -51,7 +66,7 @@ export default function Home() {
             <WarpDropzone />
             <TextShare />
             <Suspense fallback={<div className="text-center text-muted text-sm py-4">Loading...</div>}>
-              <ConnectionManager />
+              <ConnectionManager onOpenHistory={() => setShowHistory(true)} />
             </Suspense>
             <TransferStatus />
           </div>
@@ -60,6 +75,9 @@ export default function Home() {
 
       {/* Informational Section */}
       <InfoSection />
+
+      {/* Transfer History Modal */}
+      <TransferHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
 
       {/* Fixed Footer - Bottom Left */}
       <footer className="fixed bottom-6 left-6 z-40">

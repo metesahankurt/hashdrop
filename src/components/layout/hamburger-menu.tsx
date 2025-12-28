@@ -1,14 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, X, History } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TransferHistory } from '@/components/ui/transfer-history'
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
 
   return (
     <>
@@ -58,17 +56,6 @@ export function HamburgerMenu() {
             >
               <div className="flex flex-col gap-5 mt-16">
 
-                <button
-                  onClick={() => {
-                    setShowHistory(true)
-                    setIsOpen(false)
-                  }}
-                  className="text-base text-foreground hover:text-primary py-1 flex items-center gap-2 text-left"
-                >
-                  <History className="w-4 h-4" />
-                  Transfer History
-                </button>
-
                 <Link
                   href="/privacy"
                   onClick={() => setIsOpen(false)}
@@ -109,9 +96,6 @@ export function HamburgerMenu() {
           </>
         )}
       </AnimatePresence>
-
-      {/* Transfer History Modal */}
-      <TransferHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
     </>
   )
 }

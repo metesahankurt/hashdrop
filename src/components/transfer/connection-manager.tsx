@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2 } from 'lucide-react'
+import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
@@ -33,7 +33,11 @@ function isFileMetaData(data: unknown): data is FileMetaData {
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
-export function ConnectionManager() {
+interface ConnectionManagerProps {
+  onOpenHistory?: () => void
+}
+
+export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}) {
   const { 
     setMyId, peer, setPeer, 
     setConn, setStatus, status, 
@@ -545,6 +549,19 @@ export function ConnectionManager() {
               <ChevronDown className="w-4 h-4" />
             </motion.div>
           </button>
+
+          {/* View History Link - Estetik placement */}
+          {onOpenHistory && (
+            <motion.button
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={onOpenHistory}
+              className="w-full py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
+            >
+              <History className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+              <span>View Transfer History</span>
+            </motion.button>
+          )}
 
           {/* Collapsible Input Section */}
           <AnimatePresence>
