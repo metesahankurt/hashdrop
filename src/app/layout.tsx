@@ -44,6 +44,7 @@ const jsonLd = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://hashdrop.metesahankurt.cloud'),
   title: "HashDrop | Secure P2P File Transfer",
   description: "HashDrop - Share files directly between devices with lightspeed. No cloud, no limits. Powered by WebRTC.",
   keywords: ["HashDrop", "File Transfer", "P2P", "WebRTC", "Privacy", "P2P file transfer", "secure file sharing", "webrtc", "no cloud", "peer to peer"],
@@ -51,9 +52,13 @@ export const metadata: Metadata = {
   creator: "Mete Şahan Kurt",
   publisher: "Mete Şahan Kurt",
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: '32x32' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+    ],
+    apple: '/apple-touch-icon.png',
   },
-  // metadataBase will be set when domain is configured
   alternates: {
     canonical: "/",
   },
@@ -62,12 +67,21 @@ export const metadata: Metadata = {
     title: "HashDrop | Secure P2P File Transfer",
     description: "Share files directly between devices with lightspeed. No cloud, no limits. Powered by WebRTC.",
     siteName: "HashDrop",
-    images: ["/hashdrop-logo.png"],
+    url: 'https://hashdrop.metesahankurt.cloud',
+    images: [
+      {
+        url: '/hashdrop-logo.png',
+        width: 1200,
+        height: 630,
+        alt: 'HashDrop - Secure P2P File Transfer',
+      }
+    ],
   },
   robots: {
     index: true,
     follow: true,
   },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

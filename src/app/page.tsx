@@ -1,11 +1,13 @@
 "use client"
 
+import { Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { MinimalHeader } from '@/components/layout/minimal-header'
 import { SignatureBadge } from '@/components/ui/signature-badge'
 import { WarpDropzone } from '@/components/transfer/warp-dropzone'
 import { ConnectionManager } from '@/components/transfer/connection-manager'
 import { TransferStatus } from '@/components/transfer/transfer-status'
+import { TextShare } from '@/components/transfer/text-share'
 import { InfoSection } from '@/components/ui/info-section'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
@@ -47,7 +49,10 @@ export default function Home() {
           {/* Interactive Components - Clean Spacing */}
           <div className="w-full space-y-4">
             <WarpDropzone />
-            <ConnectionManager />
+            <TextShare />
+            <Suspense fallback={<div className="text-center text-muted text-sm py-4">Loading...</div>}>
+              <ConnectionManager />
+            </Suspense>
             <TransferStatus />
           </div>
         </div>

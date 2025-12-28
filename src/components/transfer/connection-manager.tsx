@@ -1,13 +1,15 @@
 "use client"
 
 import { useEffect, useState, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown } from 'lucide-react'
+import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
+import { QRCodeDisplay } from './qr-code-display'
 
 // Type for file metadata received over the connection
 interface FileMetaData {
@@ -39,11 +41,14 @@ export function ConnectionManager() {
     codeExpiry, setCodeExpiry, setFileHash
   } = useWarpStore()
 
+  const searchParams = useSearchParams()
   const [inputCode, setInputCode] = useState('')
   const [isCopied, setIsCopied] = useState(false)
   const [generatedInfo, setGeneratedInfo] = useState<{displayCode: string, peerId: string} | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [showReceive, setShowReceive] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+  const [autoConnected, setAutoConnected] = useState(false)
 
   // Generate code and set expiry on mount
   useEffect(() => {
@@ -51,12 +56,28 @@ export function ConnectionManager() {
       const displayCode = generateSecureCode()
       const peerId = codeToPeerId(displayCode)
       const expiry = Date.now() + CODE_EXPIRY_MS
-      
+
       setGeneratedInfo({ displayCode, peerId })
       setCodeExpiry(expiry)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Auto-connect from URL parameter (QR code scan)
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (code && !autoConnected && peer && status === 'idle') {
+      console.log('[QR] Auto-connecting with code:', code)
+      setInputCode(code)
+      setShowReceive(true)
+      setAutoConnected(true)
+
+      // Auto-connect after a brief delay to ensure peer is ready
+      setTimeout(() => {
+        connect(code)
+      }, 1000)
+    }
+  }, [searchParams, autoConnected, peer, status])
 
   // Countdown timer for code expiry
   useEffect(() => {
@@ -92,19 +113,35 @@ export function ConnectionManager() {
   const [meta, setMeta] = useState<FileMetaData | null>(null)
 
   const handleReceiveData = useCallback((data: unknown) => {
+    // 0. Handle Text Message
+    if (
+      data &&
+      typeof data === 'object' &&
+      'type' in data &&
+      (data as Record<string, unknown>).type === 'text-message'
+    ) {
+      const textData = data as { type: 'text-message'; content: string; timestamp: number }
+      console.log('[Receive] Got text message:', textData.content.substring(0, 50))
+      setMode('receive')
+      setStatus('completed')
+      useWarpStore.getState().setTextContent(textData.content)
+      toast.success('Text received!')
+      return
+    }
+
     // 1. Handle Meta (now includes hash)
     if (isFileMetaData(data)) {
       console.log('[Receive] Got metadata:', data.name, data.size, 'bytes')
       setMeta(data)
       setReceivedChunks([])
       setReceivedSize(0)
-      
+
       setMode('receive')
       setFile({ name: data.name, size: data.size, type: data.fileType } as File)
       setFileHash(data.hash) // Store expected hash
       setProgress(0)
       setStatus('transferring')
-      
+
       toast.info(`Receiving: ${data.name}\nHash: ${formatHashPreview(data.hash)}`)
     }
     // 2. Handle Chunk
@@ -375,14 +412,16 @@ export function ConnectionManager() {
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
 
       {/* Sender View - Compact Code Display */}
-      {(mode === 'send' || mode === null) && status === 'idle' && (
+      {(mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
           className="text-center space-y-3"
         >
-          <p className="text-sm text-muted">Share this code to send your file</p>
+          <p className="text-sm text-muted">
+            {mode === 'text' ? 'Share this code to send your text' : 'Share this code to send your file'}
+          </p>
 
           {/* Compact Code Display with Glass Effect */}
           <div className="inline-flex items-center gap-2 glass-card rounded-lg px-3 py-2.5 glow-primary">
@@ -402,12 +441,20 @@ export function ConnectionManager() {
                 )}
               </button>
               <button
+                onClick={() => setShowQR(!showQR)}
+                className="p-1.5 hover:bg-white/10 rounded-md transition-all"
+                title={showQR ? 'Hide QR code' : 'Show QR code'}
+              >
+                <QrCode className={`w-4 h-4 ${showQR ? 'text-primary' : 'text-muted hover:text-foreground'}`} />
+              </button>
+              <button
                 onClick={() => {
                   const displayCode = generateSecureCode()
                   const peerId = codeToPeerId(displayCode)
                   const expiry = Date.now() + CODE_EXPIRY_MS
                   setGeneratedInfo({ displayCode, peerId })
                   setCodeExpiry(expiry)
+                  setShowQR(false)
                   toast.success('New code generated!')
                 }}
                 className="p-1.5 hover:bg-white/10 rounded-md transition-all"
@@ -417,6 +464,13 @@ export function ConnectionManager() {
               </button>
             </div>
           </div>
+
+          {/* QR Code Display */}
+          <AnimatePresence>
+            {showQR && displayCode && (
+              <QRCodeDisplay code={displayCode} size={180} />
+            )}
+          </AnimatePresence>
 
           {/* Code Expiry Timer */}
           {timeLeft !== null && timeLeft > 0 && (

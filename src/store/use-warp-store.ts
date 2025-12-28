@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { DataConnection, Peer } from 'peerjs'
 
 export type TransferStatus = 'idle' | 'generating' | 'ready' | 'connecting' | 'connected' | 'transferring' | 'completed' | 'failed'
-export type Mode = 'send' | 'receive' | null
+export type Mode = 'send' | 'receive' | 'text' | null
 
 interface WarpState {
   myId: string | null
@@ -17,6 +17,7 @@ interface WarpState {
   readyToDownload: File | null  // Stores the completed file blob for manual download
   fileHash: string | null  // SHA-256 hash of sent/received file
   codeExpiry: number | null  // Unix timestamp when code expires
+  textContent: string | null  // Text/link content for sharing
 
   setMyId: (id: string) => void
   setPeer: (peer: Peer | null) => void
@@ -30,6 +31,7 @@ interface WarpState {
   setReadyToDownload: (file: File | null) => void
   setFileHash: (hash: string | null) => void
   setCodeExpiry: (expiry: number | null) => void
+  setTextContent: (text: string | null) => void
   reset: () => void
 }
 
@@ -46,6 +48,7 @@ export const useWarpStore = create<WarpState>((set) => ({
   readyToDownload: null,
   fileHash: null,
   codeExpiry: null,
+  textContent: null,
 
   setMyId: (id) => set({ myId: id }),
   setPeer: (peer) => set({ peer }),
@@ -60,6 +63,7 @@ export const useWarpStore = create<WarpState>((set) => ({
   setReadyToDownload: (file) => set({ readyToDownload: file }),
   setFileHash: (hash) => set({ fileHash: hash }),
   setCodeExpiry: (expiry) => set({ codeExpiry: expiry }),
+  setTextContent: (text) => set({ textContent: text }),
   setError: (error) => set({ error }),
   reset: () => set({ 
     conn: null, 
@@ -70,7 +74,8 @@ export const useWarpStore = create<WarpState>((set) => ({
     error: null,
     isPeerReady: false,
     readyToDownload: null,
-    fileHash: null
+    fileHash: null,
+    textContent: null
     // We keep 'peer', 'myId', and 'codeExpiry' to avoid reconnecting
   })
 }))
