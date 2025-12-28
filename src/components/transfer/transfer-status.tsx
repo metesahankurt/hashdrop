@@ -115,7 +115,9 @@ export function TransferStatus() {
       setStatus('transferring')
 
       // If multiple files, zip them first
-      let fileToSend = file
+      // If single file, use files[0] if file is not set
+      let fileToSend = file || (files.length === 1 ? files[0] : null)
+
       if (shouldZipFiles(files) && files.length > 0) {
         toast.info(`Zipping ${files.length} files...`)
         fileToSend = await createZipFromFiles(files)
