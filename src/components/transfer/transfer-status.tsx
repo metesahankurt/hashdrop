@@ -249,30 +249,34 @@ export function TransferStatus() {
     a.click()
     URL.revokeObjectURL(url)
 
-    toast.success('Download Started!')
+    toast.success('Download Started! Click "Receive Another" to continue.')
 
-    // Reset and reload page after download
-    setTimeout(() => {
-      // Close connection if active
-      if (conn) {
-        conn.close()
-      }
-
-      // Destroy peer if exists
-      if (peer) {
-        peer.destroy()
-      }
-
-      // Full reset (including peer and myId)
-      fullReset()
-
-      // Reload page to start fresh
-      window.location.reload()
-    }, 1000)
+    // Don't auto-reload, let user decide
   }
 
   // Send another file - reset and return to home
   const handleSendAnother = () => {
+    // Close connection if active
+    if (conn) {
+      conn.close()
+    }
+
+    // Destroy peer if exists
+    if (peer) {
+      peer.destroy()
+    }
+
+    // Full reset (including peer and myId)
+    fullReset()
+
+    // Reload page to get new peer ID and code
+    setTimeout(() => {
+      window.location.reload()
+    }, 100)
+  }
+
+  // Receive another file - reset and return to home
+  const handleReceiveAnother = () => {
     // Close connection if active
     if (conn) {
       conn.close()
@@ -408,29 +412,40 @@ export function TransferStatus() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
-          className="flex gap-2 mt-3"
+          className="space-y-2 mt-3"
         >
-          {/* Preview Button (only for images) */}
-          {readyToDownload && isImageFile(readyToDownload) && (
-            <button
-              onClick={() => {
-                const url = createImagePreviewUrl(readyToDownload)
-                setPreviewUrl(url)
-                setShowImagePreview(true)
-              }}
-              className="glass-card px-4 py-2.5 text-sm border border-border hover:border-primary/30 transition-colors flex items-center justify-center gap-2 rounded-lg"
-            >
-              <Eye className="w-4 h-4" />
-              Preview
-            </button>
-          )}
+          <div className="flex gap-2">
+            {/* Preview Button (only for images) */}
+            {readyToDownload && isImageFile(readyToDownload) && (
+              <button
+                onClick={() => {
+                  const url = createImagePreviewUrl(readyToDownload)
+                  setPreviewUrl(url)
+                  setShowImagePreview(true)
+                }}
+                className="glass-card px-4 py-2.5 text-sm border border-border hover:border-primary/30 transition-colors flex items-center justify-center gap-2 rounded-lg"
+              >
+                <Eye className="w-4 h-4" />
+                Preview
+              </button>
+            )}
 
-          {/* Download Button */}
+            {/* Download Button */}
+            <button
+              onClick={handleDownload}
+              className="glass-btn-primary flex-1 py-2.5 text-sm glow-success"
+            >
+              Download File
+            </button>
+          </div>
+
+          {/* Receive Another Button */}
           <button
-            onClick={handleDownload}
-            className="glass-btn-primary flex-1 py-2.5 text-sm glow-success"
+            onClick={handleReceiveAnother}
+            className="glass-card w-full py-2.5 text-sm flex items-center justify-center gap-2 border border-border hover:border-primary/30 transition-colors"
           >
-            Download File
+            <RefreshCw className="w-4 h-4" />
+            Receive Another File
           </button>
         </motion.div>
       )}
