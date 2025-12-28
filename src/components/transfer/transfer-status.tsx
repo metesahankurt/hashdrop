@@ -19,7 +19,7 @@ export function TransferStatus() {
     status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
     readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
     transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
-    setTransferStartTime, setTransferredBytes
+    setTransferStartTime, setTransferredBytes, textContent
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)
@@ -140,17 +140,33 @@ export function TransferStatus() {
       setTransferStartTime(Date.now())
       setTransferredBytes(0)
 
-      // 1. Send Meta WITH HASH
+      // 1. Send Text First (if present)
+      if (textContent) {
+        conn.send({
+          type: 'text-message',
+          content: textContent,
+          timestamp: Date.now(),
+          hasFile: true  // Flag: file is coming after this text
+        })
+        console.log('[Send] Text message sent along with file')
+      }
+
+      // 2. Send Meta WITH HASH
       conn.send({
         type: 'file-meta',
         name: fileToSend.name,
         size: fileToSend.size,
         fileType: fileToSend.type,
-        hash: fileHash  // SHA-256 hash for integrity verification
+        hash: fileHash,  // SHA-256 hash for integrity verification
+        hasText: !!textContent  // Flag to indicate text was sent
       })
 
       console.log('[Send] Metadata sent:', fileToSend.name, fileToSend.size, 'bytes')
-      toast.success('Hash verified. Starting transfer...')
+      if (textContent) {
+        toast.success('Sending text and file...')
+      } else {
+        toast.success('Hash verified. Starting transfer...')
+      }
 
       // 2. Chunk & Send - Convert ArrayBuffer to base64 to avoid PeerJS serialization issues
       const CHUNK_SIZE = 16 * 1024 // 16KB

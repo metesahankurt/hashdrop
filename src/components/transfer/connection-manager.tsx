@@ -153,14 +153,27 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       'type' in data &&
       (data as Record<string, unknown>).type === 'text-message'
     ) {
-      const textData = data as { type: 'text-message'; content: string; timestamp: number }
+      const textData = data as { type: 'text-message'; content: string; timestamp: number; hasFile?: boolean }
       console.log('[Receive] Got text message:', textData.content.substring(0, 50))
-      setMode('receive')
-      setStatus('completed')
+
+      // Store the text content
       useWarpStore.getState().setTextContent(textData.content)
-      toast.success('Text received!')
-      notifyTextReceived(textData.content)
-      return
+
+      // If no file is coming, complete the transfer
+      if (textData.hasFile === false) {
+        setMode('receive')
+        setStatus('completed')
+        toast.success('Text received!')
+        notifyTextReceived(textData.content)
+        return
+      }
+
+      // If file is coming (hasFile=true), just store text and wait for file
+      if (textData.hasFile === true) {
+        console.log('[Receive] Text stored, waiting for file...')
+        toast.info('Text received, waiting for file...')
+        // Don't return - continue to process file-meta
+      }
     }
 
     // 1. Handle Meta (now includes hash)

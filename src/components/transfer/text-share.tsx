@@ -7,15 +7,19 @@ import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 
 export function TextShare() {
-  const { setTextContent, setMode, textContent, mode, status, conn, isPeerReady } = useWarpStore()
+  const { setTextContent, setMode, textContent, mode, status, conn, isPeerReady, files } = useWarpStore()
   const [text, setText] = useState('')
   const [isCopied, setIsCopied] = useState(false)
 
   const handleShareText = () => {
     if (text.trim()) {
       setTextContent(text)
-      setMode('text')
-      toast.success('Text ready to share!')
+      // If files are already selected, keep mode as 'send' (don't override)
+      // Otherwise, set mode to 'text'
+      if (files.length === 0) {
+        setMode('text')
+      }
+      toast.success(files.length > 0 ? 'Text will be sent with files!' : 'Text ready to share!')
     }
   }
 
@@ -25,7 +29,8 @@ export function TextShare() {
     conn.send({
       type: 'text-message',
       content: textContent,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      hasFile: false  // Text only, no file coming
     })
 
     toast.success('Text sent!')
@@ -57,7 +62,9 @@ export function TextShare() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Type className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold">Received Text</h3>
+            <h3 className="text-sm font-semibold">
+              {files.length > 0 ? 'Message with File' : 'Received Text'}
+            </h3>
           </div>
           <div className="flex gap-2">
             <button
@@ -137,8 +144,8 @@ export function TextShare() {
     )
   }
 
-  // Show text input form (when idle or preparing)
-  if (status === 'idle' || (mode === 'text' && status !== 'connected')) {
+  // Show text input form (when idle, preparing, or when files are selected)
+  if (status === 'idle' || (mode === 'text' && status !== 'connected') || (mode === 'send' && status === 'ready')) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -147,13 +154,15 @@ export function TextShare() {
       >
         <div className="flex items-center gap-2 mb-3">
           <Type className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold">Share Text or Link</h3>
+          <h3 className="text-sm font-semibold">
+            {files.length > 0 ? 'Add Message (Optional)' : 'Share Text or Link'}
+          </h3>
         </div>
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Paste text, link, or message..."
+          placeholder={files.length > 0 ? "Add a message to send with your files..." : "Paste text, link, or message..."}
           className="glass-input w-full px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
           rows={4}
           maxLength={10000}
@@ -169,7 +178,7 @@ export function TextShare() {
             className="glass-btn-primary px-3 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             <Send className="w-3 h-3" />
-            Prepare
+            {files.length > 0 ? 'Add Message' : 'Prepare'}
           </button>
         </div>
       </motion.div>
