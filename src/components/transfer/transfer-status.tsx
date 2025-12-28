@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { motion } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, Eye, RefreshCw } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Eye, RefreshCw, Upload, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { requestNotificationPermission, notifyTransferComplete, notifyTransferFailed } from '@/lib/notifications'
@@ -74,6 +74,25 @@ export function TransferStatus() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyToDownload, mode, status])
+
+  // Prevent tab/window close during transfer
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Only prevent if actively transferring
+      if (status === 'transferring' || status === 'connecting' || status === 'connected') {
+        e.preventDefault()
+        // Modern browsers require returnValue to be set
+        e.returnValue = ''
+        return ''
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [status])
 
   // Notify and track on transfer complete or failed
   useEffect(() => {
@@ -283,7 +302,7 @@ export function TransferStatus() {
           <StatusIcon status={status} size="default" />
           <div className="flex-1 min-w-0 space-y-0.5">
             <h3 className="text-base font-semibold text-foreground">
-              {getStatusText(status)}
+              {getStatusText(status, mode)}
             </h3>
             <p className="text-sm text-muted break-all overflow-hidden">
               {file ? file.name : (status === 'connected' ? 'Waiting for file...' : 'Connecting...')}
@@ -314,12 +333,22 @@ export function TransferStatus() {
           animate={{ opacity: 1, y: 0 }}
           className="flex items-center justify-between text-xs text-muted mb-3"
         >
-          <span className="font-mono">
-            {transferSpeed < 1
-              ? `${(transferSpeed * 1024).toFixed(1)} KB/s`
-              : `${transferSpeed.toFixed(2)} MB/s`
-            }
-          </span>
+          <div className="flex items-center gap-2">
+            {mode === 'send' ? (
+              <Upload className="w-3.5 h-3.5 text-primary" />
+            ) : (
+              <Download className="w-3.5 h-3.5 text-primary" />
+            )}
+            <span className="text-primary font-medium">
+              {mode === 'send' ? 'Upload:' : 'Download:'}
+            </span>
+            <span className="font-mono">
+              {transferSpeed < 1
+                ? `${(transferSpeed * 1024).toFixed(1)} KB/s`
+                : `${transferSpeed.toFixed(2)} MB/s`
+              }
+            </span>
+          </div>
           {eta !== null && eta > 0 && (
             <span>
               ETA: {eta < 60
@@ -336,7 +365,10 @@ export function TransferStatus() {
         <div className="flex items-center justify-center gap-2 mb-4">
           <StepIndicator active={progress > 0} label="Preparing" />
           <div className="w-6 h-px bg-border/50" />
-          <StepIndicator active={progress > 30} label="Sending" />
+          <StepIndicator
+            active={progress > 30}
+            label={mode === 'send' ? 'Uploading' : 'Receiving'}
+          />
           <div className="w-6 h-px bg-border/50" />
           <StepIndicator active={progress > 90} label="Verifying" />
         </div>
@@ -475,13 +507,19 @@ function StepIndicator({ active, label }: { active: boolean; label: string }) {
   )
 }
 
-function getStatusText(status: string) {
+function getStatusText(status: string, mode: string | null) {
   switch (status) {
-    case 'connecting': return 'Establishing Connection...'
-    case 'connected': return 'Connection Active'
-    case 'transferring': return 'Transferring Data...'
-    case 'completed': return 'Transfer Successful'
-    case 'failed': return 'Transfer Failed'
-    default: return status
+    case 'connecting':
+      return 'Establishing Connection...'
+    case 'connected':
+      return 'Connection Active'
+    case 'transferring':
+      return mode === 'send' ? 'Uploading File...' : 'Downloading File...'
+    case 'completed':
+      return mode === 'send' ? 'Upload Complete!' : 'Download Complete!'
+    case 'failed':
+      return 'Transfer Failed'
+    default:
+      return status
   }
 }
