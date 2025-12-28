@@ -5,6 +5,8 @@ import { HamburgerMenu } from './hamburger-menu'
 import { useEffect, useState } from 'react'
 import { HelpCircle } from 'lucide-react'
 import Link from 'next/link'
+import { useWarpStore } from '@/store/use-warp-store'
+import { useRouter } from 'next/navigation'
 
 interface MinimalHeaderProps {
   onOpenShortcuts?: () => void
@@ -12,6 +14,8 @@ interface MinimalHeaderProps {
 
 export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
   const [scrollY, setScrollY] = useState(0)
+  const { reset, peer, conn } = useWarpStore()
+  const router = useRouter()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +25,29 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+
+    // Close connection if active
+    if (conn) {
+      conn.close()
+    }
+
+    // Destroy peer if exists
+    if (peer) {
+      peer.destroy()
+    }
+
+    // Reset all state
+    reset()
+
+    // Navigate to home and force reload
+    router.push('/')
+    setTimeout(() => {
+      window.location.reload()
+    }, 100)
+  }
 
   // Scroll miktarına göre blur hesapla
   // 0-200px arası artacak, 200px'de maksimum değere ulaşacak
@@ -45,6 +72,7 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
         <div className="flex items-center relative z-10">
           <Link
             href="/"
+            onClick={handleLogoClick}
             className="text-xl md:text-2xl font-bold text-foreground tracking-tight hover:text-primary transition-colors cursor-pointer"
             style={{
               filter: 'none',
