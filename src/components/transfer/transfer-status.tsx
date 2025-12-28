@@ -256,44 +256,16 @@ export function TransferStatus() {
 
   // Send another file - reset and return to home
   const handleSendAnother = () => {
-    // Close connection if active
-    if (conn) {
-      conn.close()
-    }
-
-    // Destroy peer if exists
-    if (peer) {
-      peer.destroy()
-    }
-
-    // Full reset (including peer and myId)
-    fullReset()
-
-    // Reload page to get new peer ID and code
-    setTimeout(() => {
-      window.location.reload()
-    }, 100)
+    // Force a complete page reload to ensure everything is reset properly
+    // This will regenerate the code and return to the initial state
+    window.location.href = window.location.pathname
   }
 
   // Receive another file - reset and return to home
   const handleReceiveAnother = () => {
-    // Close connection if active
-    if (conn) {
-      conn.close()
-    }
-
-    // Destroy peer if exists
-    if (peer) {
-      peer.destroy()
-    }
-
-    // Full reset (including peer and myId)
-    fullReset()
-
-    // Reload page to get new peer ID and code
-    setTimeout(() => {
-      window.location.reload()
-    }, 100)
+    // Force a complete page reload to ensure everything is reset properly
+    // This will regenerate the code and return to the initial state
+    window.location.href = window.location.pathname
   }
 
 
