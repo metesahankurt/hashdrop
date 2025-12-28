@@ -11,6 +11,7 @@ interface WarpState {
   status: TransferStatus
   mode: Mode
   file: File | null
+  files: File[]  // Multiple files selected by user
   progress: number
   error: string | null
   isPeerReady: boolean
@@ -18,6 +19,9 @@ interface WarpState {
   fileHash: string | null  // SHA-256 hash of sent/received file
   codeExpiry: number | null  // Unix timestamp when code expires
   textContent: string | null  // Text/link content for sharing
+  transferStartTime: number | null  // Unix timestamp when transfer started
+  transferSpeed: number  // Current transfer speed in MB/s
+  transferredBytes: number  // Total bytes transferred
 
   setMyId: (id: string) => void
   setPeer: (peer: Peer | null) => void
@@ -25,6 +29,7 @@ interface WarpState {
   setStatus: (status: TransferStatus) => void
   setMode: (mode: Mode) => void
   setFile: (file: File | null) => void
+  setFiles: (files: File[]) => void
   setProgress: (progress: number | ((prev: number) => number)) => void
   setError: (error: string | null) => void
   setIsPeerReady: (ready: boolean) => void
@@ -32,6 +37,9 @@ interface WarpState {
   setFileHash: (hash: string | null) => void
   setCodeExpiry: (expiry: number | null) => void
   setTextContent: (text: string | null) => void
+  setTransferStartTime: (time: number | null) => void
+  setTransferSpeed: (speed: number) => void
+  setTransferredBytes: (bytes: number) => void
   reset: () => void
 }
 
@@ -42,6 +50,7 @@ export const useWarpStore = create<WarpState>((set) => ({
   status: 'idle',
   mode: null,
   file: null,
+  files: [],
   progress: 0,
   error: null,
   isPeerReady: false,
@@ -49,6 +58,9 @@ export const useWarpStore = create<WarpState>((set) => ({
   fileHash: null,
   codeExpiry: null,
   textContent: null,
+  transferStartTime: null,
+  transferSpeed: 0,
+  transferredBytes: 0,
 
   setMyId: (id) => set({ myId: id }),
   setPeer: (peer) => set({ peer }),
@@ -56,26 +68,34 @@ export const useWarpStore = create<WarpState>((set) => ({
   setStatus: (status) => set({ status }),
   setMode: (mode) => set({ mode }),
   setFile: (file) => set({ file }),
-  setProgress: (progress) => set((state) => ({ 
-    progress: typeof progress === 'function' ? progress(state.progress) : progress 
+  setFiles: (files) => set({ files }),
+  setProgress: (progress) => set((state) => ({
+    progress: typeof progress === 'function' ? progress(state.progress) : progress
   })),
   setIsPeerReady: (isPeerReady) => set({ isPeerReady }),
   setReadyToDownload: (file) => set({ readyToDownload: file }),
   setFileHash: (hash) => set({ fileHash: hash }),
   setCodeExpiry: (expiry) => set({ codeExpiry: expiry }),
   setTextContent: (text) => set({ textContent: text }),
+  setTransferStartTime: (time) => set({ transferStartTime: time }),
+  setTransferSpeed: (speed) => set({ transferSpeed: speed }),
+  setTransferredBytes: (bytes) => set({ transferredBytes: bytes }),
   setError: (error) => set({ error }),
-  reset: () => set({ 
-    conn: null, 
-    status: 'idle', 
-    mode: null, 
-    file: null, 
-    progress: 0, 
+  reset: () => set({
+    conn: null,
+    status: 'idle',
+    mode: null,
+    file: null,
+    files: [],
+    progress: 0,
     error: null,
     isPeerReady: false,
     readyToDownload: null,
     fileHash: null,
-    textContent: null
+    textContent: null,
+    transferStartTime: null,
+    transferSpeed: 0,
+    transferredBytes: 0
     // We keep 'peer', 'myId', and 'codeExpiry' to avoid reconnecting
   })
 }))

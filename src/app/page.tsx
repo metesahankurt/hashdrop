@@ -10,19 +10,34 @@ import { TransferStatus } from '@/components/transfer/transfer-status'
 import { TextShare } from '@/components/transfer/text-share'
 import { InfoSection } from '@/components/ui/info-section'
 import { TransferHistory } from '@/components/ui/transfer-history'
+import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 
 export default function Home() {
   const { status, file } = useWarpStore()
   const [showHistory, setShowHistory] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
-  // Keyboard shortcut: CMD+K (Mac) or Ctrl+K (Windows/Linux)
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // CMD+K or Ctrl+K: Toggle Transfer History
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setShowHistory(prev => !prev)
+      }
+
+      // CMD+? or Ctrl+? or Shift+?: Show Keyboard Shortcuts
+      if ((e.metaKey || e.ctrlKey || e.shiftKey) && e.key === '?') {
+        e.preventDefault()
+        setShowShortcuts(prev => !prev)
+      }
+
+      // ESC: Close any open modal
+      if (e.key === 'Escape') {
+        setShowHistory(false)
+        setShowShortcuts(false)
       }
     }
 
@@ -34,7 +49,7 @@ export default function Home() {
     <>
       <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
         {/* Fixed Minimal Header */}
-        <MinimalHeader />
+        <MinimalHeader onOpenShortcuts={() => setShowShortcuts(true)} />
 
         {/* Centered Main Content */}
         <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-center gap-12 md:gap-16">
@@ -78,6 +93,9 @@ export default function Home() {
 
       {/* Transfer History Modal */}
       <TransferHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
 
       {/* Fixed Footer - Bottom Left */}
       <footer className="fixed bottom-6 left-6 z-40">

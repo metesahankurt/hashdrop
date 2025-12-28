@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { motion } from 'framer-motion'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
@@ -8,9 +8,44 @@ import { toast } from 'sonner'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { requestNotificationPermission, notifyTransferComplete, notifyTransferFailed } from '@/lib/notifications'
 import { addTransferRecord } from '@/lib/storage'
+import { createZipFromFiles, shouldZipFiles } from '@/lib/zip-utils'
 
 export function TransferStatus() {
-  const { status, conn, file, progress, setProgress, setStatus, isPeerReady, mode, readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error } = useWarpStore()
+  const {
+    status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
+    readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
+    transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
+    setTransferStartTime, setTransferredBytes
+  } = useWarpStore()
+
+  const [eta, setEta] = useState<number | null>(null)
+
+  // Calculate transfer speed and ETA
+  useEffect(() => {
+    if (status !== 'transferring' || !transferStartTime || !file) {
+      setTransferSpeed(0)
+      setEta(null)
+      return
+    }
+
+    const interval = setInterval(() => {
+      const elapsedSeconds = (Date.now() - transferStartTime) / 1000
+      if (elapsedSeconds > 0) {
+        // Speed in MB/s
+        const speed = (transferredBytes / (1024 * 1024)) / elapsedSeconds
+        setTransferSpeed(speed)
+
+        // Calculate ETA
+        if (speed > 0) {
+          const remainingBytes = file.size - transferredBytes
+          const remainingSeconds = remainingBytes / (speed * 1024 * 1024)
+          setEta(remainingSeconds)
+        }
+      }
+    }, 500) // Update every 500ms
+
+    return () => clearInterval(interval)
+  }, [status, transferStartTime, transferredBytes, file, setTransferSpeed])
 
   // Request notification permission on first transfer
   useEffect(() => {
@@ -52,53 +87,77 @@ export function TransferStatus() {
 
   // Manual send function with SHA-256 hashing
   const handleSendFile = async () => {
-    if (!file || !conn) return
+    if (!conn) return
+    if (!file && files.length === 0) return
 
     try {
       setStatus('transferring')
-      
+
+      // If multiple files, zip them first
+      let fileToSend = file
+      if (shouldZipFiles(files) && files.length > 0) {
+        toast.info(`Zipping ${files.length} files...`)
+        fileToSend = await createZipFromFiles(files)
+        setFile(fileToSend) // Update store with zipped file
+        toast.success('Files zipped successfully!')
+      }
+
+      if (!fileToSend) {
+        toast.error('No file to send')
+        setStatus('failed')
+        return
+      }
+
       // CRITICAL: Calculate file hash BEFORE sending
       toast.info('Calculating file hash...')
-      const fileHash = await calculateFileHash(file)
+      const fileHash = await calculateFileHash(fileToSend)
       setFileHash(fileHash)
-      
+
+      // Start transfer tracking
+      setTransferStartTime(Date.now())
+      setTransferredBytes(0)
+
       // 1. Send Meta WITH HASH
       conn.send({
         type: 'file-meta',
-        name: file.name,
-        size: file.size,
-        fileType: file.type,
+        name: fileToSend.name,
+        size: fileToSend.size,
+        fileType: fileToSend.type,
         hash: fileHash  // SHA-256 hash for integrity verification
       })
-      
-      console.log('[Send] Metadata sent:', file.name, file.size, 'bytes')
+
+      console.log('[Send] Metadata sent:', fileToSend.name, fileToSend.size, 'bytes')
       toast.success('Hash verified. Starting transfer...')
-      
+
       // 2. Chunk & Send - Convert ArrayBuffer to base64 to avoid PeerJS serialization issues
       const CHUNK_SIZE = 16 * 1024 // 16KB
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+      const totalChunks = Math.ceil(fileToSend.size / CHUNK_SIZE)
       let offset = 0
-      
+      let totalSent = 0
+
       for (let i = 0; i < totalChunks; i++) {
-         const slice = file.slice(offset, offset + CHUNK_SIZE)
+         const slice = fileToSend.slice(offset, offset + CHUNK_SIZE)
          const buffer = await slice.arrayBuffer()
-         
+
          // Convert ArrayBuffer to Uint8Array then to base64
          const uint8 = new Uint8Array(buffer)
          const base64 = btoa(String.fromCharCode(...uint8))
-         
+
          conn.send({
            type: 'chunk',
            data: base64,  // Send as base64 string
            index: i
          })
-         
+
          console.log(`[Send] Chunk ${i + 1}/${totalChunks} sent:`, buffer.byteLength, 'bytes')
-         
+
+         totalSent += buffer.byteLength
+         setTransferredBytes(totalSent) // Update for speed calculation
+
          offset += CHUNK_SIZE
          const percent = Math.min(((i + 1) / totalChunks) * 100, 99)
          setProgress(percent)
-         
+
          if (i % 50 === 0) await new Promise(r => setTimeout(r, 0))
       }
       
@@ -142,8 +201,8 @@ export function TransferStatus() {
   if (status === 'idle' || status === 'ready') return null
 
   // Show "Send Now" button for sender when connected and peer is ready
-  const showSendButton = status === 'connected' && isPeerReady && file && mode === 'send'
-  
+  const showSendButton = status === 'connected' && isPeerReady && (file || files.length > 0) && mode === 'send'
+
   // Show "Download" button for receiver when file is ready
   const showDownloadButton = status === 'completed' && readyToDownload && mode === 'receive'
 
@@ -175,7 +234,7 @@ export function TransferStatus() {
       </div>
 
       {/* Sleek Progress Bar */}
-      <div className="h-1.5 w-full rounded-full overflow-hidden mb-3" style={{background: 'rgba(148, 163, 184, 0.1)'}}>
+      <div className="h-1.5 w-full rounded-full overflow-hidden mb-2" style={{background: 'rgba(148, 163, 184, 0.1)'}}>
         <motion.div
           className="h-full progress-gradient"
           initial={{ width: 0 }}
@@ -183,6 +242,30 @@ export function TransferStatus() {
           transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         />
       </div>
+
+      {/* Speed and ETA Indicator */}
+      {status === 'transferring' && transferSpeed > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between text-xs text-muted mb-3"
+        >
+          <span className="font-mono">
+            {transferSpeed < 1
+              ? `${(transferSpeed * 1024).toFixed(1)} KB/s`
+              : `${transferSpeed.toFixed(2)} MB/s`
+            }
+          </span>
+          {eta !== null && eta > 0 && (
+            <span>
+              ETA: {eta < 60
+                ? `${Math.ceil(eta)}s`
+                : `${Math.floor(eta / 60)}m ${Math.ceil(eta % 60)}s`
+              }
+            </span>
+          )}
+        </motion.div>
+      )}
 
       {/* Compact Step Indicators */}
       {status === 'transferring' && (

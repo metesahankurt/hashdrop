@@ -38,12 +38,13 @@ interface ConnectionManagerProps {
 }
 
 export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}) {
-  const { 
-    setMyId, peer, setPeer, 
-    setConn, setStatus, status, 
-    mode, setMode, setFile, 
+  const {
+    setMyId, peer, setPeer,
+    setConn, setStatus, status,
+    mode, setMode, setFile,
     setError, setProgress, setIsPeerReady, setReadyToDownload,
-    codeExpiry, setCodeExpiry, setFileHash
+    codeExpiry, setCodeExpiry, setFileHash,
+    setTransferStartTime, setTransferredBytes
   } = useWarpStore()
 
   const searchParams = useSearchParams()
@@ -154,6 +155,10 @@ export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}
       setProgress(0)
       setStatus('transferring')
 
+      // Start transfer tracking
+      setTransferStartTime(Date.now())
+      setTransferredBytes(0)
+
       toast.info(`Receiving: ${data.name}\nHash: ${formatHashPreview(data.hash)}`)
     }
     // 2. Handle Chunk
@@ -177,7 +182,11 @@ export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}
           
           const blob = new Blob([bytes])
           setReceivedChunks(prev => [...prev, { index: chunkIndex, blob }])
-          setReceivedSize(prev => prev + bytes.byteLength)
+          setReceivedSize(prev => {
+            const newSize = prev + bytes.byteLength
+            setTransferredBytes(newSize) // Update transferred bytes for speed calculation
+            return newSize
+          })
         } catch (error) {
           console.error('[HashDrop] Chunk decode failed:', error)
         }

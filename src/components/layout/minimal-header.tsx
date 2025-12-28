@@ -3,8 +3,13 @@
 import { motion } from 'framer-motion'
 import { HamburgerMenu } from './hamburger-menu'
 import { useEffect, useState } from 'react'
+import { HelpCircle } from 'lucide-react'
 
-export function MinimalHeader() {
+interface MinimalHeaderProps {
+  onOpenShortcuts?: () => void
+}
+
+export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
   const [scrollY, setScrollY] = useState(0)
 
   useEffect(() => {
@@ -48,8 +53,23 @@ export function MinimalHeader() {
           </span>
         </div>
 
-        {/* Menu */}
-        <HamburgerMenu />
+        {/* Right Side - Help Button & Menu */}
+        <div className="flex items-center gap-3">
+          {/* Keyboard Shortcuts Button */}
+          {onOpenShortcuts && (
+            <button
+              onClick={onOpenShortcuts}
+              className="fixed top-4 right-16 md:right-20 z-[60] p-2.5 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors group"
+              aria-label="Keyboard Shortcuts"
+              title="Keyboard Shortcuts (CMD/Ctrl + ?)"
+            >
+              <HelpCircle className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
+            </button>
+          )}
+
+          {/* Hamburger Menu */}
+          <HamburgerMenu />
+        </div>
       </div>
     </motion.header>
   )
