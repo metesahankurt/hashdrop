@@ -27,24 +27,32 @@ export function HamburgerMenu() {
       <AnimatePresence mode="wait">
         {isOpen && (
           <>
-            {/* Simple Backdrop - No Blur */}
+            {/* Backdrop with Blur - No Background Color */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/80 z-40"
+              className="fixed inset-0 z-40"
+              style={{
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)'
+              }}
             />
 
-            {/* Optimized Menu Panel - Solid Black Background */}
+            {/* Menu Panel with Blur - No Background Color */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 bg-black border-l border-border z-50 p-6 md:p-7"
-              style={{ willChange: 'transform' }}
+              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 border-l border-border z-50 p-6 md:p-7"
+              style={{
+                willChange: 'transform',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)'
+              }}
             >
               <div className="flex flex-col gap-5 mt-16">
 
