@@ -4,13 +4,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History } from 'lucide-react'
+import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History, BarChart3 } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { notifyConnectionEstablished, notifyTextReceived } from '@/lib/notifications'
 import { QRCodeDisplay } from './qr-code-display'
+import { getPreferences } from '@/lib/preferences'
 
 // Type for file metadata received over the connection
 interface FileMetaData {
@@ -35,9 +36,10 @@ const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
 interface ConnectionManagerProps {
   onOpenHistory?: () => void
+  onOpenStats?: () => void
 }
 
-export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}) {
+export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionManagerProps = {}) {
   const {
     setMyId, peer, setPeer,
     setConn, setStatus, status,
@@ -71,6 +73,19 @@ export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}
 
       setGeneratedInfo({ displayCode, peerId })
       setCodeExpiry(expiry)
+
+      // Auto-copy code if enabled
+      const preferences = getPreferences()
+      if (preferences.autoCopyCode) {
+        navigator.clipboard.writeText(displayCode).then(() => {
+          toast.success('🔗 Code auto-copied to clipboard!', {
+            description: displayCode,
+            duration: 2000
+          })
+        }).catch(() => {
+          // Silent fail - user can still copy manually
+        })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -559,18 +574,33 @@ export function ConnectionManager({ onOpenHistory }: ConnectionManagerProps = {}
             </motion.div>
           </button>
 
-          {/* View History Link - Estetik placement */}
-          {onOpenHistory && (
-            <motion.button
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={onOpenHistory}
-              className="w-full py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
-            >
-              <History className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-              <span>View Transfer History</span>
-            </motion.button>
-          )}
+          {/* View History & Statistics Links - Side by side */}
+          <div className="grid grid-cols-2 gap-2">
+            {onOpenHistory && (
+              <motion.button
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={onOpenHistory}
+                className="py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
+              >
+                <History className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+                <span>History</span>
+              </motion.button>
+            )}
+
+            {onOpenStats && (
+              <motion.button
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                onClick={onOpenStats}
+                className="py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
+              >
+                <BarChart3 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                <span>Statistics</span>
+              </motion.button>
+            )}
+          </div>
 
           {/* Collapsible Input Section */}
           <AnimatePresence>

@@ -21,6 +21,11 @@ const shortcuts: Shortcut[] = [
     category: 'Navigation'
   },
   {
+    keys: ['CMD/Ctrl', 'S'],
+    description: 'Open Statistics Dashboard',
+    category: 'Navigation'
+  },
+  {
     keys: ['CMD/Ctrl', '?'],
     description: 'Show Keyboard Shortcuts',
     category: 'Navigation'

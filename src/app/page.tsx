@@ -11,6 +11,7 @@ import { TextShare } from '@/components/transfer/text-share'
 import { InfoSection } from '@/components/ui/info-section'
 import { TransferHistory } from '@/components/ui/transfer-history'
 import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
+import { StatisticsDashboard } from '@/components/ui/statistics-dashboard'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 
@@ -18,6 +19,7 @@ export default function Home() {
   const { status, file } = useWarpStore()
   const [showHistory, setShowHistory] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showStats, setShowStats] = useState(false)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -26,6 +28,12 @@ export default function Home() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
         setShowHistory(prev => !prev)
+      }
+
+      // CMD+S or Ctrl+S: Toggle Statistics Dashboard
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        setShowStats(prev => !prev)
       }
 
       // CMD+? or Ctrl+? or Shift+?: Show Keyboard Shortcuts
@@ -38,6 +46,7 @@ export default function Home() {
       if (e.key === 'Escape') {
         setShowHistory(false)
         setShowShortcuts(false)
+        setShowStats(false)
       }
     }
 
@@ -81,7 +90,10 @@ export default function Home() {
             <WarpDropzone />
             <TextShare />
             <Suspense fallback={<div className="text-center text-muted text-sm py-4">Loading...</div>}>
-              <ConnectionManager onOpenHistory={() => setShowHistory(true)} />
+              <ConnectionManager
+                onOpenHistory={() => setShowHistory(true)}
+                onOpenStats={() => setShowStats(true)}
+              />
             </Suspense>
             <TransferStatus />
           </div>
@@ -93,6 +105,9 @@ export default function Home() {
 
       {/* Transfer History Modal */}
       <TransferHistory isOpen={showHistory} onClose={() => setShowHistory(false)} />
+
+      {/* Statistics Dashboard Modal */}
+      <StatisticsDashboard isOpen={showStats} onClose={() => setShowStats(false)} />
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
