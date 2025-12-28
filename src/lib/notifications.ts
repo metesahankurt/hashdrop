@@ -70,3 +70,17 @@ export function notifyTransferFailed(fileName?: string) {
     requireInteraction: false,
   })
 }
+
+export function notifyError(title: string, message: string, actionable?: string, requireInteraction = false) {
+  const body = actionable
+    ? `${message}\n\n💡 ${actionable}`
+    : message
+
+  showNotification(`⚠️ ${title}`, {
+    body,
+    tag: 'error',
+    requireInteraction, // Critical errors require user dismissal
+    icon: '/icon-192.png',
+    badge: '/favicon.ico',
+  })
+}

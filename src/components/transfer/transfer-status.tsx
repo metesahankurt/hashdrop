@@ -11,6 +11,8 @@ import { addTransferRecord } from '@/lib/storage'
 import { createZipFromFiles, shouldZipFiles } from '@/lib/zip-utils'
 import { isImageFile, createImagePreviewUrl } from '@/lib/file-utils'
 import { ImagePreviewModal } from '@/components/ui/image-preview-modal'
+import { formatErrorForToast } from '@/lib/error-handler'
+import { getPreferences } from '@/lib/preferences'
 
 export function TransferStatus() {
   const {
@@ -57,6 +59,21 @@ export function TransferStatus() {
       requestNotificationPermission()
     }
   }, [status])
+
+  // Auto-download when file is ready and preference is enabled
+  useEffect(() => {
+    if (readyToDownload && mode === 'receive' && status === 'completed') {
+      const prefs = getPreferences()
+      if (prefs.autoDownload) {
+        // Small delay to ensure UI updates first
+        setTimeout(() => {
+          handleDownload()
+          toast.info('File downloaded automatically')
+        }, 500)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readyToDownload, mode, status])
 
   // Notify and track on transfer complete or failed
   useEffect(() => {
@@ -176,7 +193,11 @@ export function TransferStatus() {
     } catch (err) {
       console.error('[Send] Error:', err)
       setStatus('failed')
-      toast.error('Transfer Failed')
+      const errorInfo = formatErrorForToast(err, 'transfer-interrupted')
+      toast.error(errorInfo.title, {
+        description: errorInfo.description,
+        duration: errorInfo.duration
+      })
     }
   }
 

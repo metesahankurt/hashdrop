@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { UploadIllustration } from '@/components/ui/upload-illustration'
 import { isImageFile, createImagePreviewUrl, revokeImagePreviewUrl } from '@/lib/file-utils'
 import { ImagePreviewModal } from '@/components/ui/image-preview-modal'
+import { toast } from 'sonner'
 
 export function WarpDropzone() {
   const { files, setFiles, setMode, status } = useWarpStore()
@@ -33,6 +34,25 @@ export function WarpDropzone() {
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
+      // Check for large files
+      const largeFiles = acceptedFiles.filter(f => f.size > 2 * 1024 * 1024 * 1024) // 2GB
+      const veryLargeFiles = acceptedFiles.filter(f => f.size > 500 * 1024 * 1024) // 500MB
+
+      if (largeFiles.length > 0) {
+        toast.error('File Too Large', {
+          description: `Files over 2GB may fail to transfer due to browser memory limits.\n💡 Try splitting large files or using smaller files.`,
+          duration: 8000
+        })
+        return
+      }
+
+      if (veryLargeFiles.length > 0) {
+        toast.warning('Large File Warning', {
+          description: `${veryLargeFiles.length} file(s) over 500MB detected. Transfer may be slow or fail on low-end devices.\n💡 Files under 500MB work best.`,
+          duration: 6000
+        })
+      }
+
       setFiles(acceptedFiles)
       setMode('send')
     }
@@ -41,7 +61,10 @@ export function WarpDropzone() {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: true,
-    disabled: status !== 'idle' && status !== 'ready'
+    disabled: status !== 'idle' && status !== 'ready',
+    useFsAccessApi: false, // Enable folder upload support
+    noClick: false,
+    noKeyboard: false
   })
 
   const clearFiles = (e: React.MouseEvent) => {
@@ -95,10 +118,10 @@ export function WarpDropzone() {
               {/* Compact Text */}
               <div className="space-y-1.5">
                 <h2 className="text-lg md:text-xl font-semibold text-foreground">
-                  {isDragActive ? "Drop files here" : "Choose files"}
+                  {isDragActive ? "Drop files here" : "Choose files or folders"}
                 </h2>
                 <p className="text-sm text-muted">
-                  or drag and drop • multiple files supported
+                  or drag and drop • multiple files & folders supported
                 </p>
               </div>
             </div>

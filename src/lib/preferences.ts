@@ -2,11 +2,15 @@ const PREFERENCES_KEY = 'hashdrop-preferences'
 
 export interface UserPreferences {
   autoCopyCode: boolean
+  autoDownload: boolean
+  errorNotifications: boolean
   // Future preferences can be added here
 }
 
 const defaultPreferences: UserPreferences = {
-  autoCopyCode: true // Default to auto-copy enabled
+  autoCopyCode: true, // Default to auto-copy enabled
+  autoDownload: false, // Default to manual download (safer)
+  errorNotifications: true // Default to error notifications enabled
 }
 
 export function getPreferences(): UserPreferences {
@@ -40,5 +44,19 @@ export function toggleAutoCopyCode(): boolean {
   const current = getPreferences()
   const newValue = !current.autoCopyCode
   setPreferences({ autoCopyCode: newValue })
+  return newValue
+}
+
+export function toggleAutoDownload(): boolean {
+  const current = getPreferences()
+  const newValue = !current.autoDownload
+  setPreferences({ autoDownload: newValue })
+  return newValue
+}
+
+export function toggleErrorNotifications(): boolean {
+  const current = getPreferences()
+  const newValue = !current.errorNotifications
+  setPreferences({ errorNotifications: newValue })
   return newValue
 }

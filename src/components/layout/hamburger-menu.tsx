@@ -4,15 +4,20 @@ import { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getPreferences, toggleAutoCopyCode } from '@/lib/preferences'
+import { getPreferences, toggleAutoCopyCode, toggleAutoDownload, toggleErrorNotifications } from '@/lib/preferences'
 import { toast } from 'sonner'
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
   const [autoCopyEnabled, setAutoCopyEnabled] = useState(true)
+  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(false)
+  const [errorNotificationsEnabled, setErrorNotificationsEnabled] = useState(true)
 
   useEffect(() => {
-    setAutoCopyEnabled(getPreferences().autoCopyCode)
+    const prefs = getPreferences()
+    setAutoCopyEnabled(prefs.autoCopyCode)
+    setAutoDownloadEnabled(prefs.autoDownload)
+    setErrorNotificationsEnabled(prefs.errorNotifications)
   }, [])
 
   return (
@@ -85,6 +90,50 @@ export function HamburgerMenu() {
                     }`}>
                       <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
                         autoCopyEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+
+                  {/* Auto-download Files Toggle */}
+                  <button
+                    onClick={() => {
+                      const newValue = toggleAutoDownload()
+                      setAutoDownloadEnabled(newValue)
+                      toast.success(
+                        newValue ? '✅ Auto-download enabled' : '❌ Auto-download disabled',
+                        { duration: 1500 }
+                      )
+                    }}
+                    className="w-full flex items-center justify-between text-left py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
+                  >
+                    <span className="text-sm text-foreground">Auto-download Files</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors ${
+                      autoDownloadEnabled ? 'bg-primary' : 'bg-border'
+                    }`}>
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                        autoDownloadEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+
+                  {/* Error Notifications Toggle */}
+                  <button
+                    onClick={() => {
+                      const newValue = toggleErrorNotifications()
+                      setErrorNotificationsEnabled(newValue)
+                      toast.success(
+                        newValue ? '🔔 Error notifications enabled' : '🔕 Error notifications disabled',
+                        { duration: 1500 }
+                      )
+                    }}
+                    className="w-full flex items-center justify-between text-left py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
+                  >
+                    <span className="text-sm text-foreground">Error Notifications</span>
+                    <div className={`relative w-11 h-6 rounded-full transition-colors ${
+                      errorNotificationsEnabled ? 'bg-primary' : 'bg-border'
+                    }`}>
+                      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                        errorNotificationsEnabled ? 'translate-x-5' : 'translate-x-0'
                       }`} />
                     </div>
                   </button>

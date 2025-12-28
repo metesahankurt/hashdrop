@@ -12,6 +12,7 @@ import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { notifyConnectionEstablished, notifyTextReceived } from '@/lib/notifications'
 import { QRCodeDisplay } from './qr-code-display'
 import { getPreferences } from '@/lib/preferences'
+import { formatErrorForToast } from '@/lib/error-handler'
 
 // Type for file metadata received over the connection
 interface FileMetaData {
@@ -307,9 +308,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       setIsPeerReady(false)
     })
     
-    conn.on('error', () => {
+    conn.on('error', (err) => {
         setStatus('failed')
-        toast.error("Connection Interrupted")
+        const errorInfo = formatErrorForToast(err, 'transfer-interrupted')
+        toast.error(errorInfo.title, {
+          description: errorInfo.description,
+          duration: errorInfo.duration
+        })
     })
   }, [setConn, setStatus, handleReceiveData, setIsPeerReady])
   
@@ -376,7 +381,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         newPeer.on('error', (err) => {
           console.error('[Peer] Error:', err)
           clearTimeout(connectionTimeout)
-          
+
           if (err.type === 'unavailable-id') {
             toast.error('Code already in use. Generating new code...')
             const newCode = generateSecureCode()
@@ -388,12 +393,16 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           } else {
             // Only show error for non-network issues
             if (retryCount >= MAX_RETRIES) {
-              toast.error('Connection error. Please refresh the page.')
+              const errorInfo = formatErrorForToast(err, 'connection-failed')
+              toast.error(errorInfo.title, {
+                description: errorInfo.description,
+                duration: errorInfo.duration
+              })
             }
           }
-          
+
           newPeer.destroy()
-          
+
           if (retryCount < MAX_RETRIES && err.type === 'network') {
             retryCount++
             setTimeout(createPeer, 3000)
@@ -402,12 +411,16 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
       } catch (error) {
         console.error('[Peer] Creation failed:', error)
-        
+
         if (retryCount < MAX_RETRIES) {
           retryCount++
           setTimeout(createPeer, 3000)
         } else {
-          toast.error('Failed to initialize. Please refresh the page.')
+          const errorInfo = formatErrorForToast(error, 'connection-failed')
+          toast.error(errorInfo.title, {
+            description: errorInfo.description,
+            duration: errorInfo.duration
+          })
         }
       }
     }
@@ -432,9 +445,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         handleConnection(conn)
     })
     
-    conn.on('error', () => {
+    conn.on('error', (err) => {
       setStatus('failed')
-      toast.error('Connection Failed')
+      const errorInfo = formatErrorForToast(err, 'peer-unavailable')
+      toast.error(errorInfo.title, {
+        description: errorInfo.description,
+        duration: errorInfo.duration
+      })
     })
   }
   
