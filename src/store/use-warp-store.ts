@@ -41,6 +41,7 @@ interface WarpState {
   setTransferSpeed: (speed: number) => void
   setTransferredBytes: (bytes: number) => void
   reset: () => void
+  fullReset: () => void
 }
 
 export const useWarpStore = create<WarpState>((set) => ({
@@ -97,5 +98,24 @@ export const useWarpStore = create<WarpState>((set) => ({
     transferSpeed: 0,
     transferredBytes: 0
     // We keep 'peer', 'myId', and 'codeExpiry' to avoid reconnecting
+  }),
+  fullReset: () => set({
+    myId: null,
+    peer: null,
+    conn: null,
+    status: 'idle',
+    mode: null,
+    file: null,
+    files: [],
+    progress: 0,
+    error: null,
+    isPeerReady: false,
+    readyToDownload: null,
+    fileHash: null,
+    codeExpiry: null,
+    textContent: null,
+    transferStartTime: null,
+    transferSpeed: 0,
+    transferredBytes: 0
   })
 }))

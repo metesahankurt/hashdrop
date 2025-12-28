@@ -19,7 +19,7 @@ export function TransferStatus() {
     status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
     readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
     transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
-    setTransferStartTime, setTransferredBytes, textContent, peer, reset
+    setTransferStartTime, setTransferredBytes, textContent, peer, reset, fullReset
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)
@@ -251,11 +251,23 @@ export function TransferStatus() {
 
     toast.success('Download Started!')
 
-    // Reset after download
+    // Reset and reload page after download
     setTimeout(() => {
-      setReadyToDownload(null)
-      setFile(null)
-      setStatus('idle')
+      // Close connection if active
+      if (conn) {
+        conn.close()
+      }
+
+      // Destroy peer if exists
+      if (peer) {
+        peer.destroy()
+      }
+
+      // Full reset (including peer and myId)
+      fullReset()
+
+      // Reload page to start fresh
+      window.location.reload()
     }, 1000)
   }
 
@@ -271,10 +283,13 @@ export function TransferStatus() {
       peer.destroy()
     }
 
-    // Reset all state
-    reset()
+    // Full reset (including peer and myId)
+    fullReset()
 
-    toast.success('Ready for new transfer!')
+    // Reload page to get new peer ID and code
+    setTimeout(() => {
+      window.location.reload()
+    }, 100)
   }
 
 

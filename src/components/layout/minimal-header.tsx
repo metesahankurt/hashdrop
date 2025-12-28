@@ -14,7 +14,7 @@ interface MinimalHeaderProps {
 
 export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
   const [scrollY, setScrollY] = useState(0)
-  const { reset, peer, conn } = useWarpStore()
+  const { reset, fullReset, peer, conn } = useWarpStore()
   const router = useRouter()
 
   useEffect(() => {
@@ -39,8 +39,8 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
       peer.destroy()
     }
 
-    // Reset all state
-    reset()
+    // Full reset (including peer and myId)
+    fullReset()
 
     // Navigate to home and force reload
     router.push('/')
