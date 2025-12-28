@@ -3,12 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { motion } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { requestNotificationPermission, notifyTransferComplete, notifyTransferFailed } from '@/lib/notifications'
 import { addTransferRecord } from '@/lib/storage'
 import { createZipFromFiles, shouldZipFiles } from '@/lib/zip-utils'
+import { isImageFile, createImagePreviewUrl } from '@/lib/file-utils'
+import { ImagePreviewModal } from '@/components/ui/image-preview-modal'
 
 export function TransferStatus() {
   const {
@@ -19,6 +21,8 @@ export function TransferStatus() {
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
 
   // Calculate transfer speed and ETA
   useEffect(() => {
@@ -291,19 +295,37 @@ export function TransferStatus() {
         </motion.button>
       )}
 
-      {/* Compact Download Button */}
+      {/* Download & Preview Buttons */}
       {showDownloadButton && (
-        <motion.button
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
           transition={{ duration: 0.3 }}
-          onClick={handleDownload}
-          className="glass-btn-primary w-full mt-3 py-2.5 text-sm glow-success"
+          className="flex gap-2 mt-3"
         >
-          Download File
-        </motion.button>
+          {/* Preview Button (only for images) */}
+          {readyToDownload && isImageFile(readyToDownload) && (
+            <button
+              onClick={() => {
+                const url = createImagePreviewUrl(readyToDownload)
+                setPreviewUrl(url)
+                setShowImagePreview(true)
+              }}
+              className="glass-card px-4 py-2.5 text-sm border border-border hover:border-primary/30 transition-colors flex items-center justify-center gap-2 rounded-lg"
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </button>
+          )}
+
+          {/* Download Button */}
+          <button
+            onClick={handleDownload}
+            className="glass-btn-primary flex-1 py-2.5 text-sm glow-success"
+          >
+            Download File
+          </button>
+        </motion.div>
       )}
 
       {status === 'connected' && !showSendButton && !showDownloadButton && (
@@ -311,6 +333,21 @@ export function TransferStatus() {
           {isPeerReady ? 'Ready to transfer...' : 'Establishing secure handshake...'}
         </p>
       )}
+
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        isOpen={showImagePreview}
+        onClose={() => {
+          setShowImagePreview(false)
+          if (previewUrl) {
+            URL.revokeObjectURL(previewUrl)
+            setPreviewUrl('')
+          }
+        }}
+        imageUrl={previewUrl}
+        fileName={readyToDownload?.name || ''}
+        fileSize={readyToDownload?.size}
+      />
     </motion.div>
   )
 }
