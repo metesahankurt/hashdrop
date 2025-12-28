@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { motion } from 'framer-motion'
-import { Loader2, CheckCircle2, XCircle, Eye } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle, Eye, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { requestNotificationPermission, notifyTransferComplete, notifyTransferFailed } from '@/lib/notifications'
@@ -19,7 +19,7 @@ export function TransferStatus() {
     status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
     readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
     transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
-    setTransferStartTime, setTransferredBytes, textContent
+    setTransferStartTime, setTransferredBytes, textContent, peer, reset
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)
@@ -222,22 +222,40 @@ export function TransferStatus() {
   // Manual download function
   const handleDownload = () => {
     if (!readyToDownload) return
-    
+
     const url = URL.createObjectURL(readyToDownload)
     const a = document.createElement('a')
     a.href = url
     a.download = readyToDownload.name
     a.click()
     URL.revokeObjectURL(url)
-    
+
     toast.success('Download Started!')
-    
+
     // Reset after download
     setTimeout(() => {
       setReadyToDownload(null)
       setFile(null)
       setStatus('idle')
     }, 1000)
+  }
+
+  // Send another file - reset and return to home
+  const handleSendAnother = () => {
+    // Close connection if active
+    if (conn) {
+      conn.close()
+    }
+
+    // Destroy peer if exists
+    if (peer) {
+      peer.destroy()
+    }
+
+    // Reset all state
+    reset()
+
+    toast.success('Ready for new transfer!')
   }
 
 
@@ -248,6 +266,9 @@ export function TransferStatus() {
 
   // Show "Download" button for receiver when file is ready
   const showDownloadButton = status === 'completed' && readyToDownload && mode === 'receive'
+
+  // Show "Send Another" button for sender when transfer is completed
+  const showSendAnotherButton = status === 'completed' && mode === 'send'
 
   return (
     <motion.div
@@ -363,6 +384,24 @@ export function TransferStatus() {
             className="glass-btn-primary flex-1 py-2.5 text-sm glow-success"
           >
             Download File
+          </button>
+        </motion.div>
+      )}
+
+      {/* Send Another Button (for sender after completion) */}
+      {showSendAnotherButton && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="mt-3"
+        >
+          <button
+            onClick={handleSendAnother}
+            className="glass-btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Yeni Gönderim Yap
           </button>
         </motion.div>
       )}
