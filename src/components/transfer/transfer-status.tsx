@@ -1,13 +1,54 @@
 "use client"
 
+import { useEffect } from 'react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { motion } from 'framer-motion'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
+import { requestNotificationPermission, notifyTransferComplete, notifyTransferFailed } from '@/lib/notifications'
+import { addTransferRecord } from '@/lib/storage'
 
 export function TransferStatus() {
-  const { status, conn, file, progress, setProgress, setStatus, isPeerReady, mode, readyToDownload, setReadyToDownload, setFile, setFileHash } = useWarpStore()
+  const { status, conn, file, progress, setProgress, setStatus, isPeerReady, mode, readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error } = useWarpStore()
+
+  // Request notification permission on first transfer
+  useEffect(() => {
+    if (status === 'transferring') {
+      requestNotificationPermission()
+    }
+  }, [status])
+
+  // Notify and track on transfer complete or failed
+  useEffect(() => {
+    if (status === 'completed' && file && fileHash) {
+      notifyTransferComplete(file.name, mode === 'send')
+
+      // Add to history
+      addTransferRecord({
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        direction: mode === 'send' ? 'sent' : 'received',
+        hashPreview: formatHashPreview(fileHash),
+        success: error === null
+      })
+    } else if (status === 'failed' && file) {
+      notifyTransferFailed(file.name)
+
+      // Add failed transfer to history
+      if (fileHash) {
+        addTransferRecord({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          direction: mode === 'send' ? 'sent' : 'received',
+          hashPreview: formatHashPreview(fileHash),
+          success: false
+        })
+      }
+    }
+  }, [status, file, mode, fileHash, error])
 
   // Manual send function with SHA-256 hashing
   const handleSendFile = async () => {

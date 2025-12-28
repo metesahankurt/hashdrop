@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode } from 'lucide-react'
+import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2 } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
+import { notifyConnectionEstablished, notifyTextReceived } from '@/lib/notifications'
 import { QRCodeDisplay } from './qr-code-display'
 
 // Type for file metadata received over the connection
@@ -49,6 +50,12 @@ export function ConnectionManager() {
   const [showReceive, setShowReceive] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [autoConnected, setAutoConnected] = useState(false)
+  const [canShare, setCanShare] = useState(false)
+
+  // Check if native share is available
+  useEffect(() => {
+    setCanShare(typeof navigator !== 'undefined' && !!navigator.share)
+  }, [])
 
   // Generate code and set expiry on mount
   useEffect(() => {
@@ -126,6 +133,7 @@ export function ConnectionManager() {
       setStatus('completed')
       useWarpStore.getState().setTextContent(textData.content)
       toast.success('Text received!')
+      notifyTextReceived(textData.content)
       return
     }
 
@@ -253,6 +261,7 @@ export function ConnectionManager() {
     setConn(conn)
     setStatus('connected')
     toast.success('Warp Link Established!')
+    notifyConnectionEstablished()
 
     // Handshake: Announce we are ready to receive data
     // Both sides do this, ensuring the pipe is open
@@ -408,6 +417,24 @@ export function ConnectionManager() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  const shareCode = async () => {
+    if (!navigator.share || !displayCode) return
+
+    try {
+      await navigator.share({
+        title: 'HashDrop Transfer Code',
+        text: `Join my file transfer with code: ${displayCode}`,
+        url: `https://hashdrop.metesahankurt.cloud?code=${displayCode}`
+      })
+      toast.success('Code shared!')
+    } catch (error) {
+      // User cancelled or share failed
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Share failed:', error)
+      }
+    }
+  }
+
   return (
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
 
@@ -440,6 +467,15 @@ export function ConnectionManager() {
                   <Copy className="w-4 h-4 text-muted hover:text-foreground" />
                 )}
               </button>
+              {canShare && (
+                <button
+                  onClick={shareCode}
+                  className="p-1.5 hover:bg-white/10 rounded-md transition-all"
+                  title="Share code"
+                >
+                  <Share2 className="w-4 h-4 text-muted hover:text-foreground" />
+                </button>
+              )}
               <button
                 onClick={() => setShowQR(!showQR)}
                 className="p-1.5 hover:bg-white/10 rounded-md transition-all"
