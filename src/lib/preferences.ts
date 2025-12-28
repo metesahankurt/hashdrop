@@ -8,8 +8,8 @@ export interface UserPreferences {
 }
 
 const defaultPreferences: UserPreferences = {
-  autoCopyCode: true, // Default to auto-copy enabled
-  autoDownload: false, // Default to manual download (safer)
+  autoCopyCode: false, // Default to auto-copy disabled (user must enable from hamburger menu)
+  autoDownload: true, // Default to auto-download enabled (automatic download on transfer complete)
   errorNotifications: true // Default to error notifications enabled
 }
 

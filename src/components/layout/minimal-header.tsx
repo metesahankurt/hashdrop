@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { HamburgerMenu } from './hamburger-menu'
 import { useEffect, useState } from 'react'
 import { HelpCircle } from 'lucide-react'
+import Link from 'next/link'
 
 interface MinimalHeaderProps {
   onOpenShortcuts?: () => void
@@ -40,17 +41,18 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
       }}
     >
       <div className="flex items-center justify-between max-w-7xl mx-auto">
-        {/* Clean Logo - Text Only */}
+        {/* Clean Logo - Text Only (Clickable) */}
         <div className="flex items-center relative z-10">
-          <span
-            className="text-xl md:text-2xl font-bold text-foreground tracking-tight"
+          <Link
+            href="/"
+            className="text-xl md:text-2xl font-bold text-foreground tracking-tight hover:text-primary transition-colors cursor-pointer"
             style={{
               filter: 'none',
               textShadow: 'none'
             }}
           >
             HashDrop
-          </span>
+          </Link>
         </div>
 
         {/* Right Side - Help Button & Menu */}

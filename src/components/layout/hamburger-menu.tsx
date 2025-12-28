@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
-  const [autoCopyEnabled, setAutoCopyEnabled] = useState(true)
-  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(false)
+  const [autoCopyEnabled, setAutoCopyEnabled] = useState(false)
+  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(true)
   const [errorNotificationsEnabled, setErrorNotificationsEnabled] = useState(true)
 
   useEffect(() => {
@@ -39,27 +39,27 @@ export function HamburgerMenu() {
       <AnimatePresence mode="wait">
         {isOpen && (
           <>
-            {/* Backdrop with Blur - No Background Color */}
+            {/* Backdrop with Blur and Semi-Transparent Background */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 z-40"
+              className="fixed inset-0 z-40 bg-black/30"
               style={{
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)'
               }}
             />
 
-            {/* Menu Panel with Blur - No Background Color */}
+            {/* Menu Panel with Blur and Semi-Transparent Background */}
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 border-l border-border z-50 p-6 md:p-7"
+              className="fixed top-0 right-0 h-screen w-full max-w-sm md:w-80 border-l border-border z-50 p-6 md:p-7 bg-background/95"
               style={{
                 willChange: 'transform',
                 backdropFilter: 'blur(20px)',
@@ -74,13 +74,24 @@ export function HamburgerMenu() {
 
                   {/* Auto-copy Code Toggle */}
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const newValue = toggleAutoCopyCode()
                       setAutoCopyEnabled(newValue)
-                      toast.success(
-                        newValue ? '✅ Auto-copy enabled' : '❌ Auto-copy disabled',
-                        { duration: 1500 }
-                      )
+
+                      // Request clipboard permission when enabling
+                      if (newValue && typeof navigator !== 'undefined' && navigator.clipboard) {
+                        try {
+                          // Test clipboard access
+                          await navigator.clipboard.writeText('')
+                          toast.success('✅ Auto-copy enabled', { duration: 1500 })
+                        } catch (err) {
+                          toast.warning('⚠️ Auto-copy enabled, but clipboard permission denied', {
+                            duration: 2500
+                          })
+                        }
+                      } else {
+                        toast.success('❌ Auto-copy disabled', { duration: 1500 })
+                      }
                     }}
                     className="w-full flex items-center justify-between text-left py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
                   >

@@ -35,6 +35,10 @@ function isFileMetaData(data: unknown): data is FileMetaData {
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
+// SECURITY: File size and chunk limits to prevent DoS attacks
+const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024 // 10GB max file size
+const MAX_CHUNKS = 1000000 // Maximum number of chunks (10GB / 16KB ≈ 655,360 chunks)
+
 interface ConnectionManagerProps {
   onOpenHistory?: () => void
   onOpenStats?: () => void
@@ -59,6 +63,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const [showQR, setShowQR] = useState(false)
   const [autoConnected, setAutoConnected] = useState(false)
   const [canShare, setCanShare] = useState(false)
+  const [hasActiveConnection, setHasActiveConnection] = useState(false)
 
   // Check if native share is available
   useEffect(() => {
@@ -161,6 +166,29 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     // 1. Handle Meta (now includes hash)
     if (isFileMetaData(data)) {
       console.log('[Receive] Got metadata:', data.name, data.size, 'bytes')
+
+      // SECURITY: Validate file size to prevent DoS
+      if (data.size > MAX_FILE_SIZE) {
+        toast.error('File too large!', {
+          description: `Maximum file size is ${(MAX_FILE_SIZE / (1024 * 1024 * 1024)).toFixed(1)}GB. Received: ${(data.size / (1024 * 1024 * 1024)).toFixed(1)}GB`
+        })
+        setStatus('failed')
+        setError('File size exceeds maximum allowed size')
+        return
+      }
+
+      // SECURITY: Validate expected chunk count
+      const CHUNK_SIZE = 16 * 1024
+      const expectedChunks = Math.ceil(data.size / CHUNK_SIZE)
+      if (expectedChunks > MAX_CHUNKS) {
+        toast.error('File requires too many chunks', {
+          description: 'This file exceeds the transfer complexity limit.'
+        })
+        setStatus('failed')
+        setError('File chunk count exceeds limit')
+        return
+      }
+
       setMeta(data)
       setReceivedChunks([])
       setReceivedSize(0)
@@ -179,14 +207,32 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     }
     // 2. Handle Chunk
     else if (
-        data && 
-        typeof data === 'object' && 
-        'type' in data && 
+        data &&
+        typeof data === 'object' &&
+        'type' in data &&
         (data as Record<string, unknown>).type === 'chunk'
     ) {
       const chunkData = (data as Record<string, unknown>).data
       const chunkIndex = (data as Record<string, unknown>).index as number
-      
+
+      // SECURITY: Check for duplicate chunks
+      const isDuplicate = receivedChunks.some(chunk => chunk.index === chunkIndex)
+      if (isDuplicate) {
+        console.warn(`[HashDrop] Duplicate chunk detected: ${chunkIndex}`)
+        return // Ignore duplicate chunks
+      }
+
+      // SECURITY: Check total chunks count to prevent memory exhaustion
+      if (receivedChunks.length >= MAX_CHUNKS) {
+        console.error('[HashDrop] Maximum chunk count exceeded')
+        toast.error('Transfer aborted: Too many chunks', {
+          description: 'Potential DoS attack detected.'
+        })
+        setStatus('failed')
+        setError('Maximum chunk count exceeded')
+        return
+      }
+
       // Decode base64 string back to ArrayBuffer
       if (typeof chunkData === 'string') {
         try {
@@ -195,7 +241,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i)
           }
-          
+
           const blob = new Blob([bytes])
           setReceivedChunks(prev => [...prev, { index: chunkIndex, blob }])
           setReceivedSize(prev => {
@@ -289,6 +335,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const handleConnection = useCallback((conn: DataConnection) => {
     setConn(conn)
     setStatus('connected')
+    setHasActiveConnection(true)
     toast.success('Warp Link Established!')
     notifyConnectionEstablished()
 
@@ -299,17 +346,19 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     conn.on('data', (data) => {
       handleReceiveData(data)
     })
-    
+
     conn.on('close', () => {
       setStatus('idle')
+      setHasActiveConnection(false)
       toast.info('Connection Closed')
       setReceivedChunks([])
       setReceivedSize(0)
       setIsPeerReady(false)
     })
-    
+
     conn.on('error', (err) => {
         setStatus('failed')
+        setHasActiveConnection(false)
         const errorInfo = formatErrorForToast(err, 'transfer-interrupted')
         toast.error(errorInfo.title, {
           description: errorInfo.description,
@@ -375,6 +424,17 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
         newPeer.on('connection', (conn) => {
           console.log('[Peer] Incoming connection...')
+
+          // SECURITY: Only accept the first connection to prevent multiple recipients
+          if (hasActiveConnection) {
+            console.warn('[Peer] Rejecting connection - already have an active connection')
+            toast.warning('🔒 Connection rejected: Already connected to a peer', {
+              description: 'Only one recipient is allowed per transfer for security.'
+            })
+            conn.close()
+            return
+          }
+
           handleConnection(conn)
         })
 
