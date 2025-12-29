@@ -12,7 +12,7 @@ import { ImagePreviewModal } from '@/components/ui/image-preview-modal'
 import { toast } from 'sonner'
 
 export function WarpDropzone() {
-  const { files, setFiles, setMode, status } = useWarpStore()
+  const { files, setFiles, setMode, status, addLog } = useWarpStore()
   const [previewUrls, setPreviewUrls] = useState<{ [key: string]: string }>({})
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null)
 
@@ -55,8 +55,13 @@ export function WarpDropzone() {
 
       setFiles(acceptedFiles)
       setMode('send')
+
+      // Log file selection
+      const totalSize = acceptedFiles.reduce((sum, f) => sum + f.size, 0)
+      const sizeInMB = (totalSize / (1024 * 1024)).toFixed(2)
+      addLog(`${acceptedFiles.length} file(s) selected (${sizeInMB} MB) - Ready to send`, 'success')
     }
-  }, [setFiles, setMode])
+  }, [setFiles, setMode, addLog])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -71,14 +76,19 @@ export function WarpDropzone() {
     e.stopPropagation()
     setFiles([])
     setMode(null)
+    addLog('File selection cleared', 'info')
   }
 
   const removeFile = (index: number, e: React.MouseEvent) => {
     e.stopPropagation()
+    const removedFile = files[index]
     const newFiles = files.filter((_, i) => i !== index)
     setFiles(newFiles)
     if (newFiles.length === 0) {
       setMode(null)
+      addLog('All files removed', 'info')
+    } else {
+      addLog(`Removed: ${removedFile.name}`, 'info')
     }
   }
 

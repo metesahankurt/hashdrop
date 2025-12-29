@@ -19,7 +19,7 @@ export function TransferStatus() {
     status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
     readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
     transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
-    setTransferStartTime, setTransferredBytes, textContent, peer, reset, fullReset
+    setTransferStartTime, setTransferredBytes, textContent, peer, reset, fullReset, addLog
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)
@@ -132,6 +132,7 @@ export function TransferStatus() {
 
     try {
       setStatus('transferring')
+      addLog('Starting file transfer...', 'info')
 
       // If multiple files, zip them first
       // If single file, use files[0] if file is not set
@@ -139,9 +140,11 @@ export function TransferStatus() {
 
       if (shouldZipFiles(files) && files.length > 0) {
         toast.info(`Zipping ${files.length} files...`)
+        addLog(`Preparing ${files.length} files for transfer...`, 'info')
         fileToSend = await createZipFromFiles(files)
         setFile(fileToSend) // Update store with zipped file
         toast.success('Files zipped successfully!')
+        addLog('Files compressed successfully', 'success')
       }
 
       if (!fileToSend) {
@@ -152,8 +155,10 @@ export function TransferStatus() {
 
       // CRITICAL: Calculate file hash BEFORE sending
       toast.info('Calculating file hash...')
+      addLog('Calculating file hash for integrity verification...', 'info')
       const fileHash = await calculateFileHash(fileToSend)
       setFileHash(fileHash)
+      addLog('File hash calculated successfully', 'success')
 
       // Start transfer tracking
       setTransferStartTime(Date.now())
@@ -168,6 +173,7 @@ export function TransferStatus() {
           hasFile: true  // Flag: file is coming after this text
         })
         console.log('[Send] Text message sent along with file')
+        addLog('Sending text message with file...', 'info')
       }
 
       // 2. Send Meta WITH HASH
@@ -185,6 +191,7 @@ export function TransferStatus() {
         toast.success('Sending text and file...')
       } else {
         toast.success('Hash verified. Starting transfer...')
+        addLog(`Uploading: ${fileToSend.name}`, 'info')
       }
 
       // 2. Chunk & Send - Convert ArrayBuffer to base64 to avoid PeerJS serialization issues
@@ -222,11 +229,12 @@ export function TransferStatus() {
       // 3. Complete Signal
       conn.send({ type: 'transfer-complete' })
       console.log('[Send] Transfer complete signal sent')
-      
+
       setProgress(100)
       setStatus('completed')
       toast.success('Transfer Complete!')
-      
+      addLog('File upload completed successfully', 'success')
+
     } catch (err) {
       console.error('[Send] Error:', err)
       setStatus('failed')
@@ -235,6 +243,7 @@ export function TransferStatus() {
         description: errorInfo.description,
         duration: errorInfo.duration
       })
+      addLog(`Upload failed: ${errorInfo.title}`, 'error')
     }
   }
 
@@ -250,6 +259,7 @@ export function TransferStatus() {
     URL.revokeObjectURL(url)
 
     toast.success('Download Started! Click "Receive Another" to continue.')
+    addLog(`File downloaded: ${readyToDownload.name}`, 'success')
 
     // Don't auto-reload, let user decide
   }
@@ -435,7 +445,7 @@ export function TransferStatus() {
             className="glass-btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
-            Yeni Gönderim Yap
+            Send Another File
           </button>
         </motion.div>
       )}

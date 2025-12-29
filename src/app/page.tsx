@@ -12,14 +12,20 @@ import { InfoSection } from '@/components/ui/info-section'
 import { TransferHistory } from '@/components/ui/transfer-history'
 import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
 import { StatisticsDashboard } from '@/components/ui/statistics-dashboard'
+import { ConsoleDisplay } from '@/components/ui/console-display'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 
 export default function Home() {
-  const { status, file } = useWarpStore()
+  const { status, file, addLog } = useWarpStore()
   const [showHistory, setShowHistory] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showStats, setShowStats] = useState(false)
+
+  // Add initial log message on mount
+  useEffect(() => {
+    addLog('HashDrop initialized - Ready to transfer files', 'success')
+  }, [addLog])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -87,6 +93,7 @@ export default function Home() {
 
           {/* Interactive Components - Clean Spacing */}
           <div className="w-full space-y-4">
+            <ConsoleDisplay />
             <WarpDropzone />
             <TextShare />
             <Suspense fallback={<div className="text-center text-muted text-sm py-4">Loading...</div>}>

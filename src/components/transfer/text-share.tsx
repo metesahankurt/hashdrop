@@ -7,7 +7,7 @@ import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
 
 export function TextShare() {
-  const { setTextContent, setMode, textContent, mode, status, conn, isPeerReady, files } = useWarpStore()
+  const { setTextContent, setMode, textContent, mode, status, conn, isPeerReady, files, addLog } = useWarpStore()
   const [text, setText] = useState('')
   const [isCopied, setIsCopied] = useState(false)
   const [isTextSent, setIsTextSent] = useState(false)
@@ -27,6 +27,9 @@ export function TextShare() {
       // Otherwise, set mode to 'text'
       if (files.length === 0) {
         setMode('text')
+        addLog(`Text message prepared (${text.length} chars)`, 'success')
+      } else {
+        addLog(`Text message will be sent with files (${text.length} chars)`, 'info')
       }
       toast.success(files.length > 0 ? 'Text will be sent with files!' : 'Text ready to share!')
     }
@@ -44,6 +47,7 @@ export function TextShare() {
 
     setIsTextSent(true) // Mark as sent
     toast.success('Text sent!')
+    addLog('Text message sent successfully', 'success')
   }
 
   const handleEditText = () => {
@@ -66,6 +70,7 @@ export function TextShare() {
     setTextContent(null)
     setMode(null)
     setIsTextSent(false)
+    addLog('Text message cleared', 'info')
   }
 
   // Show received text

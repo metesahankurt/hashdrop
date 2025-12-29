@@ -51,7 +51,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     mode, setMode, setFile,
     setError, setProgress, setIsPeerReady, setReadyToDownload,
     codeExpiry, setCodeExpiry, setFileHash,
-    setTransferStartTime, setTransferredBytes
+    setTransferStartTime, setTransferredBytes, addLog, resetPeerKeepFiles
   } = useWarpStore()
 
   const searchParams = useSearchParams()
@@ -69,6 +69,26 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   useEffect(() => {
     setCanShare(typeof navigator !== 'undefined' && !!navigator.share)
   }, [])
+
+  // Refresh code function - must be defined before useEffect that uses it
+  const refreshCode = useCallback(() => {
+    // Generate new code
+    const newDisplayCode = generateSecureCode()
+    const newPeerId = codeToPeerId(newDisplayCode)
+    const newExpiry = Date.now() + CODE_EXPIRY_MS
+
+    // Reset peer while keeping files
+    addLog('Refreshing connection code...', 'info')
+    resetPeerKeepFiles()
+
+    // Set new code info
+    setGeneratedInfo({ displayCode: newDisplayCode, peerId: newPeerId })
+    setCodeExpiry(newExpiry)
+    setShowQR(false)
+
+    toast.success('New code generated! Peer connection reset.')
+    addLog(`New code generated: ${newDisplayCode}`, 'success')
+  }, [addLog, resetPeerKeepFiles, setCodeExpiry])
 
   // Generate code and set expiry on mount
   useEffect(() => {
@@ -121,19 +141,16 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       if (remaining <= 0) {
         setTimeLeft(0)
         toast.error('Code expired! Generating new code...')
-        // Generate new code
-        const displayCode = generateSecureCode()
-        const peerId = codeToPeerId(displayCode)
-        const expiry = Date.now() + CODE_EXPIRY_MS
-        setGeneratedInfo({ displayCode, peerId })
-        setCodeExpiry(expiry)
+        addLog('Code expired, generating new code...', 'warning')
+        // Generate new code using refresh function
+        refreshCode()
       } else {
         setTimeLeft(Math.ceil(remaining / 1000)) // seconds
       }
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [codeExpiry, setCodeExpiry])
+  }, [codeExpiry, setCodeExpiry, addLog, refreshCode])
 
   const displayCode = generatedInfo?.displayCode || ''
   const peerId = generatedInfo?.peerId
@@ -165,6 +182,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         setStatus('completed')
         toast.success('Text received!')
         notifyTextReceived(textData.content)
+        useWarpStore.getState().addLog(`Text message received (${textData.content.length} chars)`, 'success')
         return
       }
 
@@ -172,6 +190,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       if (textData.hasFile === true) {
         console.log('[Receive] Text stored, waiting for file...')
         toast.info('Text received, waiting for file...')
+        useWarpStore.getState().addLog('Text message received, waiting for file...', 'info')
         // Don't return - continue to process file-meta
       }
     }
@@ -217,6 +236,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       setTransferredBytes(0)
 
       toast.info(`Receiving: ${data.name}\nHash: ${formatHashPreview(data.hash)}`)
+      useWarpStore.getState().addLog(`Receiving file: ${data.name} (${(data.size / (1024 * 1024)).toFixed(2)} MB)`, 'info')
     }
     // 2. Handle Chunk
     else if (
@@ -281,13 +301,14 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     }
     // 4. Handle Handshake
     else if (
-        data && 
-        typeof data === 'object' && 
-        'type' in data && 
+        data &&
+        typeof data === 'object' &&
+        'type' in data &&
         (data as Record<string, unknown>).type === 'ready'
     ) {
         console.log('[Receive] Peer is ready')
         setIsPeerReady(true)
+        useWarpStore.getState().addLog('Peer is ready to transfer', 'success')
     }
   }, [setMode, setFile, setProgress, setStatus, setIsPeerReady, setFileHash])
 
@@ -312,17 +333,19 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           toast.info('Verifying file integrity...')
           
           const calculatedHash = await calculateFileHash(file)
-          
+
           if (calculatedHash !== meta.hash) {
             console.error('[HashDrop] Hash mismatch detected')
             toast.error('⚠️ File integrity check failed')
             toast.warning('File may be corrupted. Download with caution.')
-            
+            useWarpStore.getState().addLog('File integrity check failed - Hash mismatch', 'error')
+
             setReadyToDownload(file)
             setError('Hash verification failed')
           } else {
             console.log('[HashDrop] ✅ File verified')
             toast.success('✅ File verified!')
+            useWarpStore.getState().addLog('File integrity verified successfully', 'success')
             setReadyToDownload(file)
           }
           
@@ -351,6 +374,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     setHasActiveConnection(true)
     toast.success('Warp Link Established!')
     notifyConnectionEstablished()
+    addLog('Connection established with peer', 'success')
 
     // Handshake: Announce we are ready to receive data
     // Both sides do this, ensuring the pipe is open
@@ -364,6 +388,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       setStatus('idle')
       setHasActiveConnection(false)
       toast.info('Connection Closed')
+      addLog('Connection closed', 'info')
       setReceivedChunks([])
       setReceivedSize(0)
       setIsPeerReady(false)
@@ -377,8 +402,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           description: errorInfo.description,
           duration: errorInfo.duration
         })
+        addLog(`Connection error: ${errorInfo.title}`, 'error')
     })
-  }, [setConn, setStatus, handleReceiveData, setIsPeerReady])
+  }, [setConn, setStatus, handleReceiveData, setIsPeerReady, addLog])
   
   // Clean up Peer on unmount
   useEffect(() => {
@@ -432,7 +458,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           clearTimeout(connectionTimeout)
           setMyId(id)
           setPeer(newPeer)
-          // Silent success - no toast spam
+          addLog('Network initialized successfully', 'success')
         })
 
         newPeer.on('connection', (conn) => {
@@ -457,12 +483,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
           if (err.type === 'unavailable-id') {
             toast.error('Code already in use. Generating new code...')
-            const newCode = generateSecureCode()
-            const newPeerId = codeToPeerId(newCode)
-            setGeneratedInfo({ displayCode: newCode, peerId: newPeerId })
+            addLog('Code already in use, generating new code', 'warning')
+            // Use refreshCode to properly reset peer
+            refreshCode()
           } else if (err.type === 'network') {
             // Don't show error toast immediately - let timeout handle it
             console.error('[Peer] Network error, will retry if needed')
+            addLog('Network error detected, attempting retry', 'warning')
           } else {
             // Only show error for non-network issues
             if (retryCount >= MAX_RETRIES) {
@@ -471,6 +498,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
                 description: errorInfo.description,
                 duration: errorInfo.duration
               })
+              addLog(`Network initialization failed: ${errorInfo.title}`, 'error')
             }
           }
 
@@ -505,9 +533,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const connect = (targetCode: string) => {
     if (!peer) {
       toast.error('Initializing connection... Please wait a moment.')
+      addLog('Network not ready, please wait', 'warning')
       return
     }
     setStatus('connecting')
+    addLog(`Connecting to peer: ${targetCode}`, 'info')
 
     // Normalize code input to ID
     const targetId = `sr-warp-${targetCode.trim().toLowerCase()}`
@@ -526,6 +556,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           description: 'Could not reach the other peer. Make sure they are online and try again.',
           duration: 6000
         })
+        addLog('Connection timeout - peer unreachable', 'error')
       }
     }, 15000)
 
@@ -543,6 +574,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         description: errorInfo.description,
         duration: errorInfo.duration
       })
+      addLog(`Connection failed: ${errorInfo.title}`, 'error')
     })
   }
   
@@ -620,17 +652,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
                 <QrCode className={`w-4 h-4 ${showQR ? 'text-primary' : 'text-muted hover:text-foreground'}`} />
               </button>
               <button
-                onClick={() => {
-                  const displayCode = generateSecureCode()
-                  const peerId = codeToPeerId(displayCode)
-                  const expiry = Date.now() + CODE_EXPIRY_MS
-                  setGeneratedInfo({ displayCode, peerId })
-                  setCodeExpiry(expiry)
-                  setShowQR(false)
-                  toast.success('New code generated!')
-                }}
+                onClick={refreshCode}
                 className="p-1.5 hover:bg-white/10 rounded-md transition-all"
-                title="Generate new code"
+                title="Generate new code and reset connection"
               >
                 <RefreshCw className="w-4 h-4 text-muted hover:text-foreground" />
               </button>
