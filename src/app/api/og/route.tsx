@@ -5,7 +5,18 @@ export const runtime = 'edge';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const code = searchParams.get('code');
+  const rawCode = searchParams.get('code');
+
+  // SECURITY: Validate and sanitize code parameter
+  let code: string | null = null;
+  if (rawCode) {
+    // Only allow alphanumeric and hyphens, max 50 chars
+    const sanitized = rawCode.replace(/[^a-zA-Z0-9-]/g, '').slice(0, 50);
+    // Validate format: Word-Word
+    if (/^[A-Za-z]+-[A-Za-z]+$/.test(sanitized)) {
+      code = sanitized;
+    }
+  }
 
   const isTransferShare = !!code;
 
