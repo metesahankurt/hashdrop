@@ -59,24 +59,31 @@ export async function GET() {
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            zIndex: 10,
+            zIndex: 1,
           }}
         >
-          {/* Logo */}
+          {/* Logo - Drop with # */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '32px',
+              position: 'relative',
+              width: '120px',
+              height: '120px',
             }}
           >
+            {/* Drop shape background */}
             <svg
               width="120"
               height="120"
               viewBox="0 0 200 200"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
+              style={{
+                position: 'absolute',
+              }}
             >
               <defs>
                 <linearGradient id="dropGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -89,17 +96,20 @@ export async function GET() {
                 fill="url(#dropGradient)"
                 opacity="0.95"
               />
-              <text
-                x="100"
-                y="140"
-                fontSize="90"
-                fill="white"
-                textAnchor="middle"
-                fontWeight="700"
-              >
-                #
-              </text>
             </svg>
+            {/* # symbol as HTML */}
+            <div
+              style={{
+                display: 'flex',
+                fontSize: '72px',
+                fontWeight: 900,
+                color: 'white',
+                position: 'relative',
+                marginTop: '8px',
+              }}
+            >
+              #
+            </div>
           </div>
 
           {/* Title */}
