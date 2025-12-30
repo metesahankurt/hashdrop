@@ -30,6 +30,7 @@ A **secure, peer-to-peer file transfer application** built with Next.js and WebR
 ### 🎨 **User Experience**
 - **Human-Readable Codes**: Easy-to-share transfer codes (e.g., "Cosmic-Falcon")
 - **QR Code Sharing**: Instant connection via QR code scanning
+- **Dynamic OG Images**: Beautiful link previews with transfer codes for Discord, Twitter, etc.
 - **Auto-Copy Toggle**: Optional clipboard auto-copy (privacy-first)
 - **Transfer History**: Track your recent transfers with statistics
 - **Image Preview**: Preview images before downloading
@@ -52,6 +53,8 @@ A **secure, peer-to-peer file transfer application** built with Next.js and WebR
 ✅ **Duplicate Chunk Detection**: Protects against data corruption attacks
 ✅ **File Size Limits**: 10GB maximum file size to prevent DoS
 ✅ **Chunk Count Limits**: Maximum 1M chunks to prevent memory exhaustion
+✅ **Input Validation**: All user inputs sanitized and validated (XSS protection)
+✅ **OG Image Security**: Transfer code parameters validated in Open Graph images
 
 ### **Privacy-First Design**
 ✅ **Auto-Copy Disabled by Default**: Clipboard permission only requested when user enables it
@@ -140,6 +143,8 @@ hashdrop/
 │   ├── app/                          # Next.js App Router
 │   │   ├── layout.tsx               # Root layout with metadata
 │   │   ├── page.tsx                 # Home page
+│   │   ├── api/
+│   │   │   └── og/                  # Open Graph image generation
 │   │   ├── privacy/                 # Privacy policy page
 │   │   └── terms/                   # Terms of service page
 │   │
