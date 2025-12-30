@@ -15,12 +15,56 @@ import { StatisticsDashboard } from '@/components/ui/statistics-dashboard'
 import { ConsoleDisplay } from '@/components/ui/console-display'
 import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
+import { useSearchParams } from 'next/navigation'
 
 export default function Home() {
+  const searchParams = useSearchParams()
+  const transferCode = searchParams.get('code')
   const { status, file, addLog } = useWarpStore()
   const [showHistory, setShowHistory] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showStats, setShowStats] = useState(false)
+
+  // Update OG meta tags dynamically when transfer code is present
+  useEffect(() => {
+    if (transferCode) {
+      // Update OG image
+      let ogImage = document.querySelector('meta[property="og:image"]') as HTMLMetaElement
+      if (ogImage) {
+        ogImage.content = `/api/og?code=${transferCode}`
+      }
+
+      // Update Twitter image
+      let twitterImage = document.querySelector('meta[name="twitter:image"]') as HTMLMetaElement
+      if (twitterImage) {
+        twitterImage.content = `/api/og?code=${transferCode}`
+      }
+
+      // Update OG title
+      let ogTitle = document.querySelector('meta[property="og:title"]') as HTMLMetaElement
+      if (ogTitle) {
+        ogTitle.content = `Join Transfer: ${transferCode} | HashDrop`
+      }
+
+      // Update Twitter title
+      let twitterTitle = document.querySelector('meta[name="twitter:title"]') as HTMLMetaElement
+      if (twitterTitle) {
+        twitterTitle.content = `Join Transfer: ${transferCode} | HashDrop`
+      }
+
+      // Update OG description
+      let ogDesc = document.querySelector('meta[property="og:description"]') as HTMLMetaElement
+      if (ogDesc) {
+        ogDesc.content = `Click to join this secure P2P file transfer. Code: ${transferCode}`
+      }
+
+      // Update Twitter description
+      let twitterDesc = document.querySelector('meta[name="twitter:description"]') as HTMLMetaElement
+      if (twitterDesc) {
+        twitterDesc.content = `Click to join this secure P2P file transfer. Code: ${transferCode}`
+      }
+    }
+  }, [transferCode])
 
   // Add initial log message on mount
   useEffect(() => {
