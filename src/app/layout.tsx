@@ -70,12 +70,19 @@ export const metadata: Metadata = {
     url: 'https://hashdrop.metesahankurt.cloud',
     images: [
       {
-        url: '/hashdrop-logo.png',
+        url: '/api/og',
         width: 1200,
         height: 630,
         alt: 'HashDrop - Secure P2P File Transfer',
       }
     ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'HashDrop | Secure P2P File Transfer',
+    description: 'Share files directly between devices with lightspeed. No cloud, no limits. Powered by WebRTC.',
+    images: ['/api/og'],
+    creator: '@metesahankurt',
   },
   robots: {
     index: true,
