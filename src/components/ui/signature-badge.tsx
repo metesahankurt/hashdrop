@@ -3,7 +3,7 @@
 export function SignatureBadge() {
   return (
     <a
-      href="https://github.com/metesahankurt"
+      href="https://github.com/metesahankurt/hashdrop"
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-2 group"
