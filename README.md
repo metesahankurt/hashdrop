@@ -8,6 +8,8 @@ A **secure, peer-to-peer file transfer application** built with Next.js and WebR
 
 ---
 
+<img width="1582" height="960" alt="Screenshot 2026-01-10 at 17 23 39" src="https://github.com/user-attachments/assets/b9e1b76d-7ffa-4854-8d49-c4c197cd06ab" />
+
 ## ✨ Features
 
 ### 🔒 **Security & Privacy**
