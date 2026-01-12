@@ -67,7 +67,9 @@ A **secure, peer-to-peer file transfer application** built with Next.js and WebR
 
 ### **Privacy-First Design**
 ✅ **Auto-Copy Disabled by Default**: Clipboard permission only requested when user enables it
+
 ✅ **Transparent Security**: Detailed "How Does It Work?" section educates users
+
 ✅ **Warning Messages**: Clear warnings about code sharing best practices
 
 ---
