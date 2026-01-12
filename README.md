@@ -50,12 +50,19 @@ A **secure, peer-to-peer file transfer application** built with Next.js and WebR
 ## 🛡️ Security Enhancements (Latest)
 
 ### **Critical Security Fixes**
+
 ✅ **Multi-Connection Prevention**: Only the first peer can connect, preventing unauthorized access
+
 ✅ **Enhanced Code Entropy**: 6,400 possible combinations (80×80) vs previous 1,600
+
 ✅ **Duplicate Chunk Detection**: Protects against data corruption attacks
+
 ✅ **File Size Limits**: 10GB maximum file size to prevent DoS
+
 ✅ **Chunk Count Limits**: Maximum 1M chunks to prevent memory exhaustion
+
 ✅ **Input Validation**: All user inputs sanitized and validated (XSS protection)
+
 ✅ **OG Image Security**: Transfer code parameters validated in Open Graph images
 
 ### **Privacy-First Design**
