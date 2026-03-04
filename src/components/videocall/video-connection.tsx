@@ -160,8 +160,9 @@ export function VideoConnection() {
         setLocalStream(stream)
 
         // Create peer
+        console.log('[VideoCall] Creating peer with ID:', peerId)
         const newPeer = new Peer(peerId, {
-          debug: 0,
+          debug: 2,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },

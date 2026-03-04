@@ -420,8 +420,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       try {
         // Use default PeerJS configuration (no custom server)
         // This will use PeerJS's built-in server selection
+        console.log('[FileTransfer] Creating peer with ID:', peerId)
         const newPeer = new Peer(peerId, {
-          debug: 0,
+          debug: 2,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
