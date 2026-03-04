@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2 } from 'lucide-react'
@@ -88,6 +88,13 @@ export function VideoConnection() {
   const [codeExpiry, setCodeExpiry] = useState<number | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [canShare, setCanShare] = useState(false)
+  const mountedRef = useRef(true)
+
+  // Track component unmount
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     setCanShare(typeof navigator !== 'undefined' && !!navigator.share)
@@ -146,15 +153,13 @@ export function VideoConnection() {
   useEffect(() => {
     if (!peerId || peer) return
 
-    let mounted = true
-
     const initPeer = async () => {
       try {
         // Get local media first
         console.log('[VideoCall] Step 1: Requesting camera/mic access...')
         setCallStatus('generating')
         const stream = await getLocalMediaStream()
-        if (!mounted) {
+        if (!mountedRef.current) {
           stopMediaStream(stream)
           return
         }
@@ -190,7 +195,7 @@ export function VideoConnection() {
           if (!newPeer.id) {
             console.error('[VideoCall] TIMEOUT: Peer never connected to signaling server after 30s')
             newPeer.destroy()
-            if (mounted) {
+            if (mountedRef.current) {
               toast.error('Could not connect to network. Please refresh.')
               setCallStatus('failed')
             }
@@ -199,7 +204,7 @@ export function VideoConnection() {
 
         newPeer.on('open', (id) => {
           clearTimeout(connectionTimeout)
-          if (!mounted) return
+          if (!mountedRef.current) return
           console.log('[VideoCall] Step 4: CONNECTED to signaling server! Peer ID:', id)
           setPeer(newPeer)
           setCallStatus('ready')
@@ -208,7 +213,7 @@ export function VideoConnection() {
         // Handle incoming calls
         newPeer.on('call', (call) => {
           console.log('[VideoCall] Step 5: INCOMING CALL from:', call.peer)
-          if (!mounted) return
+          if (!mountedRef.current) return
           setCallStatus('ringing')
 
           // Answer with local stream
@@ -223,7 +228,7 @@ export function VideoConnection() {
 
           call.on('stream', (remoteStream) => {
             console.log('[VideoCall] Step 8: GOT REMOTE STREAM! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
-            if (!mounted) return
+            if (!mountedRef.current) return
             if (call.peerConnection) {
               rebuildRemoteStreams(call.peerConnection)
             } else {
@@ -251,7 +256,7 @@ export function VideoConnection() {
 
           call.on('close', () => {
             console.log('[VideoCall] Call closed (receiver side)')
-            if (!mounted) return
+            if (!mountedRef.current) return
             setRemoteCameraStream(null)
             setRemoteScreenStream(null)
             setCallStatus('ended')
@@ -260,7 +265,7 @@ export function VideoConnection() {
 
           call.on('error', (err) => {
             console.error('[VideoCall] Call error (receiver):', err.type, err.message)
-            if (!mounted) return
+            if (!mountedRef.current) return
             setCallStatus('failed')
             const errorInfo = formatErrorForToast(err, 'call-failed')
             toast.error(errorInfo.title, { description: errorInfo.description })
@@ -269,7 +274,7 @@ export function VideoConnection() {
 
         newPeer.on('error', (err) => {
           clearTimeout(connectionTimeout)
-          if (!mounted) return
+          if (!mountedRef.current) return
           console.error('[VideoCall] PEER ERROR:', err.type, err.message)
 
           if (err.type === 'unavailable-id') {
@@ -291,7 +296,7 @@ export function VideoConnection() {
         })
 
       } catch (err) {
-        if (!mounted) return
+        if (!mountedRef.current) return
         console.error('[VideoCall] Media access error:', err)
         toast.error('Camera/microphone access denied', {
           description: 'Please allow camera and microphone access in your browser settings.'
@@ -303,7 +308,7 @@ export function VideoConnection() {
     initPeer()
 
     return () => {
-      mounted = false
+      // Don't set mountedRef.current = false here - it's managed by the separate unmount effect
     }
   }, [peerId, peer, setPeer, setCallStatus, setLocalStream, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, refreshCode, rebuildRemoteStreams, buildOutgoingStream])
 
