@@ -149,6 +149,37 @@ export function VideoConnection() {
     return () => clearInterval(interval)
   }, [codeExpiry, refreshCode])
 
+  // Helper: finalize call connection from ontrack (bypasses broken PeerJS stream event)
+  const finalizeConnection = useCallback((call: ReturnType<Peer['call']>, side: string) => {
+    const connectedRef = { done: false }
+
+    const tryFinalize = () => {
+      if (connectedRef.done || !mountedRef.current) return false
+      if (!call.peerConnection) return false
+
+      const receivers = call.peerConnection.getReceivers()
+      const hasVideo = receivers.some(r => r.track?.kind === 'video')
+      const hasAudio = receivers.some(r => r.track?.kind === 'audio')
+
+      console.log(`[VideoCall] ${side} tryFinalize: video=${hasVideo} audio=${hasAudio}`)
+
+      if (hasVideo || hasAudio) {
+        connectedRef.done = true
+        console.log(`[VideoCall] ${side}: CONNECTED via ontrack!`)
+        rebuildRemoteStreams(call.peerConnection)
+        setCallStatus('connected')
+        setCallStartTime(Date.now())
+        setMediaConnection(call)
+        toast.success('Call connected!')
+        return true
+      }
+
+      return false
+    }
+
+    return { tryFinalize, connectedRef }
+  }, [rebuildRemoteStreams, setCallStatus, setCallStartTime, setMediaConnection])
+
   // Initialize media and Peer
   useEffect(() => {
     if (!peerId || peer) return
@@ -226,9 +257,14 @@ export function VideoConnection() {
             console.error('[VideoCall] ERROR: No outgoing stream to answer with!')
           }
 
+          // Use ontrack-based finalization (bypasses broken PeerJS stream event)
+          const { tryFinalize, connectedRef } = finalizeConnection(call, 'RECEIVER')
+
+          // Keep PeerJS stream event as fallback
           call.on('stream', (remoteStream) => {
-            console.log('[VideoCall] Step 8: GOT REMOTE STREAM! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
-            if (!mountedRef.current) return
+            console.log('[VideoCall] Step 8: GOT REMOTE STREAM (PeerJS)! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
+            if (connectedRef.done || !mountedRef.current) return
+            connectedRef.done = true
             if (call.peerConnection) {
               rebuildRemoteStreams(call.peerConnection)
             } else {
@@ -243,11 +279,16 @@ export function VideoConnection() {
 
           if (call.peerConnection) {
             call.peerConnection.ontrack = (event) => {
-              console.log('[VideoCall] ontrack event:', event.track.kind, event.track.label)
-              rebuildRemoteStreams(call.peerConnection)
+              console.log('[VideoCall] RECEIVER ontrack:', event.track.kind, event.track.label)
+              tryFinalize()
             }
             call.peerConnection.oniceconnectionstatechange = () => {
-              console.log('[VideoCall] ICE state (receiver):', call.peerConnection.iceConnectionState)
+              const state = call.peerConnection.iceConnectionState
+              console.log('[VideoCall] ICE state (receiver):', state)
+              if (state === 'connected' || state === 'completed') {
+                // ICE connected - try to finalize if we have tracks
+                tryFinalize()
+              }
             }
             call.peerConnection.onconnectionstatechange = () => {
               console.log('[VideoCall] Connection state (receiver):', call.peerConnection.connectionState)
@@ -310,7 +351,7 @@ export function VideoConnection() {
     return () => {
       // Don't set mountedRef.current = false here - it's managed by the separate unmount effect
     }
-  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, refreshCode, rebuildRemoteStreams, buildOutgoingStream])
+  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, refreshCode, rebuildRemoteStreams, buildOutgoingStream, finalizeConnection])
 
   // Connect to peer (caller)
   const connectToCall = useCallback((targetCode: string) => {
@@ -348,8 +389,12 @@ export function VideoConnection() {
 
     console.log('[VideoCall] CALLER: Call initiated, waiting for response...')
 
+    // Use ontrack-based finalization (bypasses broken PeerJS stream event)
+    const { tryFinalize, connectedRef } = finalizeConnection(call, 'CALLER')
+
     // Connection timeout
     const callTimeout = setTimeout(() => {
+      if (connectedRef.done) return
       console.error('[VideoCall] CALLER: TIMEOUT after 30s - no stream received')
       call.close()
       setCallStatus('failed')
@@ -359,9 +404,12 @@ export function VideoConnection() {
       })
     }, 30000)
 
+    // Keep PeerJS stream event as fallback
     call.on('stream', (remoteStream) => {
-      console.log('[VideoCall] CALLER: GOT REMOTE STREAM! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
+      console.log('[VideoCall] CALLER: GOT REMOTE STREAM (PeerJS)! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
       clearTimeout(callTimeout)
+      if (connectedRef.done) return
+      connectedRef.done = true
       if (call.peerConnection) {
         rebuildRemoteStreams(call.peerConnection)
       } else {
@@ -377,10 +425,18 @@ export function VideoConnection() {
     if (call.peerConnection) {
       call.peerConnection.ontrack = (event) => {
         console.log('[VideoCall] CALLER ontrack:', event.track.kind, event.track.label)
-        rebuildRemoteStreams(call.peerConnection)
+        if (tryFinalize()) {
+          clearTimeout(callTimeout)
+        }
       }
       call.peerConnection.oniceconnectionstatechange = () => {
-        console.log('[VideoCall] CALLER ICE state:', call.peerConnection.iceConnectionState)
+        const state = call.peerConnection.iceConnectionState
+        console.log('[VideoCall] CALLER ICE state:', state)
+        if (state === 'connected' || state === 'completed') {
+          if (tryFinalize()) {
+            clearTimeout(callTimeout)
+          }
+        }
       }
       call.peerConnection.onconnectionstatechange = () => {
         console.log('[VideoCall] CALLER Connection state:', call.peerConnection.connectionState)
@@ -406,7 +462,7 @@ export function VideoConnection() {
       const errorInfo = formatErrorForToast(err, 'call-failed')
       toast.error(errorInfo.title, { description: errorInfo.description })
     })
-  }, [peer, setCallStatus, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, rebuildRemoteStreams, buildOutgoingStream])
+  }, [peer, setCallStatus, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, rebuildRemoteStreams, buildOutgoingStream, finalizeConnection])
 
   const copyCode = () => {
     navigator.clipboard.writeText(displayCode)
