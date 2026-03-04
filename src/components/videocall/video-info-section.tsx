@@ -1,63 +1,63 @@
 'use client'
 
-import { Shield, Zap, Lock, FileCheck, Users, Server, Eye, CloudOff } from 'lucide-react'
+import { Shield, Zap, Lock, Video, Users, Server, Eye, CloudOff } from 'lucide-react'
 
 const features = [
   {
     icon: Zap,
-    title: 'Lightning Fast',
-    description: 'Direct peer-to-peer transfer with no intermediary servers'
+    title: 'Zero Latency',
+    description: 'Direct peer-to-peer connection for real-time video without delay'
   },
   {
     icon: Shield,
     title: 'Privacy First',
-    description: 'Files never touch our servers or the cloud'
+    description: 'Your video and audio never pass through any server'
   },
   {
     icon: Lock,
     title: 'End-to-End Encrypted',
-    description: 'WebRTC provides automatic DTLS/SRTP encryption'
+    description: 'WebRTC provides automatic DTLS/SRTP encryption for all media'
   },
   {
-    icon: FileCheck,
-    title: 'Integrity Verified',
-    description: 'SHA-256 hashing ensures file authenticity'
+    icon: Video,
+    title: 'HD Quality',
+    description: 'Up to 720p video with echo cancellation and noise suppression'
   }
 ]
 
 const securityFeatures = [
   {
     icon: Users,
-    title: 'Only You & Recipient',
-    description: 'Only the person with the unique code can access your file. No third-party can intercept the transfer.'
+    title: 'Only You & The Other Person',
+    description: 'Only the person with the unique code can join your call. No third-party can listen in.'
   },
   {
     icon: CloudOff,
-    title: 'No Cloud Storage',
-    description: 'Your files are never uploaded to any server. They go directly from your device to the recipient.'
+    title: 'No Recording',
+    description: 'Your calls are never recorded or stored on any server. Everything stays between you and the other person.'
   },
   {
     icon: Eye,
     title: 'No Tracking',
-    description: "We don't log, track, or store any information about your transfers. Complete anonymity guaranteed."
+    description: "We don't log, track, or store any information about your calls. Complete anonymity guaranteed."
   },
   {
     icon: Server,
-    title: 'Serverless Transfer',
-    description: "Files travel through encrypted WebRTC data channels. Even we can't see what you're sharing."
+    title: 'Serverless Calls',
+    description: "Video and audio travel through encrypted WebRTC media channels. Even we can't see or hear your conversation."
   }
 ]
 
-export function InfoSection() {
+export function VideoInfoSection() {
   return (
     <section className="w-full max-w-5xl mx-auto px-4 py-16 md:py-20">
       {/* Section Header */}
       <div className="text-center mb-12 md:mb-16">
         <h2 className="text-3xl md:text-4xl font-semibold text-foreground mb-3">
-          Why HashDrop?
+          Why HashDrop Video?
         </h2>
         <p className="text-base md:text-lg text-muted max-w-2xl mx-auto">
-          Built on modern web technologies for secure, private file sharing
+          Built on WebRTC for secure, private peer-to-peer video calls
         </p>
       </div>
 
@@ -95,21 +95,21 @@ export function InfoSection() {
             <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary font-semibold text-xs">
               1
             </div>
-            <span>Choose your file</span>
+            <span>Get your code</span>
           </div>
           <div className="hidden md:block w-8 h-px bg-border"></div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary font-semibold text-xs">
               2
             </div>
-            <span>Share the code</span>
+            <span>Share with the other person</span>
           </div>
           <div className="hidden md:block w-8 h-px bg-border"></div>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary font-semibold text-xs">
               3
             </div>
-            <span>Transfer complete!</span>
+            <span>Start talking!</span>
           </div>
         </div>
       </div>
@@ -121,7 +121,7 @@ export function InfoSection() {
             Your Privacy Matters
           </h2>
           <p className="text-base text-muted max-w-2xl mx-auto">
-            HashDrop is designed with privacy and security at its core. Here&apos;s how we protect your files.
+            HashDrop Video is designed with privacy and security at its core. Here&apos;s how we protect your calls.
           </p>
         </div>
 
@@ -149,7 +149,7 @@ export function InfoSection() {
         </div>
       </div>
 
-      {/* How We Do It Section */}
+      {/* How Does It Work - Detailed */}
       <div className="mt-12 md:mt-16 glass-card p-6 md:p-8 rounded-xl">
         <h3 className="text-xl md:text-2xl font-semibold text-foreground mb-5 text-center">
           How Does It Work?
@@ -161,7 +161,7 @@ export function InfoSection() {
               1
             </div>
             <p className="leading-relaxed">
-              <span className="font-semibold text-foreground">Peer-to-Peer Connection:</span> When you upload a file, we create a unique code. This code is the only way to access your file - no one else can join the transfer.
+              <span className="font-semibold text-foreground">Peer-to-Peer Connection:</span> When you start a call, we generate a unique code. This code is the only way to join your call - no one else can connect.
             </p>
           </div>
 
@@ -170,7 +170,7 @@ export function InfoSection() {
               2
             </div>
             <p className="leading-relaxed">
-              <span className="font-semibold text-foreground">Direct Transfer:</span> Your file travels directly from your device to the recipient&apos;s device using WebRTC technology. It never passes through our servers or any cloud storage.
+              <span className="font-semibold text-foreground">Direct Media Stream:</span> Your video and audio travel directly from your device to the other person&apos;s device using WebRTC technology. It never passes through our servers.
             </p>
           </div>
 
@@ -179,7 +179,7 @@ export function InfoSection() {
               3
             </div>
             <p className="leading-relaxed">
-              <span className="font-semibold text-foreground">Encrypted Channels:</span> All data is automatically encrypted using WebRTC&apos;s built-in DTLS/SRTP encryption. Even if someone intercepts the connection, they cannot read the data.
+              <span className="font-semibold text-foreground">Encrypted Channels:</span> All media is automatically encrypted using WebRTC&apos;s built-in DTLS/SRTP encryption. Even if someone intercepts the connection, they cannot see or hear anything.
             </p>
           </div>
 
@@ -188,23 +188,14 @@ export function InfoSection() {
               4
             </div>
             <p className="leading-relaxed">
-              <span className="font-semibold text-foreground">File Verification:</span> We calculate a SHA-256 hash of your file before and after transfer. This ensures the file has not been tampered with or corrupted during transmission.
-            </p>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center text-primary font-semibold text-xs shrink-0 mt-0.5">
-              5
-            </div>
-            <p className="leading-relaxed">
-              <span className="font-semibold text-foreground">Zero Data Retention:</span> Once the transfer is complete, no trace remains. We do not store files, metadata, or transfer logs. It&apos;s as if the transfer never happened.
+              <span className="font-semibold text-foreground">Zero Data Retention:</span> Once the call ends, no trace remains. We do not record, store, or log any audio or video data. It&apos;s as if the call never happened.
             </p>
           </div>
         </div>
 
         <div className="mt-6 p-4 rounded-lg bg-warning/5 border border-warning/20">
           <p className="text-sm text-foreground/80 leading-relaxed text-center">
-            <span className="font-semibold text-warning">Important:</span> Keep your transfer code private! Anyone with the code can access the file. Share it only through secure channels (WhatsApp, Signal, email, etc.) with the intended recipient.
+            <span className="font-semibold text-warning">Important:</span> Keep your call code private! Anyone with the code can join your call. Share it only through secure channels with the intended person.
           </p>
         </div>
       </div>

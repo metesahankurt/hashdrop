@@ -1,193 +1,62 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Suspense, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { MinimalHeader } from "@/components/layout/minimal-header";
 import { SignatureBadge } from "@/components/ui/signature-badge";
-import { WarpDropzone } from "@/components/transfer/warp-dropzone";
-import { ConnectionManager } from "@/components/transfer/connection-manager";
-import { TransferStatus } from "@/components/transfer/transfer-status";
-import { TextShare } from "@/components/transfer/text-share";
-import { InfoSection } from "@/components/ui/info-section";
-import { TransferHistory } from "@/components/ui/transfer-history";
-import { KeyboardShortcutsModal } from "@/components/ui/keyboard-shortcuts-modal";
-import { StatisticsDashboard } from "@/components/ui/statistics-dashboard";
-import { ConsoleDisplay } from "@/components/ui/console-display";
-import { useWarpStore } from "@/store/use-warp-store";
-import { heroVariants } from "@/lib/animations";
+import { WelcomeScreen } from "@/components/welcome/welcome-screen";
+import { TransferView } from "@/components/transfer/transfer-view";
+import { VideoCallView } from "@/components/videocall/video-call-view";
+import { useAppStore } from "@/store/use-app-store";
 import { useSearchParams } from "next/navigation";
 
-function HomeContent() {
+const pageTransition = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.3 } },
+  exit: { opacity: 0, transition: { duration: 0.2 } },
+};
+
+function AppContent() {
   const searchParams = useSearchParams();
-  const transferCode = searchParams.get("code");
-  const { status, file, addLog } = useWarpStore();
-  const [showHistory, setShowHistory] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showStats, setShowStats] = useState(false);
+  const { appMode, setAppMode } = useAppStore();
 
-  // Update OG meta tags dynamically when transfer code is present
+  // Auto-navigate based on URL params
   useEffect(() => {
-    if (transferCode) {
-      // Update OG image
-      const ogImage = document.querySelector(
-        'meta[property="og:image"]'
-      ) as HTMLMetaElement;
-      if (ogImage) {
-        ogImage.content = `/api/og?code=${transferCode}`;
-      }
+    const code = searchParams.get("code");
+    const mode = searchParams.get("mode");
 
-      // Update Twitter image
-      const twitterImage = document.querySelector(
-        'meta[name="twitter:image"]'
-      ) as HTMLMetaElement;
-      if (twitterImage) {
-        twitterImage.content = `/api/og?code=${transferCode}`;
-      }
-
-      // Update OG title
-      const ogTitle = document.querySelector(
-        'meta[property="og:title"]'
-      ) as HTMLMetaElement;
-      if (ogTitle) {
-        ogTitle.content = `Join Transfer: ${transferCode} | HashDrop`;
-      }
-
-      // Update Twitter title
-      const twitterTitle = document.querySelector(
-        'meta[name="twitter:title"]'
-      ) as HTMLMetaElement;
-      if (twitterTitle) {
-        twitterTitle.content = `Join Transfer: ${transferCode} | HashDrop`;
-      }
-
-      // Update OG description
-      const ogDesc = document.querySelector(
-        'meta[property="og:description"]'
-      ) as HTMLMetaElement;
-      if (ogDesc) {
-        ogDesc.content = `Click to join this secure P2P file transfer. Code: ${transferCode}`;
-      }
-
-      // Update Twitter description
-      const twitterDesc = document.querySelector(
-        'meta[name="twitter:description"]'
-      ) as HTMLMetaElement;
-      if (twitterDesc) {
-        twitterDesc.content = `Click to join this secure P2P file transfer. Code: ${transferCode}`;
-      }
+    if (mode === "videocall" && appMode === "welcome") {
+      setAppMode("videocall");
+    } else if (code && appMode === "welcome") {
+      // Transfer code in URL -> go to transfer mode (default when no mode specified)
+      setAppMode("transfer");
     }
-  }, [transferCode]);
-
-  // Add initial log message on mount
-  useEffect(() => {
-    addLog("HashDrop initialized - Ready to transfer files", "success");
-  }, [addLog]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // CMD+K or Ctrl+K: Toggle Transfer History
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setShowHistory((prev) => !prev);
-      }
-
-      // CMD+S or Ctrl+S: Toggle Statistics Dashboard
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault();
-        setShowStats((prev) => !prev);
-      }
-
-      // CMD+? or Ctrl+? or Shift+?: Show Keyboard Shortcuts
-      if ((e.metaKey || e.ctrlKey || e.shiftKey) && e.key === "?") {
-        e.preventDefault();
-        setShowShortcuts((prev) => !prev);
-      }
-
-      // ESC: Close any open modal
-      if (e.key === "Escape") {
-        setShowHistory(false);
-        setShowShortcuts(false);
-        setShowStats(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [searchParams, appMode, setAppMode]);
 
   return (
     <>
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
-        {/* Fixed Minimal Header */}
-        <MinimalHeader onOpenShortcuts={() => setShowShortcuts(true)} />
+      {/* Header - hidden on welcome screen */}
+      {appMode !== "welcome" && <MinimalHeader />}
 
-        {/* Centered Main Content */}
-        <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-center gap-12 md:gap-16">
-          {/* Hero Section - Clean & Minimal */}
-          <AnimatePresence mode="wait">
-            {status === "idle" && !file && (
-              <motion.div
-                key="hero"
-                variants={heroVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="text-center space-y-4 md:space-y-5"
-              >
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
-                  Share files at{" "}
-                  <span className="text-primary font-bold">lightspeed</span>
-                </h1>
-                <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
-                  Secure peer-to-peer transfer. No cloud. No limits.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {appMode === "welcome" && (
+          <motion.div key="welcome" {...pageTransition}>
+            <WelcomeScreen />
+          </motion.div>
+        )}
 
-          {/* Interactive Components - Clean Spacing */}
-          <div className="w-full space-y-4">
-            <ConsoleDisplay />
-            <WarpDropzone />
-            <TextShare />
-            <Suspense
-              fallback={
-                <div className="text-center text-muted text-sm py-4">
-                  Loading...
-                </div>
-              }
-            >
-              <ConnectionManager
-                onOpenHistory={() => setShowHistory(true)}
-                onOpenStats={() => setShowStats(true)}
-              />
-            </Suspense>
-            <TransferStatus />
-          </div>
-        </div>
-      </div>
+        {appMode === "transfer" && (
+          <motion.div key="transfer" {...pageTransition}>
+            <TransferView />
+          </motion.div>
+        )}
 
-      {/* Informational Section */}
-      <InfoSection />
-
-      {/* Transfer History Modal */}
-      <TransferHistory
-        isOpen={showHistory}
-        onClose={() => setShowHistory(false)}
-      />
-
-      {/* Statistics Dashboard Modal */}
-      <StatisticsDashboard
-        isOpen={showStats}
-        onClose={() => setShowStats(false)}
-      />
-
-      {/* Keyboard Shortcuts Modal */}
-      <KeyboardShortcutsModal
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-      />
+        {appMode === "videocall" && (
+          <motion.div key="videocall" {...pageTransition}>
+            <VideoCallView />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Fixed Footer - Bottom Left */}
       <footer className="fixed bottom-6 left-6 z-40">
@@ -199,8 +68,14 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-muted">Loading...</div></div>}>
-      <HomeContent />
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-muted">Loading...</div>
+        </div>
+      }
+    >
+      <AppContent />
     </Suspense>
   );
 }

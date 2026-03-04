@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,16 +9,9 @@ import { toast } from 'sonner'
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
-  const [autoCopyEnabled, setAutoCopyEnabled] = useState(false)
-  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(true)
-  const [errorNotificationsEnabled, setErrorNotificationsEnabled] = useState(true)
-
-  useEffect(() => {
-    const prefs = getPreferences()
-    setAutoCopyEnabled(prefs.autoCopyCode)
-    setAutoDownloadEnabled(prefs.autoDownload)
-    setErrorNotificationsEnabled(prefs.errorNotifications)
-  }, [])
+  const [autoCopyEnabled, setAutoCopyEnabled] = useState(() => getPreferences().autoCopyCode)
+  const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(() => getPreferences().autoDownload)
+  const [errorNotificationsEnabled, setErrorNotificationsEnabled] = useState(() => getPreferences().errorNotifications)
 
   return (
     <>
@@ -84,7 +77,7 @@ export function HamburgerMenu() {
                           // Test clipboard access
                           await navigator.clipboard.writeText('')
                           toast.success('✅ Auto-copy enabled', { duration: 1500 })
-                        } catch (err) {
+                        } catch {
                           toast.warning('⚠️ Auto-copy enabled, but clipboard permission denied', {
                             duration: 2500
                           })

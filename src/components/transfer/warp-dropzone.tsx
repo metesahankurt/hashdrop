@@ -1,9 +1,10 @@
 "use client"
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { motion, AnimatePresence } from 'framer-motion'
 import { File, X, Image as ImageIcon } from 'lucide-react'
+import Image from 'next/image'
 import { useWarpStore } from '@/store/use-warp-store'
 import { cn } from '@/lib/utils'
 import { UploadIllustration } from '@/components/ui/upload-illustration'
@@ -13,24 +14,25 @@ import { toast } from 'sonner'
 
 export function WarpDropzone() {
   const { files, setFiles, setMode, status, addLog } = useWarpStore()
-  const [previewUrls, setPreviewUrls] = useState<{ [key: string]: string }>({})
   const [previewFile, setPreviewFile] = useState<{ file: File; url: string } | null>(null)
 
   // Create preview URLs for image files
-  useEffect(() => {
+  const previewUrls = useMemo(() => {
     const urls: { [key: string]: string } = {}
     files.forEach((file, index) => {
       if (isImageFile(file)) {
         urls[`${file.name}-${index}`] = createImagePreviewUrl(file)
       }
     })
-    setPreviewUrls(urls)
-
-    // Cleanup URLs on unmount or when files change
-    return () => {
-      Object.values(urls).forEach(revokeImagePreviewUrl)
-    }
+    return urls
   }, [files])
+
+  // Cleanup URLs on unmount or when files change
+  useEffect(() => {
+    return () => {
+      Object.values(previewUrls).forEach(revokeImagePreviewUrl)
+    }
+  }, [previewUrls])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -195,9 +197,12 @@ export function WarpDropzone() {
                         }}
                         className="w-10 h-10 rounded-lg overflow-hidden border border-primary/20 flex-shrink-0 hover:ring-2 hover:ring-primary/50 transition-all cursor-pointer"
                       >
-                        <img
+                        <Image
                           src={previewUrl}
                           alt={file.name}
+                          width={40}
+                          height={40}
+                          unoptimized
                           className="w-full h-full object-cover"
                         />
                       </button>

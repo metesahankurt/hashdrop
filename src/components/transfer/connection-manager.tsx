@@ -116,22 +116,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-connect from URL parameter (QR code scan)
-  useEffect(() => {
-    const code = searchParams.get('code')
-    if (code && !autoConnected && peer && status === 'idle') {
-      console.log('[QR] Auto-connecting with code:', code)
-      setInputCode(code)
-      setShowReceive(true)
-      setAutoConnected(true)
-
-      // Auto-connect after a brief delay to ensure peer is ready
-      setTimeout(() => {
-        connect(code)
-      }, 1000)
-    }
-  }, [searchParams, autoConnected, peer, status])
-
   // Countdown timer for code expiry
   useEffect(() => {
     if (!codeExpiry) return
@@ -310,7 +294,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         setIsPeerReady(true)
         useWarpStore.getState().addLog('Peer is ready to transfer', 'success')
     }
-  }, [setMode, setFile, setProgress, setStatus, setIsPeerReady, setFileHash])
+  }, [receivedChunks, setMode, setFile, setMeta, setProgress, setStatus, setIsPeerReady, setFileHash, setTransferStartTime, setTransferredBytes, setError, setReceivedChunks, setReceivedSize])
 
   // Effect to track receiver progress and prepare file for download WITH HASH VERIFICATION
   useEffect(() => {
@@ -404,7 +388,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         })
         addLog(`Connection error: ${errorInfo.title}`, 'error')
     })
-  }, [setConn, setStatus, handleReceiveData, setIsPeerReady, addLog])
+  }, [setConn, setStatus, setHasActiveConnection, handleReceiveData, setIsPeerReady, addLog, setReceivedChunks, setReceivedSize])
   
   // Clean up Peer on unmount
   useEffect(() => {
@@ -527,10 +511,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     }
 
     createPeer()
-  }, [peerId, peer, handleConnection, setMyId, setPeer])
+  }, [peerId, peer, handleConnection, setMyId, setPeer, addLog, hasActiveConnection, refreshCode])
 
 
-  const connect = (targetCode: string) => {
+  const connect = useCallback((targetCode: string) => {
     if (!peer) {
       toast.error('Initializing connection... Please wait a moment.')
       addLog('Network not ready, please wait', 'warning')
@@ -576,7 +560,23 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       })
       addLog(`Connection failed: ${errorInfo.title}`, 'error')
     })
-  }
+  }, [peer, addLog, setStatus, handleConnection])
+
+  // Auto-connect from URL parameter (QR code scan)
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (code && !autoConnected && peer && status === 'idle') {
+      console.log('[QR] Auto-connecting with code:', code)
+      setInputCode(code)
+      setShowReceive(true)
+      setAutoConnected(true)
+
+      // Auto-connect after a brief delay to ensure peer is ready
+      setTimeout(() => {
+        connect(code)
+      }, 1000)
+    }
+  }, [searchParams, autoConnected, peer, status, connect])
   
   const copyCode = () => {
     navigator.clipboard.writeText(displayCode)
@@ -746,7 +746,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
               >
                 <div className="glass-card p-4 rounded-xl">
                   <h3 className="text-sm font-semibold text-foreground mb-3">
-                    Enter sender's code
+                    Enter sender&apos;s code
                   </h3>
 
                   <div className="flex flex-col gap-2.5">

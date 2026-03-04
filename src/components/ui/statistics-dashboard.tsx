@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BarChart3, X, TrendingUp, ArrowUpRight, ArrowDownLeft, FileText, Calendar, Download } from 'lucide-react'
 import { getAdvancedAnalytics, exportStatisticsAsJSON, type TransferAnalytics } from '@/lib/storage'
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { toast } from 'sonner'
 
 interface StatisticsDashboardProps {
@@ -15,12 +15,9 @@ interface StatisticsDashboardProps {
 const COLORS = ['#60a5fa', '#a78bfa', '#f472b6', '#fb923c', '#34d399', '#fbbf24', '#ef4444', '#8b5cf6']
 
 export function StatisticsDashboard({ isOpen, onClose }: StatisticsDashboardProps) {
-  const [analytics, setAnalytics] = useState<TransferAnalytics | null>(null)
-
-  useEffect(() => {
-    if (isOpen) {
-      setAnalytics(getAdvancedAnalytics())
-    }
+  const analytics = useMemo<TransferAnalytics | null>(() => {
+    if (!isOpen) return null
+    return getAdvancedAnalytics()
   }, [isOpen])
 
   const formatBytes = (bytes: number): string => {
@@ -47,11 +44,6 @@ export function StatisticsDashboard({ isOpen, onClose }: StatisticsDashboardProp
     value: ft.count,
     size: ft.totalSize
   }))
-
-  const directionData = [
-    { name: 'Sent', value: analytics.sentCount, color: '#60a5fa' },
-    { name: 'Received', value: analytics.receivedCount, color: '#a78bfa' }
-  ]
 
   const dailyChartData = analytics.dailyStats.slice(-14).map(stat => ({
     date: new Date(stat.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),

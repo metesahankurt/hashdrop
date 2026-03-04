@@ -17,9 +17,9 @@ import { getPreferences } from '@/lib/preferences'
 export function TransferStatus() {
   const {
     status, conn, file, files, progress, setProgress, setStatus, isPeerReady, mode,
-    readyToDownload, setReadyToDownload, setFile, setFileHash, fileHash, error,
+    readyToDownload, setFile, setFileHash, fileHash, error,
     transferStartTime, transferredBytes, transferSpeed, setTransferSpeed,
-    setTransferStartTime, setTransferredBytes, textContent, peer, reset, fullReset, addLog
+    setTransferStartTime, setTransferredBytes, textContent, addLog
   } = useWarpStore()
 
   const [eta, setEta] = useState<number | null>(null)

@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Command, Keyboard } from 'lucide-react'
+import { X, Keyboard } from 'lucide-react'
 
 interface KeyboardShortcutsModalProps {
   isOpen: boolean

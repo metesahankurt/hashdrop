@@ -3,19 +3,17 @@
 import { motion } from 'framer-motion'
 import { HamburgerMenu } from './hamburger-menu'
 import { useEffect, useState } from 'react'
-import { HelpCircle } from 'lucide-react'
+import { Send, Video } from 'lucide-react'
 import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
-import { useRouter } from 'next/navigation'
+import { useVideoStore } from '@/store/use-video-store'
+import { useAppStore, type AppMode } from '@/store/use-app-store'
 
-interface MinimalHeaderProps {
-  onOpenShortcuts?: () => void
-}
-
-export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
+export function MinimalHeader() {
   const [scrollY, setScrollY] = useState(0)
-  const { reset, fullReset, peer, conn } = useWarpStore()
-  const router = useRouter()
+  const { fullReset, peer, conn } = useWarpStore()
+  const resetCall = useVideoStore((s) => s.resetCall)
+  const { appMode, setAppMode } = useAppStore()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -29,31 +27,37 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
 
-    // Close connection if active
-    if (conn) {
-      conn.close()
-    }
-
-    // Destroy peer if exists
-    if (peer) {
-      peer.destroy()
-    }
-
-    // Full reset (including peer and myId)
+    // Close file transfer connection if active
+    if (conn) conn.close()
+    if (peer) peer.destroy()
     fullReset()
 
-    // Navigate to home and force reload
-    router.push('/')
-    setTimeout(() => {
-      window.location.reload()
-    }, 100)
+    // Reset video call if active
+    resetCall()
+
+    // Go back to welcome
+    setAppMode('welcome')
   }
 
-  // Scroll miktarına göre blur hesapla
-  // 0-200px arası artacak, 200px'de maksimum değere ulaşacak
+  const handleModeSwitch = (mode: AppMode) => {
+    if (mode === appMode) return
+
+    // Clean up current mode before switching
+    if (appMode === 'videocall') {
+      resetCall()
+    }
+    if (appMode === 'transfer') {
+      if (conn) conn.close()
+      if (peer) peer.destroy()
+      fullReset()
+    }
+
+    setAppMode(mode)
+  }
+
   const maxScroll = 200
   const scrollProgress = Math.min(scrollY / maxScroll, 1)
-  const blurAmount = scrollProgress * 12 // 0'dan 12px'e kadar blur
+  const blurAmount = scrollProgress * 12
 
   return (
     <motion.header
@@ -67,37 +71,47 @@ export function MinimalHeader({ onOpenShortcuts }: MinimalHeaderProps = {}) {
         isolation: 'isolate'
       }}
     >
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
-        {/* Clean Logo - Text Only (Clickable) */}
+      <div className="relative flex items-center justify-between max-w-7xl mx-auto">
+        {/* Logo - Left */}
         <div className="flex items-center relative z-10">
           <Link
             href="/"
             onClick={handleLogoClick}
             className="text-xl md:text-2xl font-bold text-foreground tracking-tight hover:text-primary transition-colors cursor-pointer"
-            style={{
-              filter: 'none',
-              textShadow: 'none'
-            }}
+            style={{ filter: 'none', textShadow: 'none' }}
           >
             HashDrop
           </Link>
         </div>
 
-        {/* Right Side - Help Button & Menu */}
-        <div className="flex items-center gap-3">
-          {/* Keyboard Shortcuts Button */}
-          {onOpenShortcuts && (
-            <button
-              onClick={onOpenShortcuts}
-              className="fixed top-4 right-16 md:right-20 z-[60] p-2.5 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors group"
-              aria-label="Keyboard Shortcuts"
-              title="Keyboard Shortcuts (CMD/Ctrl + ?)"
-            >
-              <HelpCircle className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
-            </button>
-          )}
+        {/* Center Navigation Tabs - Absolute centered */}
+        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 glass-card rounded-lg px-1 py-1 z-10">
+          <button
+            onClick={() => handleModeSwitch('transfer')}
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              appMode === 'transfer'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">File Transfer</span>
+          </button>
+          <button
+            onClick={() => handleModeSwitch('videocall')}
+            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              appMode === 'videocall'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            <span className="hidden sm:inline">Video Call</span>
+          </button>
+        </nav>
 
-          {/* Hamburger Menu */}
+        {/* Right Side - Menu */}
+        <div className="flex items-center gap-3 relative z-10">
           <HamburgerMenu />
         </div>
       </div>

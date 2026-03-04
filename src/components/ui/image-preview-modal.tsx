@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Download } from 'lucide-react'
+import Image from 'next/image'
 
 interface ImagePreviewModalProps {
   isOpen: boolean
@@ -75,11 +76,16 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, fileName, fileSiz
 
               {/* Image Container */}
               <div className="flex-1 overflow-auto p-4 md:p-6 flex items-center justify-center bg-black/20">
-                <img
-                  src={imageUrl}
-                  alt={fileName}
-                  className="max-w-full max-h-full object-contain rounded-lg"
-                />
+                <div className="relative w-full h-full min-h-[240px]">
+                  <Image
+                    src={imageUrl}
+                    alt={fileName}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 80vw"
+                    unoptimized
+                    className="object-contain rounded-lg"
+                  />
+                </div>
               </div>
             </motion.div>
           </motion.div>

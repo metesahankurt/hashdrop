@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { TextDecoder, TextEncoder } from 'util'
 
 // Mock File.prototype.arrayBuffer for tests
 if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
@@ -14,11 +15,8 @@ if (typeof File !== 'undefined' && !File.prototype.arrayBuffer) {
 }
 
 // Mock Web Crypto API for tests
-/* eslint-disable @typescript-eslint/no-var-requires */
-const { TextDecoder, TextEncoder } = require('util')
 global.TextDecoder = TextDecoder
 global.TextEncoder = TextEncoder
-/* eslint-enable @typescript-eslint/no-var-requires */
 
 Object.defineProperty(globalThis, 'crypto', {
   value: {

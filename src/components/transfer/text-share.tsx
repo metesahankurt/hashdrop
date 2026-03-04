@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { Type, Send, X, Copy, Check, Edit2, CheckCircle2 } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { toast } from 'sonner'
@@ -11,13 +11,7 @@ export function TextShare() {
   const [text, setText] = useState('')
   const [isCopied, setIsCopied] = useState(false)
   const [isTextSent, setIsTextSent] = useState(false)
-
-  // Mark text as sent when transfer starts (for text sent with files)
-  useEffect(() => {
-    if (mode === 'send' && status === 'transferring' && textContent && files.length > 0) {
-      setIsTextSent(true)
-    }
-  }, [mode, status, textContent, files.length])
+  const isTextSentDisplay = isTextSent || (mode === 'send' && status === 'transferring' && !!textContent && files.length > 0)
 
   const handleShareText = () => {
     if (text.trim()) {
@@ -132,13 +126,13 @@ export function TextShare() {
       >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            {isTextSent ? (
+            {isTextSentDisplay ? (
               <CheckCircle2 className="w-4 h-4 text-success" />
             ) : (
               <Type className="w-4 h-4 text-primary" />
             )}
             <h3 className="text-sm font-semibold">
-              {isTextSent
+              {isTextSentDisplay
                 ? 'Message Sent'
                 : isReady
                 ? 'Ready to Send'
@@ -159,7 +153,7 @@ export function TextShare() {
 
         {isReady ? (
           <div className="flex gap-2">
-            {isTextSent ? (
+            {isTextSentDisplay ? (
               <button
                 onClick={handleEditText}
                 className="glass-card flex-1 py-2.5 text-sm flex items-center justify-center gap-2 border border-border hover:border-primary/30 transition-colors"

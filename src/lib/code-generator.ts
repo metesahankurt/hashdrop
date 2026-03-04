@@ -78,6 +78,14 @@ export function codeToPeerId(displayCode: string): string {
 }
 
 /**
+ * Convert display code to PeerJS ID for video calls
+ * Example: "Cosmic-Falcon" → "sr-call-cosmic-falcon"
+ */
+export function codeToCallPeerId(displayCode: string): string {
+  return `sr-call-${displayCode.toLowerCase()}`
+}
+
+/**
  * Validate code format
  */
 export function isValidCode(code: string): boolean {

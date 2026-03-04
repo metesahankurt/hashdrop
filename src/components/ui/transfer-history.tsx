@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { History, ArrowUpRight, ArrowDownLeft, Trash2, X, Search, Filter, Download } from 'lucide-react'
 import { getTransferHistory, clearTransferHistory, exportHistoryAsCSV, exportHistoryAsJSON, type TransferRecord } from '@/lib/storage'
@@ -16,18 +16,18 @@ type StatusFilter = 'all' | 'success' | 'failed'
 type SortOption = 'date-desc' | 'date-asc' | 'size-desc' | 'size-asc' | 'name-asc' | 'name-desc'
 
 export function TransferHistory({ isOpen, onClose }: TransferHistoryProps) {
-  const [history, setHistory] = useState<TransferRecord[]>([])
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('date-desc')
   const [showFilters, setShowFilters] = useState(false)
 
-  useEffect(() => {
-    if (isOpen) {
-      setHistory(getTransferHistory())
-    }
-  }, [isOpen])
+  const history = useMemo<TransferRecord[]>(() => {
+    if (!isOpen) return []
+    void historyRefreshKey
+    return getTransferHistory()
+  }, [isOpen, historyRefreshKey])
 
   // Filter and sort history
   const filteredHistory = useMemo(() => {
@@ -79,7 +79,7 @@ export function TransferHistory({ isOpen, onClose }: TransferHistoryProps) {
   const handleClear = () => {
     if (confirm('Clear all transfer history? This cannot be undone.')) {
       clearTransferHistory()
-      setHistory([])
+      setHistoryRefreshKey((value) => value + 1)
       toast.success('History cleared')
     }
   }
