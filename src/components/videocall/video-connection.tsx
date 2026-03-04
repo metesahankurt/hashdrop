@@ -151,27 +151,28 @@ export function VideoConnection() {
     const initPeer = async () => {
       try {
         // Get local media first
+        console.log('[VideoCall] Step 1: Requesting camera/mic access...')
         setCallStatus('generating')
         const stream = await getLocalMediaStream()
         if (!mounted) {
           stopMediaStream(stream)
           return
         }
+        console.log('[VideoCall] Step 2: Media access granted. Tracks:', stream.getTracks().map(t => `${t.kind}:${t.label}`))
         setLocalStream(stream)
 
         // Create peer
-        console.log('[VideoCall] Creating peer with ID:', peerId)
-
         const peerHost = 'hashdrop.onrender.com'
         const peerPort = 443
         const peerPath = '/'
+        console.log(`[VideoCall] Step 3: Creating peer "${peerId}" → ${peerHost}:${peerPort}${peerPath}`)
 
         const newPeer = new Peer(peerId, {
           host: peerHost,
           port: peerPort,
           path: peerPath,
           secure: true,
-          debug: 2,
+          debug: 3,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
@@ -187,6 +188,7 @@ export function VideoConnection() {
 
         const connectionTimeout = setTimeout(() => {
           if (!newPeer.id) {
+            console.error('[VideoCall] TIMEOUT: Peer never connected to signaling server after 30s')
             newPeer.destroy()
             if (mounted) {
               toast.error('Could not connect to network. Please refresh.')
@@ -195,25 +197,32 @@ export function VideoConnection() {
           }
         }, 30000)
 
-        newPeer.on('open', () => {
+        newPeer.on('open', (id) => {
           clearTimeout(connectionTimeout)
           if (!mounted) return
+          console.log('[VideoCall] Step 4: CONNECTED to signaling server! Peer ID:', id)
           setPeer(newPeer)
           setCallStatus('ready')
         })
 
         // Handle incoming calls
         newPeer.on('call', (call) => {
+          console.log('[VideoCall] Step 5: INCOMING CALL from:', call.peer)
           if (!mounted) return
           setCallStatus('ringing')
 
           // Answer with local stream
           const outgoingStream = buildOutgoingStream()
+          console.log('[VideoCall] Step 6: Answering call, outgoing stream:', outgoingStream ? `${outgoingStream.getTracks().length} tracks` : 'NULL')
           if (outgoingStream) {
             call.answer(outgoingStream)
+            console.log('[VideoCall] Step 7: Call answered, waiting for remote stream...')
+          } else {
+            console.error('[VideoCall] ERROR: No outgoing stream to answer with!')
           }
 
           call.on('stream', (remoteStream) => {
+            console.log('[VideoCall] Step 8: GOT REMOTE STREAM! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
             if (!mounted) return
             if (call.peerConnection) {
               rebuildRemoteStreams(call.peerConnection)
@@ -228,12 +237,20 @@ export function VideoConnection() {
           })
 
           if (call.peerConnection) {
-            call.peerConnection.ontrack = () => {
+            call.peerConnection.ontrack = (event) => {
+              console.log('[VideoCall] ontrack event:', event.track.kind, event.track.label)
               rebuildRemoteStreams(call.peerConnection)
+            }
+            call.peerConnection.oniceconnectionstatechange = () => {
+              console.log('[VideoCall] ICE state (receiver):', call.peerConnection.iceConnectionState)
+            }
+            call.peerConnection.onconnectionstatechange = () => {
+              console.log('[VideoCall] Connection state (receiver):', call.peerConnection.connectionState)
             }
           }
 
           call.on('close', () => {
+            console.log('[VideoCall] Call closed (receiver side)')
             if (!mounted) return
             setRemoteCameraStream(null)
             setRemoteScreenStream(null)
@@ -242,8 +259,8 @@ export function VideoConnection() {
           })
 
           call.on('error', (err) => {
+            console.error('[VideoCall] Call error (receiver):', err.type, err.message)
             if (!mounted) return
-            console.error('[VideoCall] Call error:', err)
             setCallStatus('failed')
             const errorInfo = formatErrorForToast(err, 'call-failed')
             toast.error(errorInfo.title, { description: errorInfo.description })
@@ -253,7 +270,7 @@ export function VideoConnection() {
         newPeer.on('error', (err) => {
           clearTimeout(connectionTimeout)
           if (!mounted) return
-          console.error('[VideoCall] Peer error:', err)
+          console.error('[VideoCall] PEER ERROR:', err.type, err.message)
 
           if (err.type === 'unavailable-id') {
             toast.error('Code already in use. Generating new code...')
@@ -263,6 +280,14 @@ export function VideoConnection() {
             toast.error(errorInfo.title, { description: errorInfo.description })
             setCallStatus('failed')
           }
+        })
+
+        newPeer.on('disconnected', () => {
+          console.warn('[VideoCall] DISCONNECTED from signaling server')
+        })
+
+        newPeer.on('close', () => {
+          console.warn('[VideoCall] Peer CLOSED')
         })
 
       } catch (err) {
@@ -284,30 +309,43 @@ export function VideoConnection() {
 
   // Connect to peer (caller)
   const connectToCall = useCallback((targetCode: string) => {
+    console.log('[VideoCall] CALLER: Starting call to code:', targetCode)
+
     if (!peer) {
+      console.error('[VideoCall] CALLER: No peer! Not connected to signaling server yet.')
       toast.error('Initializing connection... Please wait.')
       return
     }
 
+    console.log('[VideoCall] CALLER: Peer is ready, ID:', peer.id)
+
     const outgoingStream = buildOutgoingStream()
     if (!outgoingStream) {
+      console.error('[VideoCall] CALLER: No outgoing stream - camera not ready')
       toast.error('Camera not ready. Please wait.')
       return
     }
 
+    console.log('[VideoCall] CALLER: Outgoing stream ready, tracks:', outgoingStream.getTracks().map(t => `${t.kind}:${t.label}`))
+
     setCallStatus('calling')
     const targetId = codeToCallPeerId(targetCode.trim())
+    console.log(`[VideoCall] CALLER: Calling target peer ID: "${targetId}"`)
 
     const call = peer.call(targetId, outgoingStream)
 
     if (!call) {
+      console.error('[VideoCall] CALLER: peer.call() returned null!')
       toast.error('Failed to initiate call')
       setCallStatus('failed')
       return
     }
 
+    console.log('[VideoCall] CALLER: Call initiated, waiting for response...')
+
     // Connection timeout
     const callTimeout = setTimeout(() => {
+      console.error('[VideoCall] CALLER: TIMEOUT after 30s - no stream received')
       call.close()
       setCallStatus('failed')
       toast.error('Call timeout', {
@@ -317,6 +355,7 @@ export function VideoConnection() {
     }, 30000)
 
     call.on('stream', (remoteStream) => {
+      console.log('[VideoCall] CALLER: GOT REMOTE STREAM! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
       clearTimeout(callTimeout)
       if (call.peerConnection) {
         rebuildRemoteStreams(call.peerConnection)
@@ -331,12 +370,23 @@ export function VideoConnection() {
     })
 
     if (call.peerConnection) {
-      call.peerConnection.ontrack = () => {
+      call.peerConnection.ontrack = (event) => {
+        console.log('[VideoCall] CALLER ontrack:', event.track.kind, event.track.label)
         rebuildRemoteStreams(call.peerConnection)
+      }
+      call.peerConnection.oniceconnectionstatechange = () => {
+        console.log('[VideoCall] CALLER ICE state:', call.peerConnection.iceConnectionState)
+      }
+      call.peerConnection.onconnectionstatechange = () => {
+        console.log('[VideoCall] CALLER Connection state:', call.peerConnection.connectionState)
+      }
+      call.peerConnection.onicecandidateerror = (event: RTCPeerConnectionIceErrorEvent) => {
+        console.warn('[VideoCall] CALLER ICE candidate error:', event.errorCode, event.errorText, event.url)
       }
     }
 
     call.on('close', () => {
+      console.log('[VideoCall] CALLER: Call closed')
       clearTimeout(callTimeout)
       setRemoteCameraStream(null)
       setRemoteScreenStream(null)
@@ -345,8 +395,8 @@ export function VideoConnection() {
     })
 
     call.on('error', (err) => {
+      console.error('[VideoCall] CALLER: Call error:', err.type, err.message)
       clearTimeout(callTimeout)
-      console.error('[VideoCall] Call error:', err)
       setCallStatus('failed')
       const errorInfo = formatErrorForToast(err, 'call-failed')
       toast.error(errorInfo.title, { description: errorInfo.description })
