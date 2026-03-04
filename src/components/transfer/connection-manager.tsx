@@ -420,9 +420,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       try {
         console.log('[FileTransfer] Creating peer with ID:', peerId)
 
-        const peerHost = process.env.NEXT_PUBLIC_PEER_HOST || '0.peerjs.com'
-        const peerPort = Number(process.env.NEXT_PUBLIC_PEER_PORT || 443)
-        const peerPath = process.env.NEXT_PUBLIC_PEER_PATH || '/'
+        const peerHost = 'hashdrop.onrender.com'
+        const peerPort = 443
+        const peerPath = '/'
 
         const newPeer = new Peer(peerId, {
           host: peerHost,
