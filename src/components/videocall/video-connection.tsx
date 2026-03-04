@@ -153,9 +153,27 @@ export function VideoConnection() {
   const finalizeConnection = useCallback((call: ReturnType<Peer['call']>, side: string) => {
     const connectedRef = { done: false }
 
-    const tryFinalize = () => {
+    const finalizeNow = (reason: string) => {
       if (connectedRef.done || !mountedRef.current) return false
       if (!call.peerConnection) return false
+
+      connectedRef.done = true
+      console.log(`[VideoCall] ${side}: CONNECTED via ${reason}!`)
+      rebuildRemoteStreams(call.peerConnection)
+      setCallStatus('connected')
+      setCallStartTime(Date.now())
+      setMediaConnection(call)
+      toast.success('Call connected!')
+      return true
+    }
+
+    const tryFinalize = (hasTrack = false) => {
+      if (connectedRef.done || !mountedRef.current) return false
+      if (!call.peerConnection) return false
+
+      if (hasTrack) {
+        return finalizeNow('ontrack')
+      }
 
       const receivers = call.peerConnection.getReceivers()
       const hasVideo = receivers.some(r => r.track?.kind === 'video')
@@ -164,14 +182,7 @@ export function VideoConnection() {
       console.log(`[VideoCall] ${side} tryFinalize: video=${hasVideo} audio=${hasAudio}`)
 
       if (hasVideo || hasAudio) {
-        connectedRef.done = true
-        console.log(`[VideoCall] ${side}: CONNECTED via ontrack!`)
-        rebuildRemoteStreams(call.peerConnection)
-        setCallStatus('connected')
-        setCallStartTime(Date.now())
-        setMediaConnection(call)
-        toast.success('Call connected!')
-        return true
+        return finalizeNow('receiver-check')
       }
 
       return false
@@ -280,7 +291,7 @@ export function VideoConnection() {
           if (call.peerConnection) {
             call.peerConnection.ontrack = (event) => {
               console.log('[VideoCall] RECEIVER ontrack:', event.track.kind, event.track.label)
-              tryFinalize()
+              tryFinalize(true)
             }
             call.peerConnection.oniceconnectionstatechange = () => {
               const state = call.peerConnection.iceConnectionState
@@ -425,7 +436,7 @@ export function VideoConnection() {
     if (call.peerConnection) {
       call.peerConnection.ontrack = (event) => {
         console.log('[VideoCall] CALLER ontrack:', event.track.kind, event.track.label)
-        if (tryFinalize()) {
+        if (tryFinalize(true)) {
           clearTimeout(callTimeout)
         }
       }
