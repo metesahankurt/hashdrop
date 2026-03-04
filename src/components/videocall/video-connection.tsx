@@ -175,7 +175,12 @@ export function VideoConnection() {
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' }
+              { urls: 'stun:stun1.l.google.com:19302' },
+              {
+                urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp'],
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              }
             ]
           }
         })
@@ -309,7 +314,7 @@ export function VideoConnection() {
         description: 'Could not reach the other peer. Make sure they are online.',
         duration: 6000
       })
-    }, 15000)
+    }, 30000)
 
     call.on('stream', (remoteStream) => {
       clearTimeout(callTimeout)
