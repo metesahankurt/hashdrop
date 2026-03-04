@@ -418,24 +418,22 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     
     const createPeer = () => {
       try {
-        // Use default PeerJS configuration (no custom server)
-        // This will use PeerJS's built-in server selection
         console.log('[FileTransfer] Creating peer with ID:', peerId)
+
+        const peerHost = process.env.NEXT_PUBLIC_PEER_HOST || '0.peerjs.com'
+        const peerPort = Number(process.env.NEXT_PUBLIC_PEER_PORT || 443)
+        const peerPath = process.env.NEXT_PUBLIC_PEER_PATH || '/'
+
         const newPeer = new Peer(peerId, {
+          host: peerHost,
+          port: peerPort,
+          path: peerPath,
+          secure: true,
           debug: 2,
           config: {
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              {
-                urls: [
-                  'turn:openrelay.metered.ca:80',
-                  'turn:openrelay.metered.ca:443',
-                  'turn:openrelay.metered.ca:443?transport=tcp'
-                ],
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-              }
+              { urls: 'stun:stun1.l.google.com:19302' }
             ]
           }
         })
