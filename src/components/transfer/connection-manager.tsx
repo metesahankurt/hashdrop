@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -65,6 +65,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const [canShare, setCanShare] = useState(false)
   const [hasActiveConnection, setHasActiveConnection] = useState(false)
 
+  // Detect if we're in QR auto-connect mode (opened from QR code URL)
+  const isQRConnect = !!searchParams.get('code')
+
   // Check if native share is available
   useEffect(() => {
     setCanShare(typeof navigator !== 'undefined' && !!navigator.share)
@@ -104,7 +107,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       const preferences = getPreferences()
       if (preferences.autoCopyCode) {
         navigator.clipboard.writeText(displayCode).then(() => {
-          toast.success('🔗 Code auto-copied to clipboard!', {
+          toast.success('Code auto-copied to clipboard!', {
             description: displayCode,
             duration: 2000
           })
@@ -320,15 +323,15 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
           if (calculatedHash !== meta.hash) {
             console.error('[HashDrop] Hash mismatch detected')
-            toast.error('⚠️ File integrity check failed')
+            toast.error('File integrity check failed')
             toast.warning('File may be corrupted. Download with caution.')
             useWarpStore.getState().addLog('File integrity check failed - Hash mismatch', 'error')
 
             setReadyToDownload(file)
             setError('Hash verification failed')
           } else {
-            console.log('[HashDrop] ✅ File verified')
-            toast.success('✅ File verified!')
+            console.log('[HashDrop] File verified')
+            toast.success('File verified!')
             useWarpStore.getState().addLog('File integrity verified successfully', 'success')
             setReadyToDownload(file)
           }
@@ -390,12 +393,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
     })
   }, [setConn, setStatus, setHasActiveConnection, handleReceiveData, setIsPeerReady, addLog, setReceivedChunks, setReceivedSize])
   
-  // Clean up Peer on unmount
+  // Ref to always have the latest handleConnection without stale closures
+  const handleConnectionRef = useRef(handleConnection)
   useEffect(() => {
-    // We generally want to keep the peer alive during the session
-    // newPeer.destroy() 
-  }, [])
-
+    handleConnectionRef.current = handleConnection
+  }, [handleConnection])
 
   // Initialize Peer WITH RETRY LOGIC
   useEffect(() => {
@@ -403,7 +405,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
     console.log('[Peer] Attempting to create peer with ID:', peerId)
     let retryCount = 0
-    const MAX_RETRIES = 1 // Only retry once to avoid spam
+    const MAX_RETRIES = 3 // Retry up to 3 times for reliability
     
     const createPeer = () => {
       try {
@@ -415,7 +417,24 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
             iceServers: [
               { urls: 'stun:stun.l.google.com:19302' },
               { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' }
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:stun3.l.google.com:19302' },
+              { urls: 'stun:stun4.l.google.com:19302' },
+              {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              },
+              {
+                urls: 'turn:openrelay.metered.ca:443',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              },
+              {
+                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              }
             ]
           }
         })
@@ -428,11 +447,14 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
             
             if (retryCount < MAX_RETRIES) {
               retryCount++
-              console.log(`[Peer] Retry attempt ${retryCount}/${MAX_RETRIES}`)
-              setTimeout(createPeer, 3000)
+              const delay = 2000 * retryCount // Exponential: 2s, 4s, 6s
+              console.log(`[Peer] Retry attempt ${retryCount}/${MAX_RETRIES} in ${delay}ms`)
+              addLog(`Retrying connection (${retryCount}/${MAX_RETRIES})...`, 'warning')
+              setTimeout(createPeer, delay)
             } else {
               // Only show error toast on final failure
               toast.error('Could not connect to network. Please refresh the page.')
+              addLog('Network connection failed after all retries', 'error')
             }
           }
         }, 30000) // 30 second timeout
@@ -451,14 +473,15 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           // SECURITY: Only accept the first connection to prevent multiple recipients
           if (hasActiveConnection) {
             console.warn('[Peer] Rejecting connection - already have an active connection')
-            toast.warning('🔒 Connection rejected: Already connected to a peer', {
+            toast.warning('Connection rejected: Already connected to a peer', {
               description: 'Only one recipient is allowed per transfer for security.'
             })
             conn.close()
             return
           }
 
-          handleConnection(conn)
+          // Use ref to avoid stale closure - always calls the latest handler
+          handleConnectionRef.current(conn)
         })
 
         newPeer.on('error', (err) => {
@@ -490,7 +513,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
           if (retryCount < MAX_RETRIES && err.type === 'network') {
             retryCount++
-            setTimeout(createPeer, 3000)
+            const delay = 2000 * retryCount
+            console.log(`[Peer] Network error retry ${retryCount}/${MAX_RETRIES} in ${delay}ms`)
+            addLog(`Network retry (${retryCount}/${MAX_RETRIES})...`, 'warning')
+            setTimeout(createPeer, delay)
           }
         })
 
@@ -499,7 +525,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
         if (retryCount < MAX_RETRIES) {
           retryCount++
-          setTimeout(createPeer, 3000)
+          const delay = 2000 * retryCount
+          setTimeout(createPeer, delay)
         } else {
           const errorInfo = formatErrorForToast(error, 'connection-failed')
           toast.error(errorInfo.title, {
@@ -540,9 +567,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
           description: 'Could not reach the other peer. Make sure they are online and try again.',
           duration: 6000
         })
-        addLog('Connection timeout - peer unreachable', 'error')
+        addLog('Connection timeout - peer unreachable. Check that the sender has the app open.', 'error')
       }
-    }, 15000)
+    }, 20000) // 20 seconds timeout for better reliability
 
     conn.on('open', () => {
         hasConnected = true
@@ -570,13 +597,14 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
       setInputCode(code)
       setShowReceive(true)
       setAutoConnected(true)
+      addLog(`QR code detected: ${code}`, 'info')
 
       // Auto-connect after a brief delay to ensure peer is ready
       setTimeout(() => {
         connect(code)
-      }, 1000)
+      }, 500)
     }
-  }, [searchParams, autoConnected, peer, status, connect])
+  }, [searchParams, autoConnected, peer, status, connect, addLog])
   
   const copyCode = () => {
     navigator.clipboard.writeText(displayCode)
@@ -606,8 +634,27 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   return (
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
 
-      {/* Sender View - Compact Code Display */}
-      {(mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
+      {/* QR Auto-Connect View - Shown when page is opened from QR code scan */}
+      {isQRConnect && !autoConnected && status === 'idle' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-center space-y-4"
+        >
+          <div className="inline-flex items-center gap-3 glass-card rounded-lg px-5 py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-foreground">Connecting to peer...</p>
+              <p className="text-xs text-muted font-mono">{searchParams.get('code')}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted">Initializing secure connection</p>
+        </motion.div>
+      )}
+
+      {/* Sender View - Compact Code Display (hidden when auto-connecting from QR) */}
+      {!isQRConnect && (mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -678,8 +725,52 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
         </motion.div>
       )}
 
-      {/* Collapsible Receiver View */}
-      {mode === null && (status === 'idle' || status === 'connecting') && (
+      {/* QR Connection Status - Active connecting state */}
+      {isQRConnect && status === 'connecting' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-center space-y-4"
+        >
+          <div className="inline-flex items-center gap-3 glass-card rounded-lg px-5 py-4 glow-primary">
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            <div className="text-left">
+              <p className="text-sm font-semibold text-foreground">Establishing connection...</p>
+              <p className="text-xs text-muted font-mono">{inputCode}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted">Waiting for peer to respond</p>
+        </motion.div>
+      )}
+
+      {/* QR Connection Failed */}
+      {isQRConnect && status === 'failed' && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-center space-y-4"
+        >
+          <div className="glass-card rounded-lg px-5 py-4 space-y-3">
+            <p className="text-sm font-semibold text-foreground">Connection failed</p>
+            <p className="text-xs text-muted">Make sure the sender is online and the code is still valid.</p>
+            <button
+              onClick={() => {
+                setStatus('idle')
+                setAutoConnected(false)
+              }}
+              className="glass-btn-primary px-4 py-2 text-sm flex items-center justify-center gap-2 mx-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Try Again</span>
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Collapsible Receiver View (hidden when auto-connecting from QR) */}
+      {!isQRConnect && mode === null && (status === 'idle' || status === 'connecting') && (
         <div className="w-full space-y-3">
 
           {/* Minimal Divider */}
