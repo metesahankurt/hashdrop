@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { MinimalHeader } from "@/components/layout/minimal-header";
 import { SignatureBadge } from "@/components/ui/signature-badge";
@@ -19,19 +19,45 @@ const pageTransition = {
 function AppContent() {
   const searchParams = useSearchParams();
   const { appMode, setAppMode } = useAppStore();
+  const [initialized, setInitialized] = useState(false);
 
-  // Auto-navigate based on URL params
+  // Detect URL params and set correct mode IMMEDIATELY on first render
   useEffect(() => {
+    if (initialized) return;
+
+    const code = searchParams.get("code");
+    const mode = searchParams.get("mode");
+
+    if (mode === "videocall") {
+      setAppMode("videocall");
+    } else if (code) {
+      setAppMode("transfer");
+    }
+    setInitialized(true);
+  }, [searchParams, initialized, setAppMode]);
+
+  // Also handle subsequent URL param changes
+  useEffect(() => {
+    if (!initialized) return;
+
     const code = searchParams.get("code");
     const mode = searchParams.get("mode");
 
     if (mode === "videocall" && appMode === "welcome") {
       setAppMode("videocall");
     } else if (code && appMode === "welcome") {
-      // Transfer code in URL -> go to transfer mode (default when no mode specified)
       setAppMode("transfer");
     }
-  }, [searchParams, appMode, setAppMode]);
+  }, [searchParams, appMode, setAppMode, initialized]);
+
+  // Don't render until we've checked URL params (prevents Welcome screen flash)
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <>

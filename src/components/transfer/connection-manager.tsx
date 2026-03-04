@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -66,7 +66,16 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const [hasActiveConnection, setHasActiveConnection] = useState(false)
 
   // Detect if we're in QR auto-connect mode (opened from QR code URL)
-  const isQRConnect = !!searchParams.get('code')
+  // Use both searchParams hook AND window.location as fallback for reliability
+  const isQRConnect = useMemo(() => {
+    const fromHook = searchParams.get('code')
+    if (fromHook) return true
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      return !!urlParams.get('code')
+    }
+    return false
+  }, [searchParams])
 
   // Check if native share is available
   useEffect(() => {
@@ -591,7 +600,12 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
   // Auto-connect from URL parameter (QR code scan)
   useEffect(() => {
-    const code = searchParams.get('code')
+    // Try searchParams hook first, fall back to window.location
+    let code = searchParams.get('code')
+    if (!code && typeof window !== 'undefined') {
+      code = new URLSearchParams(window.location.search).get('code')
+    }
+
     if (code && !autoConnected && peer && status === 'idle') {
       console.log('[QR] Auto-connecting with code:', code)
       setInputCode(code)
@@ -601,7 +615,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
       // Auto-connect after a brief delay to ensure peer is ready
       setTimeout(() => {
-        connect(code)
+        connect(code!)
       }, 500)
     }
   }, [searchParams, autoConnected, peer, status, connect, addLog])
@@ -646,7 +660,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <div className="text-left">
               <p className="text-sm font-semibold text-foreground">Connecting to peer...</p>
-              <p className="text-xs text-muted font-mono">{searchParams.get('code')}</p>
+              <p className="text-xs text-muted font-mono">{searchParams.get('code') || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('code') : '')}</p>
             </div>
           </div>
           <p className="text-xs text-muted">Initializing secure connection</p>
