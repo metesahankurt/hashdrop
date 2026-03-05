@@ -9,6 +9,7 @@ import { TransferView } from "@/components/transfer/transfer-view";
 import { VideoCallView } from "@/components/videocall/video-call-view";
 import { ChatRoomView } from "@/components/chatroom/chat-room-view";
 import { WithUsernameGate } from "@/components/ui/username-gate";
+import { IncomingRequestScreen } from "@/components/ui/incoming-request-screen";
 import { Video, Send, MessageSquare } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/use-app-store";
@@ -19,43 +20,58 @@ const pageTransition = {
   exit: { opacity: 0, transition: { duration: 0.2 } },
 };
 
+// Determine which mode an incoming link targets
+function getIncomingMode(mode: string | null, code: string | null): 'transfer' | 'videocall' | 'chatroom' | null {
+  if (mode === 'videocall' && code) return 'videocall'
+  if (mode === 'chatroom' && code) return 'chatroom'
+  if (code && !mode) return 'transfer'
+  return null
+}
+
 function AppContent() {
   const searchParams = useSearchParams();
   const { appMode, setAppMode } = useAppStore();
   const [initialized, setInitialized] = useState(false);
 
-  // Detect URL params and set correct mode IMMEDIATELY on first render
+  // Incoming link state
+  const [pendingMode, setPendingMode] = useState<'transfer' | 'videocall' | 'chatroom' | null>(null);
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
+  const [pendingFrom, setPendingFrom] = useState<string | null>(null);
+
   useEffect(() => {
     if (initialized) return;
-
     const code = searchParams.get("code");
     const mode = searchParams.get("mode");
+    const from = searchParams.get("from");
+    const incoming = getIncomingMode(mode, code);
 
-    if (mode === "videocall") {
-      setAppMode("videocall");
-    } else if (mode === "chatroom") {
-      setAppMode("chatroom");
-    } else if (code) {
-      setAppMode("transfer");
+    if (incoming) {
+      // Show accept/decline screen instead of jumping straight in
+      setPendingMode(incoming);
+      setPendingCode(code);
+      setPendingFrom(from);
     }
     setInitialized(true);
-  }, [searchParams, initialized, setAppMode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Also handle subsequent URL param changes
-  useEffect(() => {
-    if (!initialized) return;
+  const handleAccept = () => {
+    if (!pendingMode) return;
+    setAppMode(pendingMode);
+    setPendingMode(null);
+  };
 
-    const code = searchParams.get("code");
-    const mode = searchParams.get("mode");
-
-    if (mode === "videocall" && appMode === "welcome") {
-      setAppMode("videocall");
-    } else if (code && appMode === "welcome") {
-      setAppMode("transfer");
+  const handleDecline = () => {
+    setPendingMode(null);
+    setPendingCode(null);
+    setPendingFrom(null);
+    setAppMode('welcome');
+    // Clear URL params
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/')
     }
-  }, [searchParams, appMode, setAppMode, initialized]);
+  };
 
-  // Don't render until we've checked URL params (prevents Welcome screen flash)
   if (!initialized) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,9 +80,27 @@ function AppContent() {
     );
   }
 
+  // Show incoming request screen for external link/QR opens
+  if (pendingMode && pendingCode) {
+    return (
+      <>
+        <MinimalHeader />
+        <IncomingRequestScreen
+          mode={pendingMode}
+          from={pendingFrom}
+          code={pendingCode}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
+        <footer className="fixed bottom-6 left-6 z-40">
+          <SignatureBadge />
+        </footer>
+      </>
+    );
+  }
+
   return (
     <>
-      {/* Header - hidden on welcome screen */}
       {appMode !== "welcome" && <MinimalHeader />}
 
       <AnimatePresence mode="wait">
@@ -119,7 +153,6 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      {/* Fixed Footer - Bottom Left */}
       <footer className="fixed bottom-6 left-6 z-40">
         <SignatureBadge />
       </footer>

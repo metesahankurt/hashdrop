@@ -5,6 +5,7 @@ import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, ScanLine, Lock, Eye, EyeOff } from 'lucide-react'
 import { useVideoStore, type ChatMessage } from '@/store/use-video-store'
+import { useUsernameStore } from '@/store/use-username-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
 import { getLocalMediaStream, stopMediaStream } from '@/lib/media-utils'
@@ -35,6 +36,7 @@ export function VideoConnection() {
     resetCall,
     addChatMessage,
     callPasswordHash, setCallPasswordHash,
+    addPeerUsername, removePeerUsername,
   } = useVideoStore()
 
   const buildOutgoingStream = useCallback(() => {
@@ -70,9 +72,14 @@ export function VideoConnection() {
   // ---------- Data channel helpers ----------
   const setupDataConnection = useCallback((conn: DataConnection, remotePeerId: string) => {
     conn.on('data', (raw) => {
-      const data = raw as { type: string; payload?: ChatMessage; hash?: string }
+      const data = raw as { type: string; payload?: ChatMessage; hash?: string; username?: string }
       if (data.type === 'chat' && data.payload) {
-        addChatMessage({ ...data.payload, from: 'remote', fromLabel: `Peer` })
+        const { peerUsernames } = useVideoStore.getState()
+        const senderName = peerUsernames.get(remotePeerId) || 'Peer'
+        addChatMessage({ ...data.payload, from: 'remote', fromLabel: senderName })
+      } else if (data.type === 'announce' && data.username) {
+        // Store remote peer's username
+        addPeerUsername(remotePeerId, data.username)
       } else if (data.type === 'auth') {
         // Host receives auth attempt
         const { callPasswordHash: storedHash } = useVideoStore.getState()
@@ -92,16 +99,18 @@ export function VideoConnection() {
           conn.send({ type: 'auth-ok' })
         }
       } else if (data.type === 'auth-ok') {
-        // Joiner: auth accepted, nothing extra needed
+        // Announce local username to remote peer after auth passes
+        const { username: localUsername } = useUsernameStore.getState()
+        if (localUsername) conn.send({ type: 'announce', username: localUsername })
       } else if (data.type === 'auth-rejected') {
         toast.error('Wrong password — kicked from call')
         resetCall()
       }
     })
-    conn.on('close', () => removeDataConnection(remotePeerId))
+    conn.on('close', () => { removeDataConnection(remotePeerId); removePeerUsername(remotePeerId) })
     conn.on('error', (err) => console.error('[DataConn] Error:', err))
     addDataConnection(remotePeerId, conn)
-  }, [addChatMessage, addDataConnection, removeDataConnection, resetCall])
+  }, [addChatMessage, addDataConnection, removeDataConnection, resetCall, addPeerUsername, removePeerUsername])
 
   // ---------- States ----------
   const [generatedInfo, setGeneratedInfo] = useState<{ displayCode: string; peerId: string } | null>(null)
@@ -362,8 +371,10 @@ export function VideoConnection() {
 
   const shareCode = async () => {
     if (!navigator.share || !displayCode) return
+    const { username } = useUsernameStore.getState()
+    const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
     try {
-      await navigator.share({ title: 'HashDrop Video Call', text: `Join my video call with code: ${displayCode}`, url: `https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}` })
+      await navigator.share({ title: 'HashDrop Video Call', text: `Join my video call with code: ${displayCode}`, url: `https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}` })
     } catch (error) {
       if ((error as Error).name !== 'AbortError') console.error('Share failed:', error)
     }
@@ -406,9 +417,11 @@ export function VideoConnection() {
             </div>
 
             <AnimatePresence>
-              {showQR && displayCode && (
-                <QRCodeDisplay code={displayCode} size={180} url={`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}`} />
-              )}
+              {showQR && displayCode && (() => {
+                const { username } = useUsernameStore.getState()
+                const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
+                return <QRCodeDisplay code={displayCode} size={180} url={`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`} />
+              })()}
             </AnimatePresence>
 
             {timeLeft !== null && timeLeft > 0 && (

@@ -40,6 +40,9 @@ interface VideoState {
   // Password
   callPasswordHash: string | null
 
+  // Peer usernames (for tile labels)
+  peerUsernames: Map<string, string>
+
   setPeer: (peer: Peer | null) => void
   addMediaConnection: (peerId: string, conn: MediaConnection) => void
   removeMediaConnection: (peerId: string) => void
@@ -66,6 +69,10 @@ interface VideoState {
   // Password actions
   setCallPasswordHash: (hash: string | null) => void
 
+  // Peer username actions
+  addPeerUsername: (peerId: string, username: string) => void
+  removePeerUsername: (peerId: string) => void
+
   resetCall: () => void
 }
 
@@ -90,6 +97,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   isChatOpen: false,
 
   callPasswordHash: null,
+  peerUsernames: new Map(),
 
   setPeer: (peer) => set({ peer }),
 
@@ -178,6 +186,18 @@ export const useVideoStore = create<VideoState>((set, get) => ({
 
   setCallPasswordHash: (hash) => set({ callPasswordHash: hash }),
 
+  addPeerUsername: (peerId, username) => {
+    const m = new Map(get().peerUsernames)
+    m.set(peerId, username)
+    set({ peerUsernames: m })
+  },
+
+  removePeerUsername: (peerId) => {
+    const m = new Map(get().peerUsernames)
+    m.delete(peerId)
+    set({ peerUsernames: m })
+  },
+
   resetCall: () => {
     const { localStream, screenStream, peer, mediaConnections, dataConnections } = get()
     if (localStream) localStream.getTracks().forEach(t => t.stop())
@@ -204,6 +224,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       unreadCount: 0,
       isChatOpen: false,
       callPasswordHash: null,
+      peerUsernames: new Map(),
     })
   },
 }))

@@ -8,6 +8,7 @@ import {
   Send, Users, Lock, Eye, EyeOff, X, ChevronLeft, QrCode, Share2, ScanLine
 } from 'lucide-react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
+import { useUsernameStore } from '@/store/use-username-store'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
 import { QRCodeDisplay } from '@/components/transfer/qr-code-display'
 import { QrScanner } from '@/components/transfer/qr-scanner'
@@ -84,7 +85,9 @@ function RoomSetup({ username, onBack, onRoomReady }: RoomSetupProps) {
   }
 
   const shareCode = async () => {
-    try { await navigator.share({ title: 'HashDrop Sohbet Odası', text: `Sohbet odama katıl: ${genCode}` }) } catch { /* ignore */ }
+    const { username } = useUsernameStore.getState()
+    const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
+    try { await navigator.share({ title: 'HashDrop Sohbet Odası', text: `Sohbet odama katıl: ${genCode}`, url: `https://hashdrop.metesahankurt.cloud?mode=chatroom&code=${genCode}${fromParam}` }) } catch { /* ignore */ }
   }
 
   const handleCreate = async () => {

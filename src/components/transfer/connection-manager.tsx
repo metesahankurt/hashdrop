@@ -6,6 +6,7 @@ import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History, BarChart3 } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
+import { useUsernameStore } from '@/store/use-username-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
@@ -624,16 +625,16 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
 
   const shareCode = async () => {
     if (!navigator.share || !displayCode) return
-
+    const { username } = useUsernameStore.getState()
+    const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
     try {
       await navigator.share({
         title: 'HashDrop Transfer Code',
         text: `Join my file transfer with code: ${displayCode}`,
-        url: `https://hashdrop.metesahankurt.cloud?code=${displayCode}`
+        url: `https://hashdrop.metesahankurt.cloud?code=${displayCode}${fromParam}`
       })
       toast.success('Code shared!')
     } catch (error) {
-      // User cancelled or share failed
       if ((error as Error).name !== 'AbortError') {
         console.error('Share failed:', error)
       }

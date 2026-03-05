@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
 import { CameraOff, User, MonitorUp } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
+import { useUsernameStore } from '@/store/use-username-store'
 import { isPortraitTrack } from '@/lib/media-utils'
 import { VideoLightbox, ExpandHint } from './video-lightbox'
 
@@ -17,7 +18,10 @@ export function VideoDisplay() {
     isScreenSharing,
     isSpeakerMuted,
     callStatus,
+    peerUsernames,
   } = useVideoStore()
+
+  const localUsername = useUsernameStore((s) => s.username)
 
   // Lightbox state
   const [lightboxStream, setLightboxStream] = useState<MediaStream | null>(null)
@@ -45,10 +49,12 @@ export function VideoDisplay() {
   }, [remoteStreams])
 
   const activeScreenStream = localScreenStream || remoteScreenEntry?.stream || null
+  const localLabel = localUsername ? `${localUsername} (Sen)` : 'Sen'
+
   const screenOwnerLabel = localScreenStream
-    ? 'You (screen)'
+    ? `${localLabel} (ekran)`
     : remoteScreenEntry
-      ? 'Peer (screen)'
+      ? `${peerUsernames.get(remoteScreenEntry.peerId) || 'Peer'} (ekran)`
       : ''
 
   // Build list of camera participant entries
@@ -141,7 +147,7 @@ export function VideoDisplay() {
             {/* Local */}
             <div
               className="flex-shrink-0 md:w-full w-28 aspect-video rounded-xl overflow-hidden glass-card bg-black relative group cursor-pointer"
-              onClick={() => localStream ? openLightbox(localStream, 'You', true) : null}
+              onClick={() => localStream ? openLightbox(localStream, localLabel, true) : null}
             >
               {localStream && !isCameraOff ? (
                 <LocalVideoEl
@@ -149,9 +155,9 @@ export function VideoDisplay() {
                   videoRef={localVideoRef}
                 />
               ) : (
-                <CamOffPlaceholder label="You" />
+                <CamOffPlaceholder label={localLabel} />
               )}
-              <TileLabel label="You" />
+              <TileLabel label={localLabel} isLocal />
               <ExpandHint />
             </div>
 
@@ -160,18 +166,19 @@ export function VideoDisplay() {
               const streams = remoteStreams.get(pid)
               const camStream = streams?.camera || null
               const track = camStream?.getVideoTracks()[0] || null
+              const peerLabel = peerUsernames.get(pid) || `Peer ${i + 1}`
               return (
                 <div
                   key={pid}
                   className="flex-shrink-0 md:w-full w-28 aspect-video rounded-xl overflow-hidden glass-card bg-black relative group cursor-pointer"
-                  onClick={() => camStream ? openLightbox(camStream, `Peer ${i + 1}`) : null}
+                  onClick={() => camStream ? openLightbox(camStream, peerLabel) : null}
                 >
                   {camStream ? (
                     <RemoteVideoEl stream={camStream} muted={isSpeakerMuted} track={track} />
                   ) : (
-                    <CamOffPlaceholder label={`Peer ${i + 1}`} />
+                    <CamOffPlaceholder label={peerLabel} />
                   )}
-                  <TileLabel label={`Peer ${i + 1}`} />
+                  <TileLabel label={peerLabel} />
                   <ExpandHint />
                 </div>
               )
@@ -199,14 +206,14 @@ export function VideoDisplay() {
         {/* Local tile */}
         <div
           className="rounded-2xl overflow-hidden glass-card bg-black relative aspect-video group cursor-pointer"
-          onClick={() => localStream ? openLightbox(localStream, 'You', true) : null}
+          onClick={() => localStream ? openLightbox(localStream, localLabel, true) : null}
         >
           {localStream && !isCameraOff ? (
             <LocalVideoEl stream={localStream} videoRef={localVideoRef} />
           ) : (
-            <CamOffPlaceholder label="You" />
+            <CamOffPlaceholder label={localLabel} />
           )}
-          <TileLabel label="You" />
+          <TileLabel label={localLabel} isLocal />
           <ExpandHint />
         </div>
 
@@ -215,18 +222,19 @@ export function VideoDisplay() {
           const streams = remoteStreams.get(pid)
           const camStream = streams?.camera || null
           const track = camStream?.getVideoTracks()[0] || null
+          const peerLabel = peerUsernames.get(pid) || `Peer ${i + 1}`
           return (
             <div
               key={pid}
               className="rounded-2xl overflow-hidden glass-card bg-black relative aspect-video group cursor-pointer"
-              onClick={() => camStream ? openLightbox(camStream, `Peer ${i + 1}`) : null}
+              onClick={() => camStream ? openLightbox(camStream, peerLabel) : null}
             >
               {camStream ? (
                 <RemoteVideoEl stream={camStream} muted={isSpeakerMuted} track={track} />
               ) : (
-                <CamOffPlaceholder label={`Peer ${i + 1}`} />
+                <CamOffPlaceholder label={peerLabel} />
               )}
-              <TileLabel label={`Peer ${i + 1}`} />
+              <TileLabel label={peerLabel} />
               <ExpandHint />
             </div>
           )
@@ -317,10 +325,17 @@ function CamOffPlaceholder({ label }: { label: string }) {
   )
 }
 
-function TileLabel({ label }: { label: string }) {
+function TileLabel({ label, isLocal }: { label: string; isLocal?: boolean }) {
   return (
-    <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/60 to-transparent">
-      <span className="text-xs text-white/80 font-medium truncate block">{label}</span>
+    <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2 bg-gradient-to-t from-black/70 to-transparent">
+      <div className="flex items-center gap-1.5">
+        {isLocal && (
+          <span className="text-[9px] bg-primary/40 border border-primary/50 text-primary px-1.5 py-0.5 rounded-full font-semibold tracking-wide uppercase leading-none">
+            Sen
+          </span>
+        )}
+        <span className="text-xs text-white/90 font-medium truncate">{label}</span>
+      </div>
     </div>
   )
 }
