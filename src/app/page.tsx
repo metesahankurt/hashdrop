@@ -114,10 +114,10 @@ function AppContent() {
           <motion.div key="transfer" {...pageTransition}>
             <WithUsernameGate
               icon={<Send className="w-7 h-7 text-primary" />}
-              title="Dosya"
-              highlight="Transferi"
-              description="Peer-to-peer dosya transferi. Bulut yok, limit yok."
-              hint="Kullanıcı adın diğer tarafta gözükür"
+              title="File"
+              highlight="Transfer"
+              description="Peer-to-peer file transfer. No cloud, no limits."
+              hint="Your username will be visible to the other party"
             >
               {() => <TransferView />}
             </WithUsernameGate>
@@ -128,10 +128,10 @@ function AppContent() {
           <motion.div key="videocall" {...pageTransition}>
             <WithUsernameGate
               icon={<Video className="w-7 h-7 text-primary" />}
-              title="Görüntülü"
-              highlight="Görüşme"
-              description="Şifreli peer-to-peer video görüşmesi. 5 kişiye kadar."
-              hint="Kullanıcı adın diğer katılımcılara gösterilecek"
+              title="Video"
+              highlight="Call"
+              description="Encrypted peer-to-peer video call. Up to 5 participants."
+              hint="Your username will be shown to other participants"
             >
               {() => <VideoCallView />}
             </WithUsernameGate>
@@ -142,10 +142,10 @@ function AppContent() {
           <motion.div key="chatroom" {...pageTransition}>
             <WithUsernameGate
               icon={<MessageSquare className="w-7 h-7 text-primary" />}
-              title="Sohbet"
-              highlight="Odası"
-              description="Anlık şifreli mesajlaşma odaları. 5 kişiye kadar."
-              hint="Sohbet odasında bu isimle görüneceksin"
+              title="Chat"
+              highlight="Room"
+              description="Instant encrypted messaging rooms. Up to 5 people."
+              hint="You will appear in the chat room with this name"
             >
               {(username) => <ChatRoomView initialUsername={username} />}
             </WithUsernameGate>

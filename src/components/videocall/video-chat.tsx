@@ -97,7 +97,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Sohbet</span>
+          <span className="text-sm font-semibold text-foreground">Chat</span>
         </div>
         <button
           onClick={onClose}
@@ -112,7 +112,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
         {chatMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <MessageSquare className="w-8 h-8 text-muted/40" />
-            <p className="text-xs text-muted">Henüz mesaj yok. Sohbeti başlat!</p>
+            <p className="text-xs text-muted">No messages yet. Start the conversation!</p>
           </div>
         )}
 
@@ -150,7 +150,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
       <div className="flex-shrink-0 p-3 border-t border-border">
         {dataConnections.size === 0 && (
           <p className="text-xs text-muted text-center mb-2">
-            Bağlı peer olmadığında mesaj gönderilemez
+            No peers connected — messages cannot be sent
           </p>
         )}
         <div className="flex gap-2">
@@ -159,7 +159,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Mesaj yaz... (Enter gönder)"
+            placeholder="Type a message... (Enter to send)"
             className="glass-input flex-1 text-sm py-2 px-3 rounded-xl"
             style={{ fontSize: '16px' }} // prevent iOS zoom
           />

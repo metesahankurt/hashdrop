@@ -127,7 +127,7 @@ export function QrScanner({ onCodeScanned, onClose }: QrScannerProps) {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Camera className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">QR Tarayıcı</span>
+              <span className="text-sm font-semibold text-foreground">QR Scanner</span>
             </div>
             <button onClick={handleClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-all">
               <X className="w-4 h-4 text-muted" />
@@ -165,16 +165,16 @@ export function QrScanner({ onCodeScanned, onClose }: QrScannerProps) {
                     ))}
                   </div>
                 </div>
-                <p className="text-xs text-muted text-center mt-3">Kamerayı QR koda tutun</p>
+                <p className="text-xs text-muted text-center mt-3">Point your camera at a QR code</p>
               </div>
             )}
 
             {status === 'error' && (
               <div className="text-center py-10 space-y-3">
                 <Camera className="w-10 h-10 text-danger mx-auto" />
-                <p className="text-sm text-muted">Kamera erişimi sağlanamadı. Lütfen izin verin.</p>
+                <p className="text-sm text-muted">Camera access denied. Please allow permission.</p>
                 <button onClick={handleClose} className="glass-btn-primary px-4 py-2 text-sm rounded-xl">
-                  Kapat
+                  Close
                 </button>
               </div>
             )}
@@ -182,13 +182,13 @@ export function QrScanner({ onCodeScanned, onClose }: QrScannerProps) {
             {status === 'result' && result && (
               <div className="space-y-3">
                 <div className="glass-card rounded-xl p-3">
-                  <p className="text-xs text-muted mb-1">Taranan içerik</p>
+                  <p className="text-xs text-muted mb-1">Scanned content</p>
                   <p className="text-sm text-foreground break-all font-mono">{result}</p>
                 </div>
                 <div className="flex gap-2">
                   <button onClick={copyResult} className="flex-1 glass-btn rounded-xl py-2 text-sm flex items-center justify-center gap-2">
                     {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
-                    {copied ? 'Kopyalandı' : 'Kopyala'}
+                    {copied ? 'Copied' : 'Copy'}
                   </button>
                   {result.startsWith('http') && (
                     <a
@@ -198,12 +198,12 @@ export function QrScanner({ onCodeScanned, onClose }: QrScannerProps) {
                       className="flex-1 glass-btn rounded-xl py-2 text-sm flex items-center justify-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />
-                      Aç
+                      Open
                     </a>
                   )}
                 </div>
                 <button onClick={handleClose} className="w-full glass-btn-primary py-2 rounded-xl text-sm">
-                  Kapat
+                  Close
                 </button>
               </div>
             )}

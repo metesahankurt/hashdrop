@@ -359,7 +359,7 @@ export function VideoConnection() {
     setInputCode(code)
     setShowQRScanner(false)
     setShowReceive(true)
-    toast.success('QR kodu okundu! Bağlanmak için "Join Call" butonuna bas.')
+    toast.success('QR code scanned! Press "Join Call" to connect.')
   }, [])
 
   const copyCode = () => {
@@ -441,8 +441,7 @@ export function VideoConnection() {
                   <div className={`w-3 h-3 rounded-full bg-white mt-0.5 ml-0.5 transition-all ${enablePassword ? 'translate-x-4' : 'translate-x-0'}`} />
                 </div>
                 <span className="text-xs text-muted group-hover:text-foreground transition-colors flex items-center gap-1">
-                  <Lock className="w-3 h-3" />
-                  Şifre Koru
+                  <Lock className="w-3 h-3" /> Password protect
                 </span>
               </label>
 
@@ -452,7 +451,7 @@ export function VideoConnection() {
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Çağrı şifresi..."
+                        placeholder="Call password..."
                         value={passwordInput}
                         onChange={(e) => setPasswordInput(e.target.value)}
                         className="glass-input w-full text-sm pr-9"
@@ -466,7 +465,7 @@ export function VideoConnection() {
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    {callPasswordHash && <p className="text-xs text-primary mt-1">✓ Şifre ayarlandı</p>}
+                    {callPasswordHash && <p className="text-xs text-primary mt-1">✓ Password set</p>}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -517,7 +516,7 @@ export function VideoConnection() {
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Şifre (varsa)"
+                        placeholder="Password (if any)"
                         value={joinPassword}
                         onChange={(e) => setJoinPassword(e.target.value)}
                         className="glass-input w-full text-sm pr-9"

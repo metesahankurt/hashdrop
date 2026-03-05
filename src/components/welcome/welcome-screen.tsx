@@ -54,7 +54,7 @@ export function WelcomeScreen() {
           <span className="text-primary font-bold">HashDrop</span>
         </h1>
         <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
-          Güvenli uçtan uca iletişim. Bulut yok. Limit yok.
+          Secure end-to-end communication. No cloud. No limits.
         </p>
       </div>
 
@@ -62,27 +62,27 @@ export function WelcomeScreen() {
       <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
         <FeatureCard
           icon={<Send className="w-6 h-6 text-primary" />}
-          title="Dosya Transferi"
-          description="Işık hızında, doğrudan cihazdan cihaza dosya gönder. Bulut yok, limit yok."
-          cta="Transfere başla"
+          title="File Transfer"
+          description="Blazing-fast, direct device-to-device file transfer. No cloud, no limits."
+          cta="Start transfer"
           onClick={() => setAppMode('transfer')}
         />
 
         <FeatureCard
           icon={<Video className="w-6 h-6 text-primary" />}
-          title="Görüntülü Görüşme"
-          description="Uçtan uca şifreli görüntülü görüşme. 5 kişiye kadar destekler."
-          cta="Görüşme başlat"
-          badge="YENİ"
+          title="Video Call"
+          description="End-to-end encrypted video calls. Supports up to 5 participants."
+          cta="Start a call"
+          badge="NEW"
           onClick={() => setAppMode('videocall')}
         />
 
         <FeatureCard
           icon={<MessageSquare className="w-6 h-6 text-primary" />}
-          title="Sohbet Odası"
-          description="Şifreli anlık mesajlaşma odaları. 5 kişiye kadar. Kamera yok, sadece yazışma."
-          cta="Odaya gir"
-          badge="YENİ"
+          title="Chat Room"
+          description="Encrypted instant messaging rooms. Up to 5 people. No camera, text only."
+          cta="Enter room"
+          badge="NEW"
           onClick={() => setAppMode('chatroom')}
         />
       </div>

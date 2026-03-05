@@ -60,7 +60,7 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
           <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
           <input
             type="text"
-            placeholder="Kullanıcı adın..."
+            placeholder="Your username..."
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleConfirm()}
@@ -87,7 +87,7 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
           disabled={!name.trim()}
           className="glass-btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Devam Et
+          Continue
           <ArrowRight className="w-4 h-4" />
         </button>
 
@@ -96,7 +96,7 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
             onClick={() => { setName(savedUsername); onConfirm(savedUsername) }}
             className="text-xs text-muted hover:text-foreground underline transition-colors"
           >
-            &quot;{savedUsername}&quot; olarak devam et
+            Continue as &quot;{savedUsername}&quot;
           </button>
         )}
       </div>

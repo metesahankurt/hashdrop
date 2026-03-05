@@ -14,37 +14,37 @@ interface IncomingRequestScreenProps {
 const modeConfig = {
   transfer: {
     icon: Send,
-    label: 'Dosya Transferi',
+    label: 'File Transfer',
     color: 'text-primary',
     bgColor: 'bg-primary/10',
     borderColor: 'border-primary/20',
-    actionText: 'Dosyayı Al',
-    description: 'sizi bir dosya transferine davet ediyor.',
+    actionText: 'Receive File',
+    description: 'is inviting you to a file transfer.',
   },
   videocall: {
     icon: Video,
-    label: 'Görüntülü Görüşme',
+    label: 'Video Call',
     color: 'text-primary',
     bgColor: 'bg-primary/10',
     borderColor: 'border-primary/20',
-    actionText: 'Görüşmeye Katıl',
-    description: 'sizi görüntülü görüşmeye davet ediyor.',
+    actionText: 'Join Call',
+    description: 'is inviting you to a video call.',
   },
   chatroom: {
     icon: MessageSquare,
-    label: 'Sohbet Odası',
+    label: 'Chat Room',
     color: 'text-primary',
     bgColor: 'bg-primary/10',
     borderColor: 'border-primary/20',
-    actionText: 'Odaya Katıl',
-    description: 'sizi sohbet odasına davet ediyor.',
+    actionText: 'Join Room',
+    description: 'is inviting you to a chat room.',
   },
 }
 
 export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }: IncomingRequestScreenProps) {
   const cfg = modeConfig[mode]
   const Icon = cfg.icon
-  const senderName = from || 'Birisi'
+  const senderName = from || 'Someone'
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative z-10">
@@ -84,7 +84,7 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
 
           {/* Code display */}
           <div className="glass-card rounded-xl px-4 py-2.5 inline-flex items-center gap-2">
-            <span className="text-xs text-muted">Kod:</span>
+            <span className="text-xs text-muted">Code:</span>
             <span className="font-mono text-sm text-primary font-bold tracking-wide">{code}</span>
           </div>
         </div>
@@ -97,7 +97,7 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
             className="flex-1 py-3 rounded-xl glass-card text-sm font-medium text-muted hover:text-foreground hover:bg-white/10 transition-all flex items-center justify-center gap-2"
           >
             <X className="w-4 h-4" />
-            Reddet
+            Decline
           </button>
 
           {/* Accept */}
@@ -112,7 +112,7 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
         </div>
 
         <p className="text-xs text-muted/60">
-          Güvenli uçtan uca şifreli bağlantı
+          Secure end-to-end encrypted connection
         </p>
       </motion.div>
     </div>
