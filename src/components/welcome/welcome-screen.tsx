@@ -1,6 +1,6 @@
 'use client'
 
-import { Video, Send } from 'lucide-react'
+import { Video, Send, MessageSquare } from 'lucide-react'
 import { useAppStore } from '@/store/use-app-store'
 
 export function WelcomeScreen() {
@@ -19,21 +19,19 @@ export function WelcomeScreen() {
         </p>
       </div>
 
-      {/* Cards Grid */}
-      <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        {/* Video Call Card */}
+      {/* Cards Grid — 3 cards in responsive layout */}
+      <div className="w-full max-w-3xl grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+        {/* Video Call */}
         <button
           onClick={() => setAppMode('videocall')}
-          className="glass-card-hover rounded-2xl p-6 md:p-8 text-left group cursor-pointer"
+          className="glass-card-hover rounded-2xl p-6 md:p-7 text-left group cursor-pointer"
         >
           <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
             <Video className="w-6 h-6 text-primary" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Video Call
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">Video Call</h2>
           <p className="text-sm text-muted leading-relaxed">
-            Start a secure peer-to-peer video call with end-to-end encryption
+            Peer-to-peer video calls with end-to-end encryption. Up to 5 people.
           </p>
           <div className="mt-5 inline-flex items-center text-sm text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
             Start call
@@ -43,19 +41,41 @@ export function WelcomeScreen() {
           </div>
         </button>
 
-        {/* File Transfer Card */}
+        {/* Chat Room */}
+        <button
+          onClick={() => setAppMode('chatroom')}
+          className="glass-card-hover rounded-2xl p-6 md:p-7 text-left group cursor-pointer relative"
+        >
+          {/* NEW badge */}
+          <div className="absolute top-3 right-3 bg-primary/20 border border-primary/30 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full">
+            YENİ
+          </div>
+          <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
+            <MessageSquare className="w-6 h-6 text-primary" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground mb-2">Sohbet Odası</h2>
+          <p className="text-sm text-muted leading-relaxed">
+            Şifresiz veya şifreli anlık sohbet odaları. 5 kişiye kadar. Kamera yok, sadece yazışma.
+          </p>
+          <div className="mt-5 inline-flex items-center text-sm text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            Odaya gir
+            <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </button>
+
+        {/* File Transfer */}
         <button
           onClick={() => setAppMode('transfer')}
-          className="glass-card-hover rounded-2xl p-6 md:p-8 text-left group cursor-pointer"
+          className="glass-card-hover rounded-2xl p-6 md:p-7 text-left group cursor-pointer"
         >
           <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
             <Send className="w-6 h-6 text-primary" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            File Transfer
-          </h2>
+          <h2 className="text-lg font-semibold text-foreground mb-2">File Transfer</h2>
           <p className="text-sm text-muted leading-relaxed">
-            Send files at lightspeed with direct peer-to-peer transfer
+            Send files at lightspeed with direct peer-to-peer transfer.
           </p>
           <div className="mt-5 inline-flex items-center text-sm text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
             Transfer files

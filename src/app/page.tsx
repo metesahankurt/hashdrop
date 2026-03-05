@@ -7,6 +7,7 @@ import { SignatureBadge } from "@/components/ui/signature-badge";
 import { WelcomeScreen } from "@/components/welcome/welcome-screen";
 import { TransferView } from "@/components/transfer/transfer-view";
 import { VideoCallView } from "@/components/videocall/video-call-view";
+import { ChatRoomView } from "@/components/chatroom/chat-room-view";
 import { useAppStore } from "@/store/use-app-store";
 import { useSearchParams } from "next/navigation";
 
@@ -30,6 +31,8 @@ function AppContent() {
 
     if (mode === "videocall") {
       setAppMode("videocall");
+    } else if (mode === "chatroom") {
+      setAppMode("chatroom");
     } else if (code) {
       setAppMode("transfer");
     }
@@ -80,6 +83,12 @@ function AppContent() {
         {appMode === "videocall" && (
           <motion.div key="videocall" {...pageTransition}>
             <VideoCallView />
+          </motion.div>
+        )}
+
+        {appMode === "chatroom" && (
+          <motion.div key="chatroom" {...pageTransition}>
+            <ChatRoomView />
           </motion.div>
         )}
       </AnimatePresence>

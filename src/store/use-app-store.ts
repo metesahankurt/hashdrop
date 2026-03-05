@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type AppMode = 'welcome' | 'transfer' | 'videocall'
+export type AppMode = 'welcome' | 'transfer' | 'videocall' | 'chatroom'
 
 interface AppState {
   appMode: AppMode
