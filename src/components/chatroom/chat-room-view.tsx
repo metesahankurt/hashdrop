@@ -41,43 +41,7 @@ function LinkText({ text }: { text: string }) {
   )
 }
 
-// ============================================================
-// STEP 1 — Username entry
-// ============================================================
-function UsernameStep({ onNext }: { onNext: (name: string) => void }) {
-  const [name, setName] = useState('')
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-md mx-auto space-y-6 text-center">
-      <div className="space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
-          <MessageSquare className="w-7 h-7 text-primary" />
-        </div>
-        <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">
-          Sohbet <span className="text-primary font-bold">Odası</span>
-        </h2>
-        <p className="text-muted text-sm">Önce kendine bir kullanıcı adı seç</p>
-      </div>
-      <div className="space-y-3">
-        <input
-          type="text"
-          placeholder="Kullanıcı adın..."
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && name.trim() && onNext(name.trim())}
-          className="glass-input w-full text-center text-lg font-medium"
-          style={{ fontSize: '16px' }}
-          maxLength={24}
-          autoFocus
-        />
-        <button onClick={() => name.trim() && onNext(name.trim())} disabled={!name.trim()}
-          className="glass-btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40">
-          Devam Et <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    </motion.div>
-  )
-}
+
 
 // ============================================================
 // STEP 2 — Room code generation + join
@@ -378,15 +342,22 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
 // ============================================================
 // MAIN — ChatRoomView
 // ============================================================
-type Step = 'username' | 'setup' | 'chatting'
+type Step = 'setup' | 'chatting'
 
-export function ChatRoomView() {
+export function ChatRoomView({ initialUsername }: { initialUsername?: string }) {
   const {
     setPeer, setStatus, username, setUsername, setRoomCode, setRoomPasswordHash,
     addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
   } = useChatRoomStore()
 
-  const [step, setStep] = useState<Step>('username')
+  // Use provided username (from gate) or whatever's in the store
+  useEffect(() => {
+    if (initialUsername && !username) setUsername(initialUsername)
+    else if (initialUsername) setUsername(initialUsername)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const [step, setStep] = useState<Step>('setup')
   const mountedRef = useRef(true)
 
   useEffect(() => {
@@ -399,7 +370,7 @@ export function ChatRoomView() {
     addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
   }, [addMessage])
 
-  const handleLeave = useCallback(() => { resetRoom(); setStep('username') }, [resetRoom])
+  const handleLeave = useCallback(() => { resetRoom(); setStep('setup') }, [resetRoom])
 
   const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null) => {
     conn.on('data', (raw) => {
@@ -513,14 +484,9 @@ export function ChatRoomView() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
       <AnimatePresence mode="wait">
-        {step === 'username' && (
-          <motion.div key="username" className="w-full">
-            <UsernameStep onNext={(name) => { setUsername(name); setStep('setup') }} />
-          </motion.div>
-        )}
         {step === 'setup' && (
           <motion.div key="setup" className="w-full">
-            <RoomSetup username={username} onBack={() => setStep('username')} onRoomReady={handleRoomReady} />
+            <RoomSetup username={username} onBack={() => setStep('setup')} onRoomReady={handleRoomReady} />
           </motion.div>
         )}
         {step === 'chatting' && (

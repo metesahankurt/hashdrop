@@ -8,8 +8,10 @@ import { WelcomeScreen } from "@/components/welcome/welcome-screen";
 import { TransferView } from "@/components/transfer/transfer-view";
 import { VideoCallView } from "@/components/videocall/video-call-view";
 import { ChatRoomView } from "@/components/chatroom/chat-room-view";
-import { useAppStore } from "@/store/use-app-store";
+import { WithUsernameGate } from "@/components/ui/username-gate";
+import { Video, Send, MessageSquare } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { useAppStore } from "@/store/use-app-store";
 
 const pageTransition = {
   initial: { opacity: 0 },
@@ -76,19 +78,43 @@ function AppContent() {
 
         {appMode === "transfer" && (
           <motion.div key="transfer" {...pageTransition}>
-            <TransferView />
+            <WithUsernameGate
+              icon={<Send className="w-7 h-7 text-primary" />}
+              title="Dosya"
+              highlight="Transferi"
+              description="Peer-to-peer dosya transferi. Bulut yok, limit yok."
+              hint="Kullanıcı adın diğer tarafta gözükür"
+            >
+              {() => <TransferView />}
+            </WithUsernameGate>
           </motion.div>
         )}
 
         {appMode === "videocall" && (
           <motion.div key="videocall" {...pageTransition}>
-            <VideoCallView />
+            <WithUsernameGate
+              icon={<Video className="w-7 h-7 text-primary" />}
+              title="Görüntülü"
+              highlight="Görüşme"
+              description="Şifreli peer-to-peer video görüşmesi. 5 kişiye kadar."
+              hint="Kullanıcı adın diğer katılımcılara gösterilecek"
+            >
+              {() => <VideoCallView />}
+            </WithUsernameGate>
           </motion.div>
         )}
 
         {appMode === "chatroom" && (
           <motion.div key="chatroom" {...pageTransition}>
-            <ChatRoomView />
+            <WithUsernameGate
+              icon={<MessageSquare className="w-7 h-7 text-primary" />}
+              title="Sohbet"
+              highlight="Odası"
+              description="Anlık şifreli mesajlaşma odaları. 5 kişiye kadar."
+              hint="Sohbet odasında bu isimle görüneceksin"
+            >
+              {(username) => <ChatRoomView initialUsername={username} />}
+            </WithUsernameGate>
           </motion.div>
         )}
       </AnimatePresence>
