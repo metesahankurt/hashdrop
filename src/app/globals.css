@@ -36,18 +36,18 @@ body {
 
 :root {
   /* Supabase-Inspired Clean Theme */
-  --background: #0D0D0D;
-  --foreground: #EDEDED;
+  --background: #0d0d0d;
+  --foreground: #ededed;
 
   --card: rgba(255, 255, 255, 0.03);
   --card-hover: rgba(255, 255, 255, 0.05);
   --border: rgba(255, 255, 255, 0.08);
 
-  --primary: #3ECF8E; /* Supabase Green */
-  --primary-dark: #2AB672;
-  --success: #3ECF8E;
-  --danger: #F04438;
-  --muted: #8B8B8B;
+  --primary: #3ecf8e; /* Supabase Green */
+  --primary-dark: #2ab672;
+  --success: #3ecf8e;
+  --danger: #f04438;
+  --muted: #8b8b8b;
 
   /* Minimal Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -81,7 +81,7 @@ body {
 
 /* Subtle gradient accent - Supabase style */
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   top: 0;
   left: 0;
@@ -89,7 +89,12 @@ body::before {
   bottom: 0;
   width: 100%;
   height: 100%;
-  background: radial-gradient(ellipse 1400px 1000px at 50% 0%, rgba(62, 207, 142, 0.08) 0%, rgba(62, 207, 142, 0.03) 40%, transparent 80%);
+  background: radial-gradient(
+    ellipse 1400px 1000px at 50% 0%,
+    rgba(62, 207, 142, 0.08) 0%,
+    rgba(62, 207, 142, 0.03) 40%,
+    transparent 80%
+  );
   pointer-events: none;
   z-index: 0;
 }
@@ -144,9 +149,37 @@ body::before {
   font-weight: 500;
   font-size: 0.875rem;
   background: var(--primary);
-  color: #0D0D0D;
+  color: #0d0d0d;
   border: 1px solid var(--primary);
   box-shadow: var(--shadow-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Icon-only variant — resets padding so icons aren't clipped */
+.glass-icon-btn {
+  padding: 0 !important;
+  background: var(--primary);
+  color: #0d0d0d;
+  border: 1px solid var(--primary);
+  box-shadow: var(--shadow-sm);
+  border-radius: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-icon-btn:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .glass-btn-primary:hover {
@@ -172,6 +205,11 @@ body::before {
   font-size: 0.875rem;
 }
 
+/* Input with a leading icon — extra left padding so placeholder doesn't overlap */
+.glass-input-icon {
+  padding-left: 2.75rem !important;
+}
+
 .glass-input:focus {
   background: var(--card-hover);
   border-color: var(--primary);
@@ -190,7 +228,11 @@ body::before {
 
 /* Progress Gradient */
 .progress-gradient {
-  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--primary) 0%,
+    var(--primary-dark) 100%
+  );
 }
 
 /* Clean Typography */

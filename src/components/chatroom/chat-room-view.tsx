@@ -5,12 +5,11 @@ import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, ArrowRight, Copy, Check, Clock,
-  Send, Users, Lock, Eye, EyeOff, X, ChevronLeft, QrCode, Share2, ScanLine
+  Send, Users, X, QrCode, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff
 } from 'lucide-react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
-import { QRCodeDisplay } from '@/components/transfer/qr-code-display'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { toast } from 'sonner'
 import type { DataConnection } from 'peerjs'
@@ -42,195 +41,109 @@ function LinkText({ text }: { text: string }) {
   )
 }
 
-
-
 // ============================================================
-// STEP 2 — Room code generation + join
+// JOIN SCREEN — shown when user wants to join an existing room
 // ============================================================
-interface RoomSetupProps {
+interface JoinScreenProps {
   username: string
   onBack: () => void
-  onRoomReady: (code: string, passwordHash: string | null, isHost: boolean) => void
+  onJoin: (code: string, pwdHash: string | null) => void
 }
 
-function RoomSetup({ username, onBack, onRoomReady }: RoomSetupProps) {
-  const [genCode] = useState(() => generateSecureCode())
+function JoinScreen({ username, onBack, onJoin }: JoinScreenProps) {
   const [inputCode, setInputCode] = useState('')
   const [joinPassword, setJoinPassword] = useState('')
-  const [enablePassword, setEnablePassword] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
   const [showPwd, setShowPwd] = useState(false)
-  const [showJoinPwd, setShowJoinPwd] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [showQR, setShowQR] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
-  const [showJoin, setShowJoin] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(CODE_EXPIRY_MS / 1000)
-  const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
-  const expiryTime = useRef<number>(0)
-
-  useEffect(() => {
-    expiryTime.current = Date.now() + CODE_EXPIRY_MS
-    const interval = setInterval(() => {
-      const left = Math.max(0, Math.ceil((expiryTime.current - Date.now()) / 1000))
-      setTimeLeft(left)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(genCode)
-    setCopied(true); toast.success('Code copied!')
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const shareCode = async () => {
-    const { username } = useUsernameStore.getState()
-    const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
-    try { await navigator.share({ title: 'HashDrop Chat Room', text: `Join my chat room: ${genCode}`, url: `https://hashdrop.metesahankurt.cloud?mode=chatroom&code=${genCode}${fromParam}` }) } catch { /* ignore */ }
-  }
-
-  const handleCreate = async () => {
-    const hash = enablePassword && passwordInput ? await hashPassword(passwordInput) : null
-    onRoomReady(genCode, hash, true)
-  }
 
   const handleJoin = async () => {
     if (!inputCode.trim()) return
     const hash = joinPassword ? await hashPassword(joinPassword) : null
-    onRoomReady(inputCode.trim(), hash, false)
+    onJoin(inputCode.trim(), hash)
   }
-
-  const callUrl = `https://hashdrop.metesahankurt.cloud?mode=chatroom&code=${genCode}`
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="w-full max-w-md mx-auto space-y-5">
-      {/* Back + username */}
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-lg transition-all text-muted hover:text-foreground">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
-            {username[0]?.toUpperCase()}
-          </div>
-          <span className="text-sm text-foreground font-medium">{username}</span>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Join a Room</h2>
+          <p className="text-xs text-muted">Joining as <span className="text-primary">{username}</span></p>
         </div>
       </div>
 
-      {/* Create Room */}
       <div className="glass-card rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">Create Room</h3>
-        <div className="flex items-center gap-2 glass-card rounded-xl px-3 py-2.5 glow-primary">
-          <span className="font-mono text-lg text-primary font-bold tracking-wide flex-1">{genCode}</span>
-          <div className="flex gap-1">
-            <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-              {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4 text-muted" />}
-            </button>
-            {canShare && <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all"><Share2 className="w-4 h-4 text-muted" /></button>}
-            <button onClick={() => setShowQR(!showQR)} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-              <QrCode className={`w-4 h-4 ${showQR ? 'text-primary' : 'text-muted'}`} />
-            </button>
-          </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Enter room code (e.g. Cosmic-Falcon)"
+            value={inputCode}
+            onChange={e => setInputCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleJoin()}
+            className="glass-input flex-1 text-base font-mono text-center"
+            style={{ fontSize: '16px' }}
+            autoFocus
+          />
+          <button onClick={() => setShowQRScanner(true)} className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all">
+            <ScanLine className="w-4 h-4" />
+          </button>
         </div>
 
-        <AnimatePresence>
-          {showQR && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden flex justify-center">
-              <QRCodeDisplay code={genCode} size={160} url={callUrl} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="flex items-center justify-center gap-1.5 text-xs text-muted">
-          <Clock className="w-3 h-3" />
-          <span>Expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+        <div className="relative">
+          <input
+            type={showPwd ? 'text' : 'password'}
+            placeholder="Password (if any)"
+            value={joinPassword}
+            onChange={e => setJoinPassword(e.target.value)}
+            className="glass-input w-full text-sm pr-9"
+            style={{ fontSize: '16px' }}
+          />
+          <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
+            {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Password */}
-        <div>
-          <label className="flex items-center gap-2 cursor-pointer mb-2">
-            <div onClick={() => setEnablePassword(!enablePassword)}
-              className={`w-9 h-5 rounded-full transition-all relative flex-shrink-0 ${enablePassword ? 'bg-primary' : 'bg-white/20'}`}>
-              <div className={`absolute top-1 w-3 h-3 rounded-full bg-white shadow transition-all ${enablePassword ? 'left-5' : 'left-1'}`} />
-            </div>
-            <span className="text-xs text-muted flex items-center gap-1"><Lock className="w-3 h-3" /> Password protect</span>
-          </label>
-          <AnimatePresence>
-            {enablePassword && (
-              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                <div className="relative">
-                  <input type={showPwd ? 'text' : 'password'} placeholder="Room password..." value={passwordInput}
-                    onChange={e => setPasswordInput(e.target.value)} className="glass-input w-full text-sm pr-9" style={{ fontSize: '16px' }} />
-                  <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        <button onClick={handleCreate} className="glass-btn-primary w-full py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
-          Create Room <ArrowRight className="w-4 h-4" />
+        <button
+          onClick={handleJoin}
+          disabled={!inputCode.trim()}
+          className="glass-btn-primary w-full py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          Join Room <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/30" /></div>
-        <div className="relative flex justify-center"><span className="px-3 text-xs text-muted bg-background">veya</span></div>
-      </div>
-
-      <button onClick={() => setShowJoin(!showJoin)} className="w-full py-2 text-sm text-muted hover:text-foreground transition-all flex items-center justify-center gap-2">
-        <span>{showJoin ? 'Hide' : 'Join a Room'}</span>
-        <motion.div animate={{ rotate: showJoin ? 90 : 0 }} transition={{ duration: 0.2 }}><ArrowRight className="w-4 h-4" /></motion.div>
-      </button>
-
-      <AnimatePresence>
-        {showJoin && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-            <div className="glass-card rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Enter Room Code</h3>
-              <div className="flex gap-2">
-                <input type="text" placeholder="Cosmic-Falcon" value={inputCode} onChange={e => setInputCode(e.target.value)}
-                  className="glass-input flex-1 text-base font-mono text-center" style={{ fontSize: '16px' }} />
-                <button onClick={() => setShowQRScanner(true)} className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all">
-                  <ScanLine className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="relative">
-                <input type={showJoinPwd ? 'text' : 'password'} placeholder="Password (if any)" value={joinPassword}
-                  onChange={e => setJoinPassword(e.target.value)} className="glass-input w-full text-sm pr-9" style={{ fontSize: '16px' }} />
-                <button onClick={() => setShowJoinPwd(!showJoinPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
-                  {showJoinPwd ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-              <button onClick={handleJoin} disabled={!inputCode.trim()}
-                className="glass-btn-primary w-full py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2">
-                Join <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {showQRScanner && (
-        <QrScanner onCodeScanned={(code) => { setInputCode(code); setShowQRScanner(false); setShowJoin(true); toast.success('QR scanned!') }}
-          onClose={() => setShowQRScanner(false)} />
+        <QrScanner
+          onCodeScanned={(code) => { setInputCode(code); setShowQRScanner(false); toast.success('QR scanned!') }}
+          onClose={() => setShowQRScanner(false)}
+        />
       )}
     </motion.div>
   )
 }
 
 // ============================================================
-// STEP 3 — Live Chat Room
+// LIVE CHAT ROOM
 // ============================================================
-function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => void }) {
+interface LiveChatRoomProps {
+  username: string
+  roomCode: string
+  timeLeft: number
+  onLeave: () => void
+}
+
+function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomProps) {
   const { messages, participants, dataConnections, addMessage } = useChatRoomStore()
   const [input, setInput] = useState('')
   const [showParticipants, setShowParticipants] = useState(false)
+  const [showCode, setShowCode] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
   const bottomRef = useRef<HTMLDivElement>(null)
+  // Only show remote participants (not self)
   const participantList = useMemo(() => Array.from(participants.entries()), [participants])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -249,6 +162,24 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
     onLeave()
   }
 
+  const copyCode = () => {
+    navigator.clipboard.writeText(roomCode)
+    setCopied(true); toast.success('Code copied!')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const shareCode = async () => {
+    const { username: uname } = useUsernameStore.getState()
+    const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
+    try {
+      await navigator.share({
+        title: 'HashDrop Chat Room',
+        text: `Join my chat room: ${roomCode}`,
+        url: `https://hashdrop.metesahankurt.cloud?mode=chatroom&code=${roomCode}${fromParam}`
+      })
+    } catch { /* ignore */ }
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 480 }}>
       {/* Header */}
@@ -262,7 +193,17 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
             <p className="text-xs text-muted">{username}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Room code toggle */}
+          <button
+            onClick={() => setShowCode(!showCode)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted hover:text-foreground glass-card rounded-lg transition-all"
+            title="Share room code"
+          >
+            <QrCode className={`w-3.5 h-3.5 ${showCode ? 'text-primary' : ''}`} />
+            <span className="hidden sm:inline">Invite</span>
+          </button>
+          {/* Participants count */}
           <button onClick={() => setShowParticipants(!showParticipants)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted hover:text-foreground glass-card rounded-lg transition-all">
             <Users className="w-3.5 h-3.5" />
@@ -274,7 +215,33 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
         </div>
       </div>
 
-      {/* Participants */}
+      {/* Room code panel */}
+      <AnimatePresence>
+        {showCode && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="glass-card border-t-0 px-4 py-3 overflow-hidden shrink-0 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-primary font-bold tracking-wide text-sm flex-1">{roomCode}</span>
+              <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
+                {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
+              </button>
+              {canShare && (
+                <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
+                  <Share2 className="w-4 h-4 text-muted" />
+                </button>
+              )}
+            </div>
+            {timeLeft > 0 && (
+              <div className="flex items-center gap-1 text-xs text-muted">
+                <Clock className="w-3 h-3" />
+                <span>Code expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Participants panel */}
       <AnimatePresence>
         {showParticipants && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
@@ -329,11 +296,20 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
       {/* Input */}
       <div className="glass-card border-t-0 rounded-b-2xl px-3 py-3 shrink-0">
         <div className="flex gap-2">
-          <input type="text" value={input} onChange={e => setInput(e.target.value)}
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-            placeholder="Type a message... (Enter)" className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl" style={{ fontSize: '16px' }} />
-          <button onClick={sendMessage} disabled={!input.trim()}
-            className="w-10 h-10 rounded-xl glass-btn-primary flex items-center justify-center disabled:opacity-40 shrink-0">
+            placeholder="Type a message... (Enter)"
+            className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl"
+            style={{ fontSize: '16px' }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={!input.trim()}
+            className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             <Send className="w-4 h-4" />
           </button>
         </div>
@@ -345,7 +321,7 @@ function LiveChatRoom({ username, onLeave }: { username: string; onLeave: () => 
 // ============================================================
 // MAIN — ChatRoomView
 // ============================================================
-type Step = 'setup' | 'chatting'
+type Step = 'creating' | 'join' | 'chatting'
 
 export function ChatRoomView({ initialUsername }: { initialUsername?: string }) {
   const {
@@ -353,15 +329,17 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
   } = useChatRoomStore()
 
-  // Use provided username (from gate) or whatever's in the store
   useEffect(() => {
-    if (initialUsername && !username) setUsername(initialUsername)
-    else if (initialUsername) setUsername(initialUsername)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (initialUsername) setUsername(initialUsername)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [step, setStep] = useState<Step>('setup')
+  const [step, setStep] = useState<Step>('creating')
+  const [timeLeft, setTimeLeft] = useState(CODE_EXPIRY_MS / 1000)
+  const [isCreating, setIsCreating] = useState(false)
+  const [activeRoomCode, setActiveRoomCode] = useState(() => generateSecureCode())
   const mountedRef = useRef(true)
+  const expiryRef = useRef(Date.now() + CODE_EXPIRY_MS)
 
   useEffect(() => {
     mountedRef.current = true
@@ -369,24 +347,39 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Countdown timer
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const left = Math.max(0, Math.ceil((expiryRef.current - Date.now()) / 1000))
+      setTimeLeft(left)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
   const addSystemMsg = useCallback((text: string) => {
     addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
   }, [addMessage])
 
-  const handleLeave = useCallback(() => { resetRoom(); setStep('setup') }, [resetRoom])
+  const handleLeave = useCallback(() => { resetRoom(); setStep('creating'); setIsCreating(false); setActiveRoomCode(generateSecureCode()) }, [resetRoom])
 
-  const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null) => {
+  const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null, announcedRef: React.MutableRefObject<Set<string>>) => {
     conn.on('data', (raw) => {
       const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][] }
 
       if (data.type === 'chat' && data.payload) {
         addMessage({ ...data.payload, isLocal: false })
       } else if (data.type === 'announce' && data.username) {
+        // Add remote participant
         addParticipant(remotePeerId, data.username)
         addSystemMsg(`${data.username} joined the room`)
-        conn.send({ type: 'announce', username: localUsername })
-        const { participants: p } = useChatRoomStore.getState()
-        conn.send({ type: 'participants', participants: Array.from(p.entries()) })
+        // Only send our announce back once (if not already announced to this peer)
+        if (!announcedRef.current.has(remotePeerId)) {
+          announcedRef.current.add(remotePeerId)
+          conn.send({ type: 'announce', username: localUsername })
+          // Send participants list to the new joiner
+          const { participants: p } = useChatRoomStore.getState()
+          conn.send({ type: 'participants', participants: Array.from(p.entries()) })
+        }
       } else if (data.type === 'participants' && data.participants) {
         const { peer: localPeer } = useChatRoomStore.getState()
         data.participants.forEach(([pid, uname]) => { if (pid !== localPeer?.id) addParticipant(pid, uname) })
@@ -402,7 +395,11 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
           conn.send({ type: 'auth-ok' })
         }
       } else if (data.type === 'auth-ok') {
-        conn.send({ type: 'announce', username: localUsername })
+        // Send our announce exactly once
+        if (!announcedRef.current.has(remotePeerId)) {
+          announcedRef.current.add(remotePeerId)
+          conn.send({ type: 'announce', username: localUsername })
+        }
       } else if (data.type === 'auth-rejected') {
         toast.error('Wrong password — access denied')
         handleLeave()
@@ -421,83 +418,148 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     addDataConnection(remotePeerId, conn)
   }, [addMessage, addParticipant, removeParticipant, addDataConnection, removeDataConnection, addSystemMsg, handleLeave])
 
-  const handleRoomReady = useCallback(async (code: string, pwdHash: string | null, isHost: boolean) => {
+  // Auto-create room when component mounts (or when "creating" step is active)
+  const createRoom = useCallback(async (code: string, pwdHash: string | null) => {
+    const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
+    if (!currentUsername) return
+
+    setIsCreating(true)
     setRoomCode(code)
     setRoomPasswordHash(pwdHash)
     setStatus('generating')
 
     const peerId = codeToCallPeerId(code)
+    const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
       host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 1,
       config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     }
 
-    if (isHost) {
-      const newPeer = new Peer(peerId, peerConfig)
+    const newPeer = new Peer(peerId, peerConfig)
 
-      newPeer.on('open', () => {
-        if (!mountedRef.current) return
-        setPeer(newPeer)
-        addParticipant(newPeer.id, username)
+    newPeer.on('open', () => {
+      if (!mountedRef.current) return
+      setPeer(newPeer)
+      // NOTE: We do NOT add host to participants map — they're shown as "(you)" separately
+      setStatus('connected')
+      setStep('chatting')
+      addSystemMsg('Room created! Share the code to invite friends.')
+      setIsCreating(false)
+    })
+
+    newPeer.on('connection', (conn) => {
+      const { dataConnections } = useChatRoomStore.getState()
+      if (dataConnections.size >= MAX_PEERS) { conn.close(); return }
+      conn.on('open', () => setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef))
+    })
+
+    newPeer.on('error', (err) => {
+      if (err.type === 'unavailable-id') toast.error('This code is in use, try another.')
+      else toast.error('Connection error')
+      setStatus('failed')
+      setIsCreating(false)
+    })
+  }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
+
+  // Auto-start creating the room when component first mounts
+  useEffect(() => {
+    if (step === 'creating' && !isCreating) {
+      createRoom(activeRoomCode, null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoomCode])
+
+  const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
+    const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
+    if (!currentUsername) return
+
+    setRoomCode(code)
+    setRoomPasswordHash(pwdHash)
+    setStatus('generating')
+
+    const joinerPeerId = codeToCallPeerId(generateSecureCode())
+    const peerId = codeToCallPeerId(code)
+    const announcedRef = { current: new Set<string>() }
+
+    const peerConfig = {
+      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 1,
+      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+    }
+
+    const newPeer = new Peer(joinerPeerId, peerConfig)
+
+    newPeer.on('open', () => {
+      if (!mountedRef.current) return
+      setPeer(newPeer)
+
+      const conn = newPeer.connect(peerId, { reliable: true })
+      conn.on('open', () => {
+        setupConn(conn, peerId, currentUsername, null, announcedRef)
+        conn.send({ type: 'auth', hash: pwdHash || '' })
         setStatus('connected')
         setStep('chatting')
-        addSystemMsg('Room created! Share the code to invite friends.')
+        addSystemMsg('Connected to the room!')
       })
 
-      newPeer.on('connection', (conn) => {
-        const { dataConnections } = useChatRoomStore.getState()
-        if (dataConnections.size >= MAX_PEERS) { conn.close(); return }
-        conn.on('open', () => setupConn(conn, conn.peer, username, pwdHash))
-      })
-
-      newPeer.on('error', (err) => {
-        if (err.type === 'unavailable-id') toast.error('This code is in use, try another.')
-        else toast.error('Connection error')
+      conn.on('error', () => {
+        toast.error('Could not connect to room. Check the code.')
         setStatus('failed')
+        setStep('join')
       })
-    } else {
-      const joinerPeerId = codeToCallPeerId(generateSecureCode())
-      const newPeer = new Peer(joinerPeerId, peerConfig)
+    })
 
-      newPeer.on('open', () => {
-        if (!mountedRef.current) return
-        setPeer(newPeer)
-
-        const conn = newPeer.connect(peerId, { reliable: true })
-        conn.on('open', () => {
-          setupConn(conn, peerId, username, null)
-          // Send auth (empty hash if no password required)
-          conn.send({ type: 'auth', hash: pwdHash || '' })
-          setStatus('connected')
-          setStep('chatting')
-          addSystemMsg('Connected to the room!')
-        })
-
-        conn.on('error', () => {
-          toast.error('Could not connect to room. Check the code.')
-          setStatus('failed')
-        })
-      })
-
-      newPeer.on('error', () => { toast.error('Connection error'); setStatus('failed') })
-    }
-  }, [username, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addParticipant, addSystemMsg, setupConn])
+    newPeer.on('error', () => { toast.error('Connection error'); setStatus('failed'); setStep('join') })
+  }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
       <AnimatePresence mode="wait">
-        {step === 'setup' && (
-          <motion.div key="setup" className="w-full">
-            <RoomSetup username={username} onBack={() => setStep('setup')} onRoomReady={handleRoomReady} />
+        {/* Creating: loading spinner while auto-creating */}
+        {step === 'creating' && (
+          <motion.div key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+            <p className="text-sm text-muted">Setting up your room...</p>
           </motion.div>
         )}
+
+        {/* Join: enter existing room code */}
+        {step === 'join' && (
+          <motion.div key="join" className="w-full">
+            <JoinScreen
+              username={username || initialUsername || ''}
+              onBack={() => setStep('creating')}
+              onJoin={handleJoin}
+            />
+          </motion.div>
+        )}
+
+        {/* Live chat */}
         {step === 'chatting' && (
           <motion.div key="chatting" className="w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <LiveChatRoom username={username} onLeave={handleLeave} />
+            <LiveChatRoom
+              username={username || initialUsername || ''}
+              roomCode={activeRoomCode}
+              timeLeft={timeLeft}
+              onLeave={handleLeave}
+            />
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* "Join existing room" link shown when creating/loading */}
+      {step === 'creating' && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          onClick={() => { resetRoom(); setStep('join') }}
+          className="absolute bottom-8 text-xs text-muted hover:text-foreground underline transition-colors"
+        >
+          Join an existing room instead
+        </motion.button>
+      )}
     </div>
   )
 }

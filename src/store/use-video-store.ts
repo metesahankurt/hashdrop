@@ -43,6 +43,9 @@ interface VideoState {
   // Peer usernames (for tile labels)
   peerUsernames: Map<string, string>
 
+  // Pending incoming call (held until user confirms in lobby)
+  pendingCall: MediaConnection | null
+
   setPeer: (peer: Peer | null) => void
   addMediaConnection: (peerId: string, conn: MediaConnection) => void
   removeMediaConnection: (peerId: string) => void
@@ -73,6 +76,9 @@ interface VideoState {
   addPeerUsername: (peerId: string, username: string) => void
   removePeerUsername: (peerId: string) => void
 
+  // Pending call
+  setPendingCall: (call: MediaConnection | null) => void
+
   resetCall: () => void
 }
 
@@ -98,6 +104,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
 
   callPasswordHash: null,
   peerUsernames: new Map(),
+  pendingCall: null,
 
   setPeer: (peer) => set({ peer }),
 
@@ -197,6 +204,8 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     m.delete(peerId)
     set({ peerUsernames: m })
   },
+
+  setPendingCall: (call) => set({ pendingCall: call }),
 
   resetCall: () => {
     const { localStream, screenStream, peer, mediaConnections, dataConnections } = get()

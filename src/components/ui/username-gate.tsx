@@ -64,7 +64,7 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleConfirm()}
-            className="glass-input w-full pl-10 text-base"
+            className="glass-input glass-input-icon w-full text-base"
             style={{ fontSize: '16px' }}
             maxLength={24}
             autoFocus

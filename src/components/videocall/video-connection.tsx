@@ -37,6 +37,7 @@ export function VideoConnection() {
     addChatMessage,
     callPasswordHash, setCallPasswordHash,
     addPeerUsername, removePeerUsername,
+    setPendingCall,
   } = useVideoStore()
 
   const buildOutgoingStream = useCallback(() => {
@@ -293,15 +294,16 @@ export function VideoConnection() {
           conn.on('open', () => setupDataConnection(conn, conn.peer))
         })
 
-        // Incoming media calls
+        // Incoming media calls — store for lobby confirmation
         newPeer.on('call', (call) => {
           if (!mountedRef.current) return
           const { mediaConnections } = useVideoStore.getState()
           if (mediaConnections.size >= MAX_PEERS) { call.close(); return }
-          setCallStatus('ringing')
-          const outgoingStream = buildOutgoingStream()
-          if (outgoingStream) call.answer(outgoingStream)
+          // Attach event handlers now so stream/close/error work post-answer
           attachCallHandlers(call, call.peer, 'RECEIVER')
+          // Store call for lobby — user must click Join to answer()
+          setPendingCall(call)
+          setCallStatus('ringing')
         })
 
         newPeer.on('error', (err) => {
@@ -321,7 +323,7 @@ export function VideoConnection() {
       }
     }
     initPeer()
-  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, refreshCode, buildOutgoingStream, attachCallHandlers, setupDataConnection, enablePassword, passwordInput, setCallPasswordHash])
+  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, refreshCode, buildOutgoingStream, attachCallHandlers, setupDataConnection, enablePassword, passwordInput, setCallPasswordHash, setPendingCall])
 
   // ---------- Connect to peer (caller) ----------
   const connectToCall = useCallback(async (targetCode: string) => {

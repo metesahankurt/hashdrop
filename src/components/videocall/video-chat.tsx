@@ -166,7 +166,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
           <button
             onClick={sendMessage}
             disabled={!input.trim() || dataConnections.size === 0}
-            className="w-10 h-10 rounded-xl glass-btn-primary flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+            className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
           </button>

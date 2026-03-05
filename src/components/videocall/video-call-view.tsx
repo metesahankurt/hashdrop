@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { VideoConnection } from './video-connection'
 import { VideoDisplay } from './video-display'
 import { VideoControls } from './video-controls'
 import { VideoChat } from './video-chat'
+import { VideoLobby } from './video-lobby'
 import { CallStatus } from './call-status'
 import { VideoInfoSection } from './video-info-section'
 import { useVideoStore } from '@/store/use-video-store'
@@ -13,7 +14,11 @@ import { heroVariants } from '@/lib/animations'
 import { Video } from 'lucide-react'
 
 export function VideoCallView() {
-  const { callStatus, callStartTime, setCallDuration, resetCall, isChatOpen, setChatOpen } = useVideoStore()
+  const {
+    callStatus, callStartTime, setCallDuration, resetCall,
+    isChatOpen, setChatOpen,
+    pendingCall, setPendingCall,
+  } = useVideoStore()
 
   useEffect(() => {
     if (callStatus !== 'connected' || !callStartTime) return
@@ -31,13 +36,45 @@ export function VideoCallView() {
   const handleEndCall = () => resetCall()
 
   const isInCall = callStatus === 'connected'
-  const isPreCall = callStatus === 'idle' || callStatus === 'generating' || callStatus === 'ready' || callStatus === 'calling' || callStatus === 'ringing'
+  const isRinging = callStatus === 'ringing'
+  const isPreCall = callStatus === 'idle' || callStatus === 'generating' || callStatus === 'ready' || callStatus === 'calling'
   const isPostCall = callStatus === 'ended' || callStatus === 'failed'
+
+  // Lobby: answer the pending call
+  const handleLobbyJoin = useCallback(() => {
+    if (!pendingCall) return
+    const { localStream, isCameraOff, screenStream, isScreenSharing } = useVideoStore.getState()
+    if (!localStream) { pendingCall.answer(new MediaStream()); setPendingCall(null); return }
+    const outgoing = new MediaStream()
+    const audioTrack = localStream.getAudioTracks()[0]
+    const screenTrack = isScreenSharing ? (screenStream?.getVideoTracks()[0] || null) : null
+    const cameraTrack = !isCameraOff ? (localStream.getVideoTracks()[0] || null) : null
+    if (cameraTrack) outgoing.addTrack(cameraTrack)
+    if (screenTrack) outgoing.addTrack(screenTrack)
+    if (audioTrack) outgoing.addTrack(audioTrack)
+    pendingCall.answer(outgoing.getTracks().length ? outgoing : localStream)
+    setPendingCall(null)
+  }, [pendingCall, setPendingCall])
+
+  const handleLobbyDecline = useCallback(() => {
+    if (pendingCall) { try { pendingCall.close() } catch { /* ignore */ } }
+    setPendingCall(null)
+    resetCall()
+  }, [pendingCall, setPendingCall, resetCall])
 
   return (
     <>
       <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
         <div className={`w-full mx-auto flex-1 flex flex-col justify-center gap-8 md:gap-12 ${isInCall ? 'max-w-7xl' : 'max-w-3xl'}`}>
+
+          {/* Lobby — incoming call waiting for user confirmation */}
+          <AnimatePresence mode="wait">
+            {isRinging && (
+              <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <VideoLobby onJoin={handleLobbyJoin} onDecline={handleLobbyDecline} />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Hero — before call */}
           <AnimatePresence mode="wait">
@@ -54,7 +91,7 @@ export function VideoCallView() {
             )}
           </AnimatePresence>
 
-          {/* Pre-call */}
+          {/* Pre-call connection UI */}
           {isPreCall && (
             <div className="w-full space-y-4">
               <VideoDisplay />
@@ -85,7 +122,7 @@ export function VideoCallView() {
                       animate={{ opacity: 1, width: 320 }}
                       exit={{ opacity: 0, width: 0 }}
                       transition={{ duration: 0.25 }}
-                      className="flex-shrink-0 overflow-hidden"
+                      className="shrink-0 overflow-hidden"
                       style={{ height: '70vh' }}
                     >
                       <div className="w-80 h-full">
