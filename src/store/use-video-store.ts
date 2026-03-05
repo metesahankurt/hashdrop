@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Peer, MediaConnection } from 'peerjs'
+import type { Peer, MediaConnection, DataConnection } from 'peerjs'
 
 export type VideoCallStatus = 'idle' | 'generating' | 'ready' | 'calling' | 'ringing' | 'connected' | 'ended' | 'failed'
 
@@ -8,11 +8,18 @@ export interface RemotePeerStreams {
   screen: MediaStream | null
 }
 
+export interface ChatMessage {
+  id: string
+  from: 'local' | 'remote'
+  fromLabel: string
+  text: string
+  timestamp: number
+}
+
 interface VideoState {
   peer: Peer | null
-  // Map of peerId → MediaConnection (supports up to 4 remote peers)
   mediaConnections: Map<string, MediaConnection>
-  // Map of peerId → { camera, screen } streams
+  dataConnections: Map<string, DataConnection>
   remoteStreams: Map<string, RemotePeerStreams>
   callStatus: VideoCallStatus
   callCode: string | null
@@ -25,9 +32,19 @@ interface VideoState {
   callStartTime: number | null
   callDuration: number
 
+  // Chat
+  chatMessages: ChatMessage[]
+  unreadCount: number
+  isChatOpen: boolean
+
+  // Password
+  callPasswordHash: string | null
+
   setPeer: (peer: Peer | null) => void
   addMediaConnection: (peerId: string, conn: MediaConnection) => void
   removeMediaConnection: (peerId: string) => void
+  addDataConnection: (peerId: string, conn: DataConnection) => void
+  removeDataConnection: (peerId: string) => void
   setRemoteStreams: (peerId: string, streams: RemotePeerStreams) => void
   removeRemoteStreams: (peerId: string) => void
   setCallStatus: (status: VideoCallStatus) => void
@@ -40,12 +57,22 @@ interface VideoState {
   setIsScreenSharing: (sharing: boolean) => void
   setCallStartTime: (time: number | null) => void
   setCallDuration: (duration: number) => void
+
+  // Chat actions
+  addChatMessage: (msg: ChatMessage) => void
+  resetUnread: () => void
+  setChatOpen: (open: boolean) => void
+
+  // Password actions
+  setCallPasswordHash: (hash: string | null) => void
+
   resetCall: () => void
 }
 
 export const useVideoStore = create<VideoState>((set, get) => ({
   peer: null,
   mediaConnections: new Map(),
+  dataConnections: new Map(),
   remoteStreams: new Map(),
   callStatus: 'idle',
   callCode: null,
@@ -57,6 +84,12 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   isSpeakerMuted: false,
   callStartTime: null,
   callDuration: 0,
+
+  chatMessages: [],
+  unreadCount: 0,
+  isChatOpen: false,
+
+  callPasswordHash: null,
 
   setPeer: (peer) => set({ peer }),
 
@@ -70,6 +103,18 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     const newMap = new Map(get().mediaConnections)
     newMap.delete(peerId)
     set({ mediaConnections: newMap })
+  },
+
+  addDataConnection: (peerId, conn) => {
+    const newMap = new Map(get().dataConnections)
+    newMap.set(peerId, conn)
+    set({ dataConnections: newMap })
+  },
+
+  removeDataConnection: (peerId) => {
+    const newMap = new Map(get().dataConnections)
+    newMap.delete(peerId)
+    set({ dataConnections: newMap })
   },
 
   setRemoteStreams: (peerId, streams) => {
@@ -93,9 +138,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     const { localStream, isMicMuted } = get()
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0]
-      if (audioTrack) {
-        audioTrack.enabled = isMicMuted
-      }
+      if (audioTrack) audioTrack.enabled = isMicMuted
     }
     set({ isMicMuted: !isMicMuted })
   },
@@ -104,9 +147,7 @@ export const useVideoStore = create<VideoState>((set, get) => ({
     const { localStream, isCameraOff } = get()
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0]
-      if (videoTrack) {
-        videoTrack.enabled = isCameraOff
-      }
+      if (videoTrack) videoTrack.enabled = isCameraOff
     }
     set({ isCameraOff: !isCameraOff })
   },
@@ -119,23 +160,35 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   setCallStartTime: (time) => set({ callStartTime: time }),
   setCallDuration: (duration) => set({ callDuration: duration }),
 
+  addChatMessage: (msg) => {
+    const { isChatOpen } = get()
+    set((state) => ({
+      chatMessages: [...state.chatMessages, msg],
+      unreadCount: msg.from === 'remote' && !isChatOpen
+        ? state.unreadCount + 1
+        : state.unreadCount,
+    }))
+  },
+
+  resetUnread: () => set({ unreadCount: 0 }),
+
+  setChatOpen: (open) => {
+    set({ isChatOpen: open, unreadCount: open ? 0 : get().unreadCount })
+  },
+
+  setCallPasswordHash: (hash) => set({ callPasswordHash: hash }),
+
   resetCall: () => {
-    const { localStream, screenStream, peer, mediaConnections } = get()
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop())
-    }
-    if (screenStream) {
-      screenStream.getTracks().forEach(track => track.stop())
-    }
-    mediaConnections.forEach(conn => {
-      try { conn.close() } catch { /* ignore */ }
-    })
-    if (peer) {
-      peer.destroy()
-    }
+    const { localStream, screenStream, peer, mediaConnections, dataConnections } = get()
+    if (localStream) localStream.getTracks().forEach(t => t.stop())
+    if (screenStream) screenStream.getTracks().forEach(t => t.stop())
+    mediaConnections.forEach(conn => { try { conn.close() } catch { /* ignore */ } })
+    dataConnections.forEach(conn => { try { conn.close() } catch { /* ignore */ } })
+    if (peer) peer.destroy()
     set({
       peer: null,
       mediaConnections: new Map(),
+      dataConnections: new Map(),
       remoteStreams: new Map(),
       callStatus: 'idle',
       callCode: null,
@@ -147,6 +200,10 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       isSpeakerMuted: false,
       callStartTime: null,
       callDuration: 0,
+      chatMessages: [],
+      unreadCount: 0,
+      isChatOpen: false,
+      callPasswordHash: null,
     })
   },
 }))
