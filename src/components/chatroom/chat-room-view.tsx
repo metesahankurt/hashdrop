@@ -171,8 +171,11 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
   }
 
   const copyCode = () => {
-    navigator.clipboard.writeText(roomCode)
-    setCopied(true); toast.success('Code copied!')
+    const { username: uname } = useUsernameStore.getState()
+    const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
+    const fullUrl = `https://hashdrop.metesahankurt.cloud?mode=chatroom&code=${roomCode}${fromParam}`
+    navigator.clipboard.writeText(fullUrl)
+    setCopied(true); toast.success('Invite link copied!')
     setTimeout(() => setCopied(false), 2000)
   }
 

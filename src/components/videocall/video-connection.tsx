@@ -371,9 +371,12 @@ export function VideoConnection() {
   }, [])
 
   const copyCode = () => {
-    navigator.clipboard.writeText(displayCode)
+    const { username: uname } = useUsernameStore.getState()
+    const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
+    const fullUrl = `https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`
+    navigator.clipboard.writeText(fullUrl)
     setIsCopied(true)
-    toast.success('Code copied!')
+    toast.success('Invite link copied!')
     setTimeout(() => setIsCopied(false), 2000)
   }
 
