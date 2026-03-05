@@ -14,25 +14,44 @@ export function VideoControls({ onEndCall, preCall = false }: VideoControlsProps
   const {
     isMicMuted, isCameraOff, isScreenSharing, isSpeakerMuted,
     toggleMic, toggleCamera, toggleSpeaker,
-    mediaConnection,
+    mediaConnections,
     screenStream, setScreenStream, setIsScreenSharing,
   } = useVideoStore()
 
+  // Add a screen track to all active peer connections
+  const addScreenTrackToAll = useCallback((track: MediaStreamTrack, stream: MediaStream) => {
+    mediaConnections.forEach((conn) => {
+      const pc = conn.peerConnection
+      if (!pc) return
+      const alreadySending = pc.getSenders().some(s => s.track?.id === track.id)
+      if (!alreadySending) {
+        pc.addTrack(track, stream)
+      }
+    })
+  }, [mediaConnections])
+
+  // Remove a screen track from all active peer connections
+  const removeScreenTrackFromAll = useCallback((track: MediaStreamTrack) => {
+    mediaConnections.forEach((conn) => {
+      const pc = conn.peerConnection
+      if (!pc) return
+      const sender = pc.getSenders().find(s => s.track?.id === track.id)
+      if (sender) {
+        pc.removeTrack(sender)
+      }
+    })
+  }, [mediaConnections])
+
   const handleScreenShare = useCallback(async () => {
     if (isScreenSharing) {
-      // Stop screen sharing - switch back to camera
-      const { screenStream } = useVideoStore.getState()
-      if (screenStream) {
-        const screenTrack = screenStream.getVideoTracks()[0]
-        if (mediaConnection && screenTrack) {
-          const sender = mediaConnection.peerConnection
-            ?.getSenders()
-            .find(s => s.track?.id === screenTrack.id)
-          if (sender) {
-            mediaConnection.peerConnection?.removeTrack(sender)
-          }
+      // Stop screen sharing
+      const { screenStream: currentScreen } = useVideoStore.getState()
+      if (currentScreen) {
+        const screenTrack = currentScreen.getVideoTracks()[0]
+        if (screenTrack) {
+          removeScreenTrackFromAll(screenTrack)
+          screenTrack.stop()
         }
-        screenStream.getTracks().forEach(track => track.stop())
       }
       setScreenStream(null)
       setIsScreenSharing(false)
@@ -41,37 +60,25 @@ export function VideoControls({ onEndCall, preCall = false }: VideoControlsProps
     }
 
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+      const capturedStream = await navigator.mediaDevices.getDisplayMedia({
         video: { cursor: 'always' } as MediaTrackConstraints,
         audio: false,
       })
 
-      setScreenStream(screenStream)
+      setScreenStream(capturedStream)
       setIsScreenSharing(true)
 
-      const screenTrack = screenStream.getVideoTracks()[0]
-      if (mediaConnection && screenTrack) {
-        const existingSender = mediaConnection.peerConnection
-          ?.getSenders()
-          .find(s => s.track?.id === screenTrack.id)
-        if (!existingSender) {
-          mediaConnection.peerConnection?.addTrack(screenTrack, screenStream)
-        }
-      }
+      const screenTrack = capturedStream.getVideoTracks()[0]
+      if (screenTrack) {
+        addScreenTrackToAll(screenTrack, capturedStream)
 
-      // When user stops sharing via browser UI
-      screenTrack.onended = () => {
-        if (mediaConnection && screenTrack) {
-          const sender = mediaConnection.peerConnection
-            ?.getSenders()
-            .find(s => s.track?.id === screenTrack.id)
-          if (sender) {
-            mediaConnection.peerConnection?.removeTrack(sender)
-          }
+        // When user stops sharing via browser UI
+        screenTrack.onended = () => {
+          removeScreenTrackFromAll(screenTrack)
+          setScreenStream(null)
+          setIsScreenSharing(false)
+          toast.info('Screen sharing stopped')
         }
-        setScreenStream(null)
-        setIsScreenSharing(false)
-        toast.info('Screen sharing stopped')
       }
 
       toast.success('Screen sharing started')
@@ -81,22 +88,15 @@ export function VideoControls({ onEndCall, preCall = false }: VideoControlsProps
         toast.error('Could not start screen sharing')
       }
     }
-  }, [isScreenSharing, mediaConnection, setScreenStream, setIsScreenSharing])
+  }, [isScreenSharing, addScreenTrackToAll, removeScreenTrackFromAll, setScreenStream, setIsScreenSharing])
 
+  // When a new connection is added mid-session and screen sharing is active, add the track
   useEffect(() => {
-    if (!mediaConnection || !isScreenSharing || !screenStream) return
-
+    if (!isScreenSharing || !screenStream) return
     const screenTrack = screenStream.getVideoTracks()[0]
     if (!screenTrack) return
-
-    const sender = mediaConnection.peerConnection
-      ?.getSenders()
-      .find(s => s.track?.id === screenTrack.id)
-
-    if (!sender) {
-      mediaConnection.peerConnection?.addTrack(screenTrack, screenStream)
-    }
-  }, [mediaConnection, isScreenSharing, screenStream])
+    addScreenTrackToAll(screenTrack, screenStream)
+  }, [mediaConnections, isScreenSharing, screenStream, addScreenTrackToAll])
 
   const formatDuration = (seconds: number) => {
     const hrs = Math.floor(seconds / 3600)

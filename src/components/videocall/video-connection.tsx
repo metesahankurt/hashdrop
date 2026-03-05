@@ -10,20 +10,20 @@ import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
 import { getLocalMediaStream, stopMediaStream } from '@/lib/media-utils'
 import { QRCodeDisplay } from '@/components/transfer/qr-code-display'
 import { formatErrorForToast } from '@/lib/error-handler'
+import type { MediaConnection } from 'peerjs'
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
+const MAX_PEERS = 4 // max remote peers (5 total including local)
 
 export function VideoConnection() {
   const {
     peer, setPeer,
     callStatus, setCallStatus,
-    setMediaConnection,
+    addMediaConnection, removeMediaConnection,
+    setRemoteStreams, removeRemoteStreams,
     setLocalStream,
-    setRemoteCameraStream,
-    setRemoteScreenStream,
     setCallStartTime,
     resetCall,
-    setRemoteDisplay,
   } = useVideoStore()
 
   const buildOutgoingStream = useCallback(() => {
@@ -43,7 +43,8 @@ export function VideoConnection() {
     return outgoing
   }, [])
 
-  const rebuildRemoteStreams = useCallback((pc: RTCPeerConnection) => {
+  // Rebuild remote streams for a specific peer from their RTCPeerConnection
+  const rebuildRemoteStreamsForPeer = useCallback((peerId: string, pc: RTCPeerConnection) => {
     const receivers = pc.getReceivers()
     const audioTracks = receivers
       .map(r => r.track)
@@ -63,22 +64,11 @@ export function VideoConnection() {
       return stream
     }
 
-    const cameraStream = buildStream(cameraTrack)
-    const screenStream = buildStream(screenTrack)
-
-    setRemoteCameraStream(cameraStream)
-    setRemoteScreenStream(screenStream)
-
-    if (screenStream && !cameraStream) {
-      setRemoteDisplay('screen')
-      return
-    }
-
-    const { remoteDisplay } = useVideoStore.getState()
-    if (remoteDisplay === 'screen' && !screenStream) {
-      setRemoteDisplay('camera')
-    }
-  }, [setRemoteCameraStream, setRemoteScreenStream, setRemoteDisplay])
+    setRemoteStreams(peerId, {
+      camera: buildStream(cameraTrack),
+      screen: buildStream(screenTrack),
+    })
+  }, [setRemoteStreams])
 
   const [generatedInfo, setGeneratedInfo] = useState<{ displayCode: string; peerId: string } | null>(null)
   const [inputCode, setInputCode] = useState('')
@@ -90,7 +80,6 @@ export function VideoConnection() {
   const [canShare, setCanShare] = useState(false)
   const mountedRef = useRef(true)
 
-  // Track component unmount
   useEffect(() => {
     mountedRef.current = true
     return () => { mountedRef.current = false }
@@ -115,26 +104,20 @@ export function VideoConnection() {
   const displayCode = generatedInfo?.displayCode || ''
   const peerId = generatedInfo?.peerId
 
-  // Refresh code
   const refreshCode = useCallback(() => {
     const newDisplayCode = generateSecureCode()
     const newPeerId = codeToCallPeerId(newDisplayCode)
     const newExpiry = Date.now() + CODE_EXPIRY_MS
-
-    // Reset existing call state
     resetCall()
-
     setGeneratedInfo({ displayCode: newDisplayCode, peerId: newPeerId })
     setCodeExpiry(newExpiry)
     setShowQR(false)
-
     toast.success('New video call code generated!')
   }, [resetCall])
 
   // Countdown timer
   useEffect(() => {
     if (!codeExpiry) return
-
     const interval = setInterval(() => {
       const remaining = codeExpiry - Date.now()
       if (remaining <= 0) {
@@ -145,24 +128,28 @@ export function VideoConnection() {
         setTimeLeft(Math.ceil(remaining / 1000))
       }
     }, 1000)
-
     return () => clearInterval(interval)
   }, [codeExpiry, refreshCode])
 
-  // Helper: finalize call connection from ontrack (bypasses broken PeerJS stream event)
-  const finalizeConnection = useCallback((call: ReturnType<Peer['call']>, side: string) => {
+  // Finalize a single peer connection
+  const finalizeConnection = useCallback((
+    call: ReturnType<Peer['call']>,
+    remotePeerId: string,
+    side: string
+  ) => {
     const connectedRef = { done: false }
 
     const finalizeNow = (reason: string) => {
       if (connectedRef.done || !mountedRef.current) return false
       if (!call.peerConnection) return false
-
       connectedRef.done = true
-      console.log(`[VideoCall] ${side}: CONNECTED via ${reason}!`)
-      rebuildRemoteStreams(call.peerConnection)
+      console.log(`[VideoCall] ${side} (${remotePeerId}): CONNECTED via ${reason}!`)
+      rebuildRemoteStreamsForPeer(remotePeerId, call.peerConnection)
+      addMediaConnection(remotePeerId, call)
+
+      // Mark as connected when we have at least one remote peer
       setCallStatus('connected')
       setCallStartTime(Date.now())
-      setMediaConnection(call)
       toast.success('Call connected!')
       return true
     }
@@ -170,26 +157,84 @@ export function VideoConnection() {
     const tryFinalize = (hasTrack = false) => {
       if (connectedRef.done || !mountedRef.current) return false
       if (!call.peerConnection) return false
-
-      if (hasTrack) {
-        return finalizeNow('ontrack')
-      }
-
+      if (hasTrack) return finalizeNow('ontrack')
       const receivers = call.peerConnection.getReceivers()
       const hasVideo = receivers.some(r => r.track?.kind === 'video')
       const hasAudio = receivers.some(r => r.track?.kind === 'audio')
-
-      console.log(`[VideoCall] ${side} tryFinalize: video=${hasVideo} audio=${hasAudio}`)
-
-      if (hasVideo || hasAudio) {
-        return finalizeNow('receiver-check')
-      }
-
+      if (hasVideo || hasAudio) return finalizeNow('receiver-check')
       return false
     }
 
     return { tryFinalize, connectedRef }
-  }, [rebuildRemoteStreams, setCallStatus, setCallStartTime, setMediaConnection])
+  }, [rebuildRemoteStreamsForPeer, addMediaConnection, setCallStatus, setCallStartTime])
+
+  // Attach standard event handlers to a call
+  const attachCallHandlers = useCallback((
+    call: MediaConnection,
+    remotePeerId: string,
+    side: string,
+    onTimeout?: () => void
+  ) => {
+    const { tryFinalize, connectedRef } = finalizeConnection(call, remotePeerId, side)
+    const callTimeout = onTimeout ? setTimeout(() => {
+      if (!connectedRef.done) {
+        console.error(`[VideoCall] ${side}: TIMEOUT for ${remotePeerId}`)
+        call.close()
+        if (onTimeout) onTimeout()
+      }
+    }, 30000) : null
+
+    // PeerJS stream fallback
+    call.on('stream', (remoteStream) => {
+      console.log(`[VideoCall] ${side} (${remotePeerId}): GOT STREAM`, remoteStream.getTracks().map(t => `${t.kind}`))
+      if (callTimeout) clearTimeout(callTimeout)
+      if (connectedRef.done || !mountedRef.current) return
+      connectedRef.done = true
+      if (call.peerConnection) {
+        rebuildRemoteStreamsForPeer(remotePeerId, call.peerConnection)
+      } else {
+        setRemoteStreams(remotePeerId, { camera: remoteStream, screen: null })
+      }
+      addMediaConnection(remotePeerId, call)
+      setCallStatus('connected')
+      setCallStartTime(Date.now())
+      toast.success('Call connected!')
+    })
+
+    if (call.peerConnection) {
+      call.peerConnection.ontrack = (event) => {
+        console.log(`[VideoCall] ${side} (${remotePeerId}) ontrack:`, event.track.kind)
+        if (tryFinalize(true) && callTimeout) clearTimeout(callTimeout)
+      }
+      call.peerConnection.oniceconnectionstatechange = () => {
+        const state = call.peerConnection.iceConnectionState
+        if (state === 'connected' || state === 'completed') {
+          if (tryFinalize() && callTimeout) clearTimeout(callTimeout)
+        }
+      }
+    }
+
+    call.on('close', () => {
+      console.log(`[VideoCall] ${side} (${remotePeerId}): closed`)
+      if (!mountedRef.current) return
+      removeMediaConnection(remotePeerId)
+      removeRemoteStreams(remotePeerId)
+
+      // If no more connections, update status
+      const { mediaConnections } = useVideoStore.getState()
+      if (mediaConnections.size === 0) {
+        setCallStatus('ended')
+        toast.info('Call ended')
+      }
+    })
+
+    call.on('error', (err) => {
+      console.error(`[VideoCall] ${side} (${remotePeerId}) error:`, err.type, err.message)
+      if (!mountedRef.current) return
+      const errorInfo = formatErrorForToast(err, 'call-failed')
+      toast.error(errorInfo.title, { description: errorInfo.description })
+    })
+  }, [finalizeConnection, rebuildRemoteStreamsForPeer, setRemoteStreams, addMediaConnection, removeMediaConnection, removeRemoteStreams, setCallStatus, setCallStartTime])
 
   // Initialize media and Peer
   useEffect(() => {
@@ -197,22 +242,17 @@ export function VideoConnection() {
 
     const initPeer = async () => {
       try {
-        // Get local media first
         console.log('[VideoCall] Step 1: Requesting camera/mic access...')
         setCallStatus('generating')
         const stream = await getLocalMediaStream()
-        if (!mountedRef.current) {
-          stopMediaStream(stream)
-          return
-        }
-        console.log('[VideoCall] Step 2: Media access granted. Tracks:', stream.getTracks().map(t => `${t.kind}:${t.label}`))
+        if (!mountedRef.current) { stopMediaStream(stream); return }
+        console.log('[VideoCall] Step 2: Media access granted.')
         setLocalStream(stream)
 
-        // Create peer
         const peerHost = 'hashdrop.onrender.com'
         const peerPort = 443
         const peerPath = '/'
-        console.log(`[VideoCall] Step 3: Creating peer "${peerId}" → ${peerHost}:${peerPort}${peerPath}`)
+        console.log(`[VideoCall] Step 3: Creating peer "${peerId}"`)
 
         const newPeer = new Peer(peerId, {
           host: peerHost,
@@ -235,7 +275,6 @@ export function VideoConnection() {
 
         const connectionTimeout = setTimeout(() => {
           if (!newPeer.id) {
-            console.error('[VideoCall] TIMEOUT: Peer never connected to signaling server after 30s')
             newPeer.destroy()
             if (mountedRef.current) {
               toast.error('Could not connect to network. Please refresh.')
@@ -252,83 +291,35 @@ export function VideoConnection() {
           setCallStatus('ready')
         })
 
-        // Handle incoming calls
+        // Handle incoming calls (someone joins via our code)
         newPeer.on('call', (call) => {
-          console.log('[VideoCall] Step 5: INCOMING CALL from:', call.peer)
+          const remotePeerId = call.peer
+          console.log('[VideoCall] INCOMING CALL from:', remotePeerId)
           if (!mountedRef.current) return
-          setCallStatus('ringing')
 
-          // Answer with local stream
+          // Reject if at capacity
+          const { mediaConnections } = useVideoStore.getState()
+          if (mediaConnections.size >= MAX_PEERS) {
+            console.warn('[VideoCall] At capacity, rejecting call from', remotePeerId)
+            call.close()
+            return
+          }
+
+          setCallStatus('ringing')
           const outgoingStream = buildOutgoingStream()
-          console.log('[VideoCall] Step 6: Answering call, outgoing stream:', outgoingStream ? `${outgoingStream.getTracks().length} tracks` : 'NULL')
           if (outgoingStream) {
             call.answer(outgoingStream)
-            console.log('[VideoCall] Step 7: Call answered, waiting for remote stream...')
           } else {
-            console.error('[VideoCall] ERROR: No outgoing stream to answer with!')
+            console.error('[VideoCall] No outgoing stream to answer with!')
           }
 
-          // Use ontrack-based finalization (bypasses broken PeerJS stream event)
-          const { tryFinalize, connectedRef } = finalizeConnection(call, 'RECEIVER')
-
-          // Keep PeerJS stream event as fallback
-          call.on('stream', (remoteStream) => {
-            console.log('[VideoCall] Step 8: GOT REMOTE STREAM (PeerJS)! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
-            if (connectedRef.done || !mountedRef.current) return
-            connectedRef.done = true
-            if (call.peerConnection) {
-              rebuildRemoteStreams(call.peerConnection)
-            } else {
-              setRemoteCameraStream(remoteStream)
-              setRemoteScreenStream(null)
-            }
-            setCallStatus('connected')
-            setCallStartTime(Date.now())
-            setMediaConnection(call)
-            toast.success('Call connected!')
-          })
-
-          if (call.peerConnection) {
-            call.peerConnection.ontrack = (event) => {
-              console.log('[VideoCall] RECEIVER ontrack:', event.track.kind, event.track.label)
-              tryFinalize(true)
-            }
-            call.peerConnection.oniceconnectionstatechange = () => {
-              const state = call.peerConnection.iceConnectionState
-              console.log('[VideoCall] ICE state (receiver):', state)
-              if (state === 'connected' || state === 'completed') {
-                // ICE connected - try to finalize if we have tracks
-                tryFinalize()
-              }
-            }
-            call.peerConnection.onconnectionstatechange = () => {
-              console.log('[VideoCall] Connection state (receiver):', call.peerConnection.connectionState)
-            }
-          }
-
-          call.on('close', () => {
-            console.log('[VideoCall] Call closed (receiver side)')
-            if (!mountedRef.current) return
-            setRemoteCameraStream(null)
-            setRemoteScreenStream(null)
-            setCallStatus('ended')
-            toast.info('Call ended')
-          })
-
-          call.on('error', (err) => {
-            console.error('[VideoCall] Call error (receiver):', err.type, err.message)
-            if (!mountedRef.current) return
-            setCallStatus('failed')
-            const errorInfo = formatErrorForToast(err, 'call-failed')
-            toast.error(errorInfo.title, { description: errorInfo.description })
-          })
+          attachCallHandlers(call, remotePeerId, 'RECEIVER')
         })
 
         newPeer.on('error', (err) => {
           clearTimeout(connectionTimeout)
           if (!mountedRef.current) return
           console.error('[VideoCall] PEER ERROR:', err.type, err.message)
-
           if (err.type === 'unavailable-id') {
             toast.error('Code already in use. Generating new code...')
             refreshCode()
@@ -339,13 +330,8 @@ export function VideoConnection() {
           }
         })
 
-        newPeer.on('disconnected', () => {
-          console.warn('[VideoCall] DISCONNECTED from signaling server')
-        })
-
-        newPeer.on('close', () => {
-          console.warn('[VideoCall] Peer CLOSED')
-        })
+        newPeer.on('disconnected', () => console.warn('[VideoCall] DISCONNECTED from signaling server'))
+        newPeer.on('close', () => console.warn('[VideoCall] Peer CLOSED'))
 
       } catch (err) {
         if (!mountedRef.current) return
@@ -358,32 +344,28 @@ export function VideoConnection() {
     }
 
     initPeer()
+  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, refreshCode, buildOutgoingStream, attachCallHandlers])
 
-    return () => {
-      // Don't set mountedRef.current = false here - it's managed by the separate unmount effect
-    }
-  }, [peerId, peer, setPeer, setCallStatus, setLocalStream, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, refreshCode, rebuildRemoteStreams, buildOutgoingStream, finalizeConnection])
-
-  // Connect to peer (caller)
+  // Connect to a peer (caller initiates)
   const connectToCall = useCallback((targetCode: string) => {
     console.log('[VideoCall] CALLER: Starting call to code:', targetCode)
 
     if (!peer) {
-      console.error('[VideoCall] CALLER: No peer! Not connected to signaling server yet.')
       toast.error('Initializing connection... Please wait.')
       return
     }
 
-    console.log('[VideoCall] CALLER: Peer is ready, ID:', peer.id)
-
-    const outgoingStream = buildOutgoingStream()
-    if (!outgoingStream) {
-      console.error('[VideoCall] CALLER: No outgoing stream - camera not ready')
-      toast.error('Camera not ready. Please wait.')
+    const { mediaConnections } = useVideoStore.getState()
+    if (mediaConnections.size >= MAX_PEERS) {
+      toast.error('Conference is full (max 5 participants)')
       return
     }
 
-    console.log('[VideoCall] CALLER: Outgoing stream ready, tracks:', outgoingStream.getTracks().map(t => `${t.kind}:${t.label}`))
+    const outgoingStream = buildOutgoingStream()
+    if (!outgoingStream) {
+      toast.error('Camera not ready. Please wait.')
+      return
+    }
 
     setCallStatus('calling')
     const targetId = codeToCallPeerId(targetCode.trim())
@@ -392,88 +374,19 @@ export function VideoConnection() {
     const call = peer.call(targetId, outgoingStream)
 
     if (!call) {
-      console.error('[VideoCall] CALLER: peer.call() returned null!')
       toast.error('Failed to initiate call')
       setCallStatus('failed')
       return
     }
 
-    console.log('[VideoCall] CALLER: Call initiated, waiting for response...')
-
-    // Use ontrack-based finalization (bypasses broken PeerJS stream event)
-    const { tryFinalize, connectedRef } = finalizeConnection(call, 'CALLER')
-
-    // Connection timeout
-    const callTimeout = setTimeout(() => {
-      if (connectedRef.done) return
-      console.error('[VideoCall] CALLER: TIMEOUT after 30s - no stream received')
-      call.close()
+    attachCallHandlers(call, targetId, 'CALLER', () => {
       setCallStatus('failed')
       toast.error('Call timeout', {
         description: 'Could not reach the other peer. Make sure they are online.',
         duration: 6000
       })
-    }, 30000)
-
-    // Keep PeerJS stream event as fallback
-    call.on('stream', (remoteStream) => {
-      console.log('[VideoCall] CALLER: GOT REMOTE STREAM (PeerJS)! Tracks:', remoteStream.getTracks().map(t => `${t.kind}:${t.label}`))
-      clearTimeout(callTimeout)
-      if (connectedRef.done) return
-      connectedRef.done = true
-      if (call.peerConnection) {
-        rebuildRemoteStreams(call.peerConnection)
-      } else {
-        setRemoteCameraStream(remoteStream)
-        setRemoteScreenStream(null)
-      }
-      setCallStatus('connected')
-      setCallStartTime(Date.now())
-      setMediaConnection(call)
-      toast.success('Call connected!')
     })
-
-    if (call.peerConnection) {
-      call.peerConnection.ontrack = (event) => {
-        console.log('[VideoCall] CALLER ontrack:', event.track.kind, event.track.label)
-        if (tryFinalize(true)) {
-          clearTimeout(callTimeout)
-        }
-      }
-      call.peerConnection.oniceconnectionstatechange = () => {
-        const state = call.peerConnection.iceConnectionState
-        console.log('[VideoCall] CALLER ICE state:', state)
-        if (state === 'connected' || state === 'completed') {
-          if (tryFinalize()) {
-            clearTimeout(callTimeout)
-          }
-        }
-      }
-      call.peerConnection.onconnectionstatechange = () => {
-        console.log('[VideoCall] CALLER Connection state:', call.peerConnection.connectionState)
-      }
-      call.peerConnection.onicecandidateerror = (event: RTCPeerConnectionIceErrorEvent) => {
-        console.warn('[VideoCall] CALLER ICE candidate error:', event.errorCode, event.errorText, event.url)
-      }
-    }
-
-    call.on('close', () => {
-      console.log('[VideoCall] CALLER: Call closed')
-      clearTimeout(callTimeout)
-      setRemoteCameraStream(null)
-      setRemoteScreenStream(null)
-      setCallStatus('ended')
-      toast.info('Call ended')
-    })
-
-    call.on('error', (err) => {
-      console.error('[VideoCall] CALLER: Call error:', err.type, err.message)
-      clearTimeout(callTimeout)
-      setCallStatus('failed')
-      const errorInfo = formatErrorForToast(err, 'call-failed')
-      toast.error(errorInfo.title, { description: errorInfo.description })
-    })
-  }, [peer, setCallStatus, setRemoteCameraStream, setRemoteScreenStream, setMediaConnection, setCallStartTime, rebuildRemoteStreams, buildOutgoingStream, finalizeConnection])
+  }, [peer, setCallStatus, buildOutgoingStream, attachCallHandlers])
 
   const copyCode = () => {
     navigator.clipboard.writeText(displayCode)
@@ -497,7 +410,6 @@ export function VideoConnection() {
     }
   }
 
-  // Don't show connection UI when connected or in call
   if (callStatus === 'connected' || callStatus === 'ended') {
     return null
   }
@@ -513,7 +425,7 @@ export function VideoConnection() {
           className="text-center space-y-3"
         >
           <p className="text-sm text-muted">
-            Share this code to start a video call
+            Share this code to start a video call (up to 5 participants)
           </p>
 
           <div className="inline-flex items-center gap-2 glass-card rounded-lg px-3 py-2.5 glow-primary">
@@ -538,14 +450,12 @@ export function VideoConnection() {
             </div>
           </div>
 
-          {/* QR Code */}
           <AnimatePresence>
             {showQR && displayCode && (
               <QRCodeDisplay code={displayCode} size={180} url={`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}`} />
             )}
           </AnimatePresence>
 
-          {/* Expiry Timer */}
           {timeLeft !== null && timeLeft > 0 && (
             <div className="flex items-center justify-center gap-1.5 text-xs text-muted">
               <Clock className="w-3 h-3" />
@@ -588,7 +498,7 @@ export function VideoConnection() {
               >
                 <div className="glass-card p-4 rounded-xl">
                   <h3 className="text-sm font-semibold text-foreground mb-3">
-                    Enter caller&apos;s code
+                    Enter host&apos;s code
                   </h3>
                   <div className="flex flex-col gap-2.5">
                     <input
@@ -620,7 +530,6 @@ export function VideoConnection() {
         </div>
       )}
 
-      {/* Calling state */}
       {callStatus === 'calling' && (
         <motion.div
           initial={{ opacity: 0 }}
