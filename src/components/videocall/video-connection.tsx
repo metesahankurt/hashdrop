@@ -13,6 +13,7 @@ import { QRCodeDisplay } from '@/components/transfer/qr-code-display'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { formatErrorForToast } from '@/lib/error-handler'
 import type { MediaConnection, DataConnection } from 'peerjs'
+import { useSearchParams } from 'next/navigation'
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000
 const MAX_PEERS = 4
@@ -114,11 +115,16 @@ export function VideoConnection() {
   }, [addChatMessage, addDataConnection, removeDataConnection, resetCall, addPeerUsername, removePeerUsername])
 
   // ---------- States ----------
+  const searchParams = useSearchParams()
+  const urlMode = searchParams?.get('mode')
+  const urlCode = searchParams?.get('code')
+  const incomingCode = urlMode === 'videocall' ? urlCode : null
+
   const [generatedInfo, setGeneratedInfo] = useState<{ displayCode: string; peerId: string } | null>(null)
-  const [inputCode, setInputCode] = useState('')
+  const [inputCode, setInputCode] = useState(incomingCode || '')
   const [joinPassword, setJoinPassword] = useState('')
   const [isCopied, setIsCopied] = useState(false)
-  const [showReceive, setShowReceive] = useState(false)
+  const [showReceive, setShowReceive] = useState(!!incomingCode)
   const [showQR, setShowQR] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [codeExpiry, setCodeExpiry] = useState<number | null>(null)

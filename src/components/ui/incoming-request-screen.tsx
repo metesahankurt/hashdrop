@@ -90,11 +90,11 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-3">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
           {/* Decline */}
           <button
             onClick={onDecline}
-            className="flex-1 py-3 rounded-xl glass-card text-sm font-medium text-muted hover:text-foreground hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+            className="w-full sm:flex-1 py-3.5 sm:py-3 rounded-xl glass-card text-sm font-medium text-muted hover:text-foreground hover:bg-white/10 transition-all flex items-center justify-center gap-2"
           >
             <X className="w-4 h-4" />
             Decline
@@ -103,7 +103,7 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
           {/* Accept */}
           <button
             onClick={onAccept}
-            className="flex-1 py-3 rounded-xl glass-btn-primary text-sm font-medium transition-all flex items-center justify-center gap-2 group"
+            className="w-full sm:flex-1 py-3.5 sm:py-3 rounded-xl glass-btn-primary text-sm font-medium transition-all flex items-center justify-center gap-2 group shadow-xl shadow-primary/20"
           >
             <Check className="w-4 h-4" />
             {cfg.actionText}

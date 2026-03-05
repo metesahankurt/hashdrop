@@ -13,6 +13,7 @@ import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { toast } from 'sonner'
 import type { DataConnection } from 'peerjs'
+import { useSearchParams } from 'next/navigation'
 
 const CODE_EXPIRY_MS = 10 * 60 * 1000
 const MAX_PEERS = 4
@@ -46,12 +47,13 @@ function LinkText({ text }: { text: string }) {
 // ============================================================
 interface JoinScreenProps {
   username: string
+  initialCode?: string | null
   onBack: () => void
   onJoin: (code: string, pwdHash: string | null) => void
 }
 
-function JoinScreen({ username, onBack, onJoin }: JoinScreenProps) {
-  const [inputCode, setInputCode] = useState('')
+function JoinScreen({ username, initialCode, onBack, onJoin }: JoinScreenProps) {
+  const [inputCode, setInputCode] = useState(initialCode || '')
   const [joinPassword, setJoinPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
@@ -324,6 +326,11 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
 type Step = 'creating' | 'join' | 'chatting'
 
 export function ChatRoomView({ initialUsername }: { initialUsername?: string }) {
+  const searchParams = useSearchParams()
+  const urlMode = searchParams?.get('mode')
+  const urlCode = searchParams?.get('code')
+  const incomingCode = urlMode === 'chatroom' ? urlCode : null
+
   const {
     setPeer, setStatus, username, setUsername, setRoomCode, setRoomPasswordHash,
     addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
@@ -334,7 +341,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [step, setStep] = useState<Step>('creating')
+  const [step, setStep] = useState<Step>(incomingCode ? 'join' : 'creating')
   const [timeLeft, setTimeLeft] = useState(CODE_EXPIRY_MS / 1000)
   const [isCreating, setIsCreating] = useState(false)
   const [activeRoomCode, setActiveRoomCode] = useState(() => generateSecureCode())
@@ -464,11 +471,11 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
 
   // Auto-start creating the room when component first mounts
   useEffect(() => {
-    if (step === 'creating' && !isCreating) {
+    if (step === 'creating' && !isCreating && !incomingCode) {
       createRoom(activeRoomCode, null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoomCode])
+  }, [activeRoomCode, step, isCreating, incomingCode])
 
   const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
     const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
@@ -529,6 +536,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
           <motion.div key="join" className="w-full">
             <JoinScreen
               username={username || initialUsername || ''}
+              initialCode={incomingCode}
               onBack={() => setStep('creating')}
               onJoin={handleJoin}
             />
