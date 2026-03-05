@@ -57,6 +57,7 @@ function JoinScreen({ username, initialCode, onBack, onJoin }: JoinScreenProps) 
   const [joinPassword, setJoinPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
+  const [isJoining, setIsJoining] = useState(false)
 
   const handleJoin = async () => {
     if (!inputCode.trim()) return
@@ -109,11 +110,16 @@ function JoinScreen({ username, initialCode, onBack, onJoin }: JoinScreenProps) 
         </div>
 
         <button
-          onClick={handleJoin}
-          disabled={!inputCode.trim()}
+          onClick={async () => {
+            if (isJoining) return
+            setIsJoining(true)
+            await onJoin(inputCode, joinPassword ? await hashPassword(joinPassword) : null)
+            setIsJoining(false)
+          }}
+          disabled={!inputCode.trim() || isJoining}
           className="glass-btn-primary w-full py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
         >
-          Join Room <ArrowRight className="w-4 h-4" />
+          {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Join Room <ArrowRight className="w-4 h-4" /></>}
         </button>
       </div>
 
@@ -263,7 +269,7 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-4 py-3 space-y-1 min-h-0">
+      <div className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
             <MessageSquare className="w-10 h-10 text-muted/30" />
@@ -302,12 +308,16 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+            onKeyDown={e => {
+              if (e.nativeEvent.isComposing) return
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+            }}
             placeholder="Type a message... (Enter)"
             className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl"
             style={{ fontSize: '16px' }}
           />
           <button
+            type="button"
             onClick={sendMessage}
             disabled={!input.trim()}
             className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40 disabled:cursor-not-allowed"
@@ -375,6 +385,17 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
 
       if (data.type === 'chat' && data.payload) {
         addMessage({ ...data.payload, isLocal: false })
+        
+        // Host Rebroadcast Logic: if we are the host, forward this to all other connected peers
+        // We know we are host if our peerId is the room's host peerId.
+        const { peer, dataConnections: conns } = useChatRoomStore.getState()
+        if (peer?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
+          conns.forEach((c, id) => {
+            if (id !== remotePeerId) {
+              try { c.send({ type: 'chat', payload: data.payload }) } catch { /* ignore */ }
+            }
+          })
+        }
       } else if (data.type === 'announce' && data.username) {
         // Add remote participant
         addParticipant(remotePeerId, data.username)
