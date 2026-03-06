@@ -80,13 +80,27 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
           <AnimatePresence mode="wait">
             {isPreCall && (
               <motion.div key="video-hero" variants={heroVariants} initial="initial" animate="animate" exit="exit" className="text-center space-y-4 md:space-y-5">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
-                  Video{' '}
-                  <span className="text-primary font-bold">Call</span>
-                </h1>
-                <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
-                  Secure peer-to-peer video calls. Fully encrypted.
-                </p>
+                {initialAction === 'join' ? (
+                  <>
+                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
+                      Join{' '}
+                      <span className="text-primary font-bold">Call</span>
+                    </h1>
+                    <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
+                      Enter the host&apos;s code to join the video call.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
+                      Video{' '}
+                      <span className="text-primary font-bold">Call</span>
+                    </h1>
+                    <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
+                      Secure peer-to-peer video calls. Fully encrypted.
+                    </p>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

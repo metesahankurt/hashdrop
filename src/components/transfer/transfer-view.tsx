@@ -77,6 +77,8 @@ export function TransferView({ initialAction }: { initialAction?: 'create' | 'jo
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  const isJoinMode = initialAction === 'join'
+
   return (
     <>
       <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
@@ -93,22 +95,36 @@ export function TransferView({ initialAction }: { initialAction?: 'create' | 'jo
                 exit="exit"
                 className="text-center space-y-4 md:space-y-5"
               >
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
-                  Share files at{' '}
-                  <span className="text-primary font-bold">lightspeed</span>
-                </h1>
-                <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
-                  Secure peer-to-peer transfer. No cloud. No limits.
-                </p>
+                {isJoinMode ? (
+                  <>
+                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
+                      Receive{' '}
+                      <span className="text-primary font-bold">Files</span>
+                    </h1>
+                    <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
+                      Enter the sender&apos;s code to start receiving.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
+                      Share files at{' '}
+                      <span className="text-primary font-bold">lightspeed</span>
+                    </h1>
+                    <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
+                      Secure peer-to-peer transfer. No cloud. No limits.
+                    </p>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Interactive Components - Clean Spacing */}
           <div className="w-full space-y-4">
-            <ConsoleDisplay />
-            <WarpDropzone />
-            <TextShare />
+            {!isJoinMode && <ConsoleDisplay />}
+            {!isJoinMode && <WarpDropzone />}
+            {!isJoinMode && <TextShare />}
             <Suspense
               fallback={
                 <div className="text-center text-muted text-sm py-4">
@@ -128,7 +144,7 @@ export function TransferView({ initialAction }: { initialAction?: 'create' | 'jo
       </div>
 
       {/* Informational Section */}
-      <InfoSection />
+      {!isJoinMode && <InfoSection />}
 
       {/* Transfer History Modal */}
       <TransferHistory

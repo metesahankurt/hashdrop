@@ -625,8 +625,8 @@ export function ChatRoomView({ initialUsername, initialAction }: { initialUserna
         )}
       </AnimatePresence>
 
-      {/* "Join existing room" link shown when creating/loading */}
-      {step === 'creating' && (
+      {/* "Join existing room" link — hidden when user already chose "Create" from entry screen */}
+      {step === 'creating' && initialAction !== 'create' && (
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Peer, { type DataConnection } from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History, BarChart3 } from 'lucide-react'
+import { Copy, ArrowRight, Loader2, Check, Clock, RefreshCw, ChevronDown, QrCode, Share2, History, BarChart3, ScanLine } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { toast } from 'sonner'
@@ -12,6 +12,7 @@ import { generateSecureCode, codeToPeerId } from '@/lib/code-generator'
 import { calculateFileHash, formatHashPreview } from '@/lib/file-hash'
 import { notifyConnectionEstablished, notifyTextReceived } from '@/lib/notifications'
 import { QRCodeDisplay } from './qr-code-display'
+import { QrScanner } from './qr-scanner'
 import { getPreferences } from '@/lib/preferences'
 import { formatErrorForToast } from '@/lib/error-handler'
 
@@ -642,6 +643,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
     }
   }
 
+  const isJoinMode = initialAction === 'join'
+  const isCreateMode = initialAction === 'create' || !initialAction
+  const [showQRScanner, setShowQRScanner] = useState(false)
+
   return (
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
 
@@ -664,8 +669,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
         </motion.div>
       )}
 
-      {/* Sender View - Compact Code Display (hidden when auto-connecting from QR) */}
-      {!isQRConnect && (mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
+      {/* Sender View - Compact Code Display (only when creating, not QR) */}
+      {isCreateMode && !isQRConnect && (mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -780,8 +785,75 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
         </motion.div>
       )}
 
-      {/* Collapsible Receiver View (hidden when auto-connecting from QR) */}
-      {!isQRConnect && mode === null && (status === 'idle' || status === 'connecting') && (
+      {/* JOIN MODE: Clean standalone join card */}
+      {isJoinMode && !isQRConnect && (status === 'idle' || status === 'connecting' || status === 'failed') && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="w-full max-w-md mx-auto"
+        >
+          <div className="glass-card p-6 rounded-2xl space-y-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder={peer ? 'Enter code (e.g. Cosmic-Falcon)' : 'Initializing...'}
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && inputCode.trim() && peer && status !== 'connecting') {
+                    connect(inputCode)
+                  }
+                }}
+                className="glass-input flex-1 px-3 py-2.5 text-base font-mono text-center text-foreground placeholder:text-muted/50 focus:outline-none"
+                disabled={status === 'connecting'}
+                style={{ fontSize: '16px' }}
+                autoFocus
+              />
+              <button
+                onClick={() => setShowQRScanner(true)}
+                className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all"
+                title="Scan QR"
+              >
+                <ScanLine className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => connect(inputCode)}
+              disabled={!inputCode.trim() || status === 'connecting' || !peer}
+              className="glass-btn-primary w-full py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {status === 'connecting' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <span>Connect</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+
+            {status === 'failed' && (
+              <p className="text-xs text-danger text-center">
+                Connection failed. Check the code and try again.
+              </p>
+            )}
+
+            {!peer && (
+              <p className="text-xs text-muted text-center">
+                Initializing secure connection...
+              </p>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* CREATE MODE: Collapsible Receiver View (hidden in join mode and QR mode) */}
+      {isCreateMode && !isQRConnect && mode === null && (status === 'idle' || status === 'connecting') && (
         <div className="w-full space-y-3">
 
           {/* Minimal Divider */}
@@ -857,6 +929,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
                       placeholder={peer ? "Cosmic-Falcon" : "Initializing..."}
                       value={inputCode}
                       onChange={(e) => setInputCode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && inputCode.trim() && peer && status !== 'connecting') {
+                          connect(inputCode)
+                        }
+                      }}
                       className="glass-input w-full px-3 py-2.5 text-base font-mono text-center text-foreground placeholder:text-muted/50 focus:outline-none"
                       disabled={status === 'connecting'}
                     />
@@ -891,6 +968,18 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
             )}
           </AnimatePresence>
         </div>
+      )}
+
+      {/* QR Scanner modal */}
+      {showQRScanner && (
+        <QrScanner
+          onCodeScanned={(code) => {
+            setInputCode(code)
+            setShowQRScanner(false)
+            toast.success('QR code scanned!')
+          }}
+          onClose={() => setShowQRScanner(false)}
+        />
       )}
     </div>
   )
