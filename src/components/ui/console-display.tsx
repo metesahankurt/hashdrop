@@ -33,9 +33,9 @@ export function ConsoleDisplay() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
       className="w-full glass-card rounded-xl p-4 mb-4"
     >
       {/* Header */}
@@ -63,13 +63,13 @@ export function ConsoleDisplay() {
           className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent"
         >
         <AnimatePresence initial={false}>
-          {consoleLogs.map((log, index) => (
+          {consoleLogs.map((log) => (
             <motion.div
               key={log.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ duration: 0.2, delay: index * 0.05 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className={cn(
                 "flex items-start gap-2 text-xs px-2 py-1.5 rounded-md",
                 "border border-transparent transition-all",

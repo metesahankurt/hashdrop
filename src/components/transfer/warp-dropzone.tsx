@@ -98,14 +98,14 @@ export function WarpDropzone() {
 
   return (
     <div className="w-full">
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         {files.length === 0 ? (
           <motion.div
             key="dropzone"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             className="w-full"
           >
             <div
@@ -147,10 +147,10 @@ export function WarpDropzone() {
         ) : (
           <motion.div
             key="files-preview"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="space-y-3"
           >
             {/* Header with total info */}
@@ -183,9 +183,9 @@ export function WarpDropzone() {
                 return (
                   <motion.div
                     key={previewKey}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.15 }}
                     className="flex items-center gap-3 glass-card rounded-lg p-3"
                   >
                     {/* Thumbnail or Icon */}

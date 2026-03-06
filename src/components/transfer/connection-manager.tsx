@@ -653,8 +653,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       {/* QR Auto-Connect View - Shown when page is opened from QR code scan */}
       {isQRConnect && !autoConnected && status === 'idle' && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="text-center space-y-4"
         >
@@ -672,8 +672,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       {/* Sender View - Compact Code Display (only when creating, not QR) */}
       {isCreateMode && !isQRConnect && (mode === 'send' || mode === 'text' || mode === null) && status === 'idle' && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="text-center space-y-3"
         >
@@ -744,8 +744,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       {/* QR Connection Status - Active connecting state */}
       {isQRConnect && status === 'connecting' && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="text-center space-y-4"
         >
@@ -763,8 +763,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       {/* QR Connection Failed */}
       {isQRConnect && status === 'failed' && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="text-center space-y-4"
         >
@@ -788,8 +788,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       {/* JOIN MODE: Clean standalone join card */}
       {isJoinMode && !isQRConnect && (status === 'idle' || status === 'connecting' || status === 'failed') && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
           className="w-full max-w-md mx-auto"
         >
@@ -884,8 +884,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
           <div className="grid grid-cols-2 gap-2">
             {onOpenHistory && (
               <motion.button
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 onClick={onOpenHistory}
                 className="py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
               >
@@ -896,8 +896,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
 
             {onOpenStats && (
               <motion.button
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ delay: 0.05 }}
                 onClick={onOpenStats}
                 className="py-2 text-xs text-muted hover:text-primary transition-all flex items-center justify-center gap-1.5 group"
