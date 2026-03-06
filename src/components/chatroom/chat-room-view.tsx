@@ -248,25 +248,27 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
       {/* Room code panel */}
       <AnimatePresence>
         {showCode && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="glass-card border-t-0 px-4 py-3 overflow-hidden shrink-0 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-primary font-bold tracking-wide text-sm flex-1">{roomCode}</span>
-              <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-                {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
-              </button>
-              {canShare && (
-                <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-                  <Share2 className="w-4 h-4 text-muted" />
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+            className="glass-card border-t-0 overflow-hidden shrink-0">
+            <div className="px-4 py-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-primary font-bold tracking-wide text-sm flex-1">{roomCode}</span>
+                <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
+                  {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
                 </button>
+                {canShare && (
+                  <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
+                    <Share2 className="w-4 h-4 text-muted" />
+                  </button>
+                )}
+              </div>
+              {timeLeft > 0 && (
+                <div className="flex items-center gap-1 text-xs text-muted">
+                  <Clock className="w-3 h-3" />
+                  <span>Code expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+                </div>
               )}
             </div>
-            {timeLeft > 0 && (
-              <div className="flex items-center gap-1 text-xs text-muted">
-                <Clock className="w-3 h-3" />
-                <span>Code expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -274,9 +276,9 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
       {/* Participants panel */}
       <AnimatePresence>
         {showParticipants && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="glass-card border-t-0 px-4 py-2 overflow-hidden shrink-0">
-            <div className="flex gap-2 flex-wrap">
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+            className="glass-card border-t-0 overflow-hidden shrink-0">
+            <div className="px-4 py-2 flex gap-2 flex-wrap">
               <span className="text-xs glass-card px-2.5 py-1 rounded-full flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-primary rounded-full" />{username} <span className="text-muted">(you)</span>
               </span>
