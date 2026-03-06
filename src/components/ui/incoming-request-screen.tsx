@@ -49,9 +49,9 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative z-10">
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
         className="w-full max-w-sm mx-auto text-center space-y-6"
       >
         {/* Sender avatar + icon stack */}

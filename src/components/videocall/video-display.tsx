@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { CameraOff, User, MonitorUp } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
 import { useUsernameStore } from '@/store/use-username-store'
@@ -41,12 +41,12 @@ export function VideoDisplay() {
 
   // Find any active screen share stream (local or remote)
   const localScreenStream = isScreenSharing ? screenStream : null
-  const remoteScreenEntry = useMemo(() => {
+  const remoteScreenEntry = (() => {
     for (const [peerId, streams] of remoteStreams) {
       if (streams.screen) return { peerId, stream: streams.screen }
     }
     return null
-  }, [remoteStreams])
+  })()
 
   const activeScreenStream = localScreenStream || remoteScreenEntry?.stream || null
   const localLabel = localUsername ? `${localUsername} (Sen)` : 'Sen'
@@ -58,7 +58,7 @@ export function VideoDisplay() {
       : ''
 
   // Build list of camera participant entries
-  const remotePeerIds = useMemo(() => Array.from(remoteStreams.keys()), [remoteStreams])
+  const remotePeerIds = Array.from(remoteStreams.keys())
 
   // Local video callback ref
   const localVideoRef = useCallback((node: HTMLVideoElement | null) => {

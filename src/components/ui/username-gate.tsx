@@ -131,7 +131,7 @@ export function WithUsernameGate({ icon, title, highlight, description, hint, mo
   const showEntryScreen = mode && confirmedUsername && !selectedAction
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="wait" initial={false}>
       {!confirmedUsername ? (
         <motion.div key="gate" className="min-h-screen flex items-center justify-center px-4 py-16 relative z-10">
           <UsernameGate

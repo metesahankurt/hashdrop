@@ -15,9 +15,17 @@ import { useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/use-app-store";
 
 const pageTransition = {
-  initial: { opacity: 0, scale: 0.98 },
-  animate: { opacity: 1, scale: 1, transition: { duration: 0.3 } },
-  exit: { opacity: 0, scale: 1.02, transition: { duration: 0.2 } },
+  initial: { opacity: 0, y: 8 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const },
+  },
+  exit: {
+    opacity: 0,
+    y: -6,
+    transition: { duration: 0.16, ease: [0.4, 0, 1, 1] as const },
+  },
 };
 
 // Determine which mode an incoming link targets
@@ -103,7 +111,7 @@ function AppContent() {
     <>
       {appMode !== "welcome" && <MinimalHeader />}
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         {appMode === "welcome" && (
           <motion.div key="welcome" {...pageTransition}>
             <WelcomeScreen />
