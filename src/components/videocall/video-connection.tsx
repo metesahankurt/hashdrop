@@ -149,6 +149,13 @@ export function VideoConnection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Add effect to auto-join if we have the peer initialized, we have an incoming code, and we haven't joined yet
+  const [hasAutoJoined, setHasAutoJoined] = useState(false)
+  const [isJoining, setIsJoining] = useState(false)
+  
+  // We will run this effect once the peer is ready and we haven't auto-joined yet
+  // We'll move it down to after `connectToCall` is declared to avoid the reference error.
+
   const displayCode = generatedInfo?.displayCode || ''
   const peerId = generatedInfo?.peerId
 
@@ -363,6 +370,14 @@ export function VideoConnection() {
     })
   }, [peer, setCallStatus, buildOutgoingStream, attachCallHandlers, setupDataConnection, joinPassword])
 
+  useEffect(() => {
+    if (incomingCode && peer && !hasAutoJoined) {
+      setHasAutoJoined(true)
+      setIsJoining(true)
+      connectToCall(incomingCode)
+    }
+  }, [incomingCode, peer, hasAutoJoined, connectToCall])
+
   const handleQRScanned = useCallback((code: string) => {
     setInputCode(code)
     setShowQRScanner(false)
@@ -487,70 +502,79 @@ export function VideoConnection() {
         {/* Join Call Section */}
         {(callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle' || callStatus === 'ringing' || callStatus === 'failed') && (
           <div className="w-full space-y-3">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/30" /></div>
-              <div className="relative flex justify-center"><span className="px-3 text-xs text-muted bg-background">or</span></div>
-            </div>
+            {incomingCode ? (
+              <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center gap-4 py-12">
+                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <p className="text-sm text-foreground">Joining call {incomingCode}...</p>
+                <p className="text-xs text-muted">Initializing camera and microphone</p>
+              </div>
+            ) : (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/30" /></div>
+                  <div className="relative flex justify-center"><span className="px-3 text-xs text-muted bg-background">or</span></div>
+                </div>
 
-            <button onClick={() => setShowReceive(!showReceive)} className="w-full py-2 text-sm text-muted hover:text-foreground transition-all flex items-center justify-center gap-2">
-              <span>{showReceive ? 'Hide join' : 'Join a call'}</span>
-              <motion.div animate={{ rotate: showReceive ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                <ChevronDown className="w-4 h-4" />
-              </motion.div>
-            </button>
+                <button onClick={() => setShowReceive(!showReceive)} className="w-full py-2 text-sm text-muted hover:text-foreground transition-all flex items-center justify-center gap-2">
+                  <span>{showReceive ? 'Hide join' : 'Join a call'}</span>
+                  <motion.div animate={{ rotate: showReceive ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown className="w-4 h-4" />
+                  </motion.div>
+                </button>
 
-            <AnimatePresence>
-              {showReceive && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
-                  <div className="glass-card p-4 rounded-xl space-y-3">
-                    <h3 className="text-sm font-semibold text-foreground">Enter host&apos;s code</h3>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder={peer ? 'Cosmic-Falcon' : 'Initializing...'}
-                        value={inputCode}
-                        onChange={(e) => setInputCode(e.target.value)}
-                        className="glass-input flex-1 text-base font-mono text-center text-foreground placeholder:text-muted/50 focus:outline-none"
-                        disabled={!peer}
-                        style={{ fontSize: '16px' }}
-                      />
-                      <button
-                        onClick={() => setShowQRScanner(true)}
-                        className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all flex items-center gap-1.5 text-xs"
-                        title="QR Tara"
-                      >
-                        <ScanLine className="w-4 h-4" />
-                      </button>
-                    </div>
+                <AnimatePresence>
+                  {showReceive && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.3 }} className="overflow-hidden">
+                      <div className="glass-card p-4 rounded-xl space-y-3">
+                        <h3 className="text-sm font-semibold text-foreground">Enter host&apos;s code</h3>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Enter code (e.g. Cosmic-Falcon)"
+                            value={inputCode}
+                            onChange={(e) => setInputCode(e.target.value)}
+                            className="glass-input flex-1 text-base font-mono text-center text-foreground placeholder:text-muted/50 focus:outline-none"
+                            disabled={!peer || isJoining}
+                            style={{ fontSize: '16px' }}
+                          />
+                          <button
+                            onClick={() => setShowQRScanner(true)}
+                            className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all flex items-center gap-1.5 text-xs"
+                            title="Scan QR"
+                          >
+                            <ScanLine className="w-4 h-4" />
+                          </button>
+                        </div>
 
-                    {/* Optional join password */}
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Password (if any)"
-                        value={joinPassword}
-                        onChange={(e) => setJoinPassword(e.target.value)}
-                        className="glass-input w-full text-sm pr-9"
-                        style={{ fontSize: '16px' }}
-                      />
-                      <button onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground" type="button">
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+                        {/* Optional join password */}
+                        <div className="relative">
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Password (if any)"
+                            value={joinPassword}
+                            onChange={(e) => setJoinPassword(e.target.value)}
+                            className="glass-input w-full text-sm pr-9"
+                            style={{ fontSize: '16px' }}
+                          />
+                          <button onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-foreground" type="button">
+                            {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
 
-                    <button
-                      onClick={() => connectToCall(inputCode)}
-                      disabled={!inputCode || !peer}
-                      className="glass-btn-primary w-full py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      <span>Join Call</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                    {!peer && <p className="text-xs text-muted text-center">Initializing camera and connection...</p>}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                        <button
+                          onClick={() => { setIsJoining(true); connectToCall(inputCode); }}
+                          disabled={!inputCode || !peer || isJoining}
+                          className="glass-btn-primary w-full py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <><span>Join Call</span><ArrowRight className="w-4 h-4" /></>}
+                        </button>
+                        {!peer && <p className="text-xs text-muted text-center">Initializing camera and connection...</p>}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </div>
         )}
 

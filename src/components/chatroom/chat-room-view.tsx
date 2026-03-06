@@ -59,10 +59,29 @@ function JoinScreen({ username, initialCode, onBack, onJoin }: JoinScreenProps) 
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
 
+  // Auto-join if there is an initial code (from a link)
+  useEffect(() => {
+    if (initialCode && !isJoining) {
+      setIsJoining(true)
+      onJoin(initialCode, null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleJoin = async () => {
     if (!inputCode.trim()) return
     const hash = joinPassword ? await hashPassword(joinPassword) : null
     onJoin(inputCode.trim(), hash)
+  }
+
+  // If auto-joining from a link, show a loading spinner instead of the form
+  if (initialCode) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto flex flex-col items-center gap-4 py-12">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-muted text-sm">Joining room {initialCode}...</p>
+      </motion.div>
+    )
   }
 
   return (
@@ -192,7 +211,7 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 480 }}>
+    <div className="w-full max-w-4xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 480 }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 glass-card rounded-t-2xl shrink-0">
         <div className="flex items-center gap-3">
