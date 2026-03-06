@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import { Video, Mic, MicOff, VideoOff, Check, X, User } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
 import { useUsernameStore } from '@/store/use-username-store'
-import { getLocalMediaStream } from '@/lib/media-utils'
+import { getLocalMediaStreamWithFallback } from '@/lib/media-utils'
 
 interface VideoLobbyProps {
   /** Called when user confirms joining */
@@ -22,7 +22,12 @@ export function VideoLobby({ onJoin, onDecline }: VideoLobbyProps) {
   // Ensure we have a local stream for preview
   useEffect(() => {
     if (!localStream) {
-      getLocalMediaStream().then(stream => { setLocalStream(stream) }).catch(() => {})
+      getLocalMediaStreamWithFallback()
+        .then(({ stream, hasVideo }) => {
+          setLocalStream(stream)
+          if (!hasVideo) useVideoStore.getState().toggleCamera()
+        })
+        .catch(() => {})
     }
   }, [localStream, setLocalStream])
 

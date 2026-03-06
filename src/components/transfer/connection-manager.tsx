@@ -43,9 +43,10 @@ const MAX_CHUNKS = 1000000 // Maximum number of chunks (10GB / 16KB ≈ 655,360 
 interface ConnectionManagerProps {
   onOpenHistory?: () => void
   onOpenStats?: () => void
+  initialAction?: 'create' | 'join'
 }
 
-export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionManagerProps = {}) {
+export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }: ConnectionManagerProps = {}) {
   const {
     setMyId, peer, setPeer,
     setConn, setStatus, status,
@@ -60,7 +61,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats }: ConnectionMana
   const [isCopied, setIsCopied] = useState(false)
   const [generatedInfo, setGeneratedInfo] = useState<{displayCode: string, peerId: string} | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
-  const [showReceive, setShowReceive] = useState(false)
+  const [showReceive, setShowReceive] = useState(initialAction === 'join')
   const [showQR, setShowQR] = useState(false)
   const [autoConnected, setAutoConnected] = useState(false)
   const [canShare, setCanShare] = useState(false)

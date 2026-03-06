@@ -15,7 +15,7 @@ import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 import { useSearchParams } from 'next/navigation'
 
-export function TransferView() {
+export function TransferView({ initialAction }: { initialAction?: 'create' | 'join' }) {
   const searchParams = useSearchParams()
   const transferCode = searchParams.get('code')
   const { status, file, addLog } = useWarpStore()
@@ -119,6 +119,7 @@ export function TransferView() {
               <ConnectionManager
                 onOpenHistory={() => setShowHistory(true)}
                 onOpenStats={() => setShowStats(true)}
+                initialAction={initialAction}
               />
             </Suspense>
             <TransferStatus />

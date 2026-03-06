@@ -18,6 +18,42 @@ export async function getLocalMediaStream(
   })
 }
 
+export type MediaFallbackResult = {
+  stream: MediaStream
+  hasVideo: boolean
+  hasAudio: boolean
+}
+
+export async function getLocalMediaStreamWithFallback(): Promise<MediaFallbackResult> {
+  // Try video + audio first
+  try {
+    const stream = await getLocalMediaStream(true, true)
+    return {
+      stream,
+      hasVideo: stream.getVideoTracks().length > 0,
+      hasAudio: stream.getAudioTracks().length > 0,
+    }
+  } catch (err) {
+    const error = err as DOMException
+    // If camera not found, fall back to audio-only
+    if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError' || error.name === 'NotReadableError') {
+      try {
+        const audioStream = await getLocalMediaStream(false, true)
+        return {
+          stream: audioStream,
+          hasVideo: false,
+          hasAudio: audioStream.getAudioTracks().length > 0,
+        }
+      } catch {
+        // Both video+audio and audio-only failed
+        throw new DOMException('No media devices available', 'NO_MEDIA_DEVICES')
+      }
+    }
+    // Permission denied or other error — rethrow
+    throw err
+  }
+}
+
 export function stopMediaStream(stream: MediaStream | null): void {
   if (stream) {
     stream.getTracks().forEach(track => track.stop())

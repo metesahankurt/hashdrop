@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRight, User, RefreshCw } from 'lucide-react'
 import { useUsernameStore } from '@/store/use-username-store'
+import { ModeEntryScreen } from './mode-entry-screen'
 import type { ReactNode } from 'react'
 
 interface UsernameGateProps {
@@ -104,21 +105,30 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
   )
 }
 
-// HOC wrapper that shows UsernameGate then children
+// HOC wrapper that shows UsernameGate → ModeEntryScreen → children
 interface WithUsernameGateProps {
   icon: ReactNode
   title: string
   highlight: string
   description: string
   hint?: string
-  children: (username: string) => ReactNode
+  /** Which mode this gate is for (enables entry screen) */
+  mode?: 'transfer' | 'videocall' | 'chatroom'
+  /** Skip entry screen (e.g. when opened from incoming link) */
+  skipEntry?: boolean
+  children: (username: string, action?: 'create' | 'join') => ReactNode
 }
 
-export function WithUsernameGate({ icon, title, highlight, description, hint, children }: WithUsernameGateProps) {
+export function WithUsernameGate({ icon, title, highlight, description, hint, mode, skipEntry, children }: WithUsernameGateProps) {
   const { username: savedUsername } = useUsernameStore()
   const [confirmedUsername, setConfirmedUsername] = useState<string | null>(
     savedUsername || null
   )
+  const [selectedAction, setSelectedAction] = useState<'create' | 'join' | null>(
+    skipEntry ? 'create' : null
+  )
+
+  const showEntryScreen = mode && confirmedUsername && !selectedAction
 
   return (
     <AnimatePresence mode="wait">
@@ -133,9 +143,17 @@ export function WithUsernameGate({ icon, title, highlight, description, hint, ch
             onConfirm={setConfirmedUsername}
           />
         </motion.div>
+      ) : showEntryScreen ? (
+        <motion.div key="entry" className="min-h-screen flex items-center justify-center px-4 py-16 relative z-10">
+          <ModeEntryScreen
+            mode={mode}
+            icon={icon}
+            onSelect={setSelectedAction}
+          />
+        </motion.div>
       ) : (
         <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }}>
-          {children(confirmedUsername)}
+          {children(confirmedUsername, selectedAction || undefined)}
         </motion.div>
       )}
     </AnimatePresence>

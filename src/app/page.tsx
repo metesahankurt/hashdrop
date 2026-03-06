@@ -118,8 +118,10 @@ function AppContent() {
               highlight="Transfer"
               description="Peer-to-peer file transfer. No cloud, no limits."
               hint="Your username will be visible to the other party"
+              mode="transfer"
+              skipEntry={!!pendingCode}
             >
-              {() => <TransferView />}
+              {(_username, action) => <TransferView initialAction={action} />}
             </WithUsernameGate>
           </motion.div>
         )}
@@ -132,8 +134,10 @@ function AppContent() {
               highlight="Call"
               description="Encrypted peer-to-peer video call. Up to 5 participants."
               hint="Your username will be shown to other participants"
+              mode="videocall"
+              skipEntry={!!pendingCode}
             >
-              {() => <VideoCallView />}
+              {(_username, action) => <VideoCallView initialAction={action} />}
             </WithUsernameGate>
           </motion.div>
         )}
@@ -146,8 +150,10 @@ function AppContent() {
               highlight="Room"
               description="Instant encrypted messaging rooms. Up to 5 people."
               hint="You will appear in the chat room with this name"
+              mode="chatroom"
+              skipEntry={!!pendingCode}
             >
-              {(username) => <ChatRoomView initialUsername={username} />}
+              {(username, action) => <ChatRoomView initialUsername={username} initialAction={action} />}
             </WithUsernameGate>
           </motion.div>
         )}

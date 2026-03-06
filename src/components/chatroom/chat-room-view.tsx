@@ -360,7 +360,7 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
 // ============================================================
 type Step = 'creating' | 'join' | 'chatting'
 
-export function ChatRoomView({ initialUsername }: { initialUsername?: string }) {
+export function ChatRoomView({ initialUsername, initialAction }: { initialUsername?: string; initialAction?: 'create' | 'join' }) {
   const searchParams = useSearchParams()
   const urlMode = searchParams?.get('mode')
   const urlCode = searchParams?.get('code')
@@ -376,7 +376,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [step, setStep] = useState<Step>(incomingCode ? 'join' : 'creating')
+  const [step, setStep] = useState<Step>(incomingCode ? 'join' : initialAction === 'join' ? 'join' : 'creating')
   const [timeLeft, setTimeLeft] = useState(CODE_EXPIRY_MS / 1000)
   const [isCreating, setIsCreating] = useState(false)
   const [activeRoomCode, setActiveRoomCode] = useState(() => generateSecureCode())
@@ -406,7 +406,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
 
   const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null, announcedRef: React.MutableRefObject<Set<string>>) => {
     conn.on('data', (raw) => {
-      const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][] }
+      const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][]; peerId?: string }
 
       if (data.type === 'chat' && data.payload) {
         addMessage({ ...data.payload, isLocal: false })
@@ -423,15 +423,26 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
         }
       } else if (data.type === 'announce' && data.username) {
         // Add remote participant
+        const { participants: existingP } = useChatRoomStore.getState()
+        const alreadyKnown = existingP.has(remotePeerId)
         addParticipant(remotePeerId, data.username)
-        addSystemMsg(`${data.username} joined the room`)
-        // Only send our announce back once (if not already announced to this peer)
+        if (!alreadyKnown) addSystemMsg(`${data.username} joined the room`)
+        // Send our announce back once (if not already announced to this peer)
         if (!announcedRef.current.has(remotePeerId)) {
           announcedRef.current.add(remotePeerId)
           conn.send({ type: 'announce', username: localUsername })
           // Send participants list to the new joiner
           const { participants: p } = useChatRoomStore.getState()
           conn.send({ type: 'participants', participants: Array.from(p.entries()) })
+          // Host broadcasts new participant to all other connected peers
+          const { peer: localPeer, dataConnections: conns } = useChatRoomStore.getState()
+          if (localPeer?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
+            conns.forEach((c, id) => {
+              if (id !== remotePeerId) {
+                try { c.send({ type: 'announce-broadcast', username: data.username, peerId: remotePeerId }) } catch { /* ignore */ }
+              }
+            })
+          }
         }
       } else if (data.type === 'participants' && data.participants) {
         const { peer: localPeer } = useChatRoomStore.getState()
@@ -440,6 +451,13 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
         removeParticipant(remotePeerId)
         removeDataConnection(remotePeerId)
         addSystemMsg(`${data.username} left the room`)
+      } else if (data.type === 'announce-broadcast' && data.username && data.peerId) {
+        // Another peer joined via the host — add them to our participant list
+        const { participants: existingP2 } = useChatRoomStore.getState()
+        if (!existingP2.has(data.peerId)) {
+          addParticipant(data.peerId, data.username)
+          addSystemMsg(`${data.username} joined the room`)
+        }
       } else if (data.type === 'auth') {
         if (localPwdHash) {
           if (data.hash === localPwdHash) conn.send({ type: 'auth-ok' })
@@ -448,11 +466,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
           conn.send({ type: 'auth-ok' })
         }
       } else if (data.type === 'auth-ok') {
-        // Send our announce exactly once
-        if (!announcedRef.current.has(remotePeerId)) {
-          announcedRef.current.add(remotePeerId)
-          conn.send({ type: 'announce', username: localUsername })
-        }
+        // Auth passed — no action needed, announce already sent on open
       } else if (data.type === 'auth-rejected') {
         toast.error('Wrong password — access denied')
         handleLeave()
@@ -504,7 +518,14 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     newPeer.on('connection', (conn) => {
       const { dataConnections } = useChatRoomStore.getState()
       if (dataConnections.size >= MAX_PEERS) { conn.close(); return }
-      conn.on('open', () => setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef))
+      conn.on('open', () => {
+        setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef)
+        // Host sends own announce + participants list immediately
+        conn.send({ type: 'announce', username: currentUsername })
+        const { participants: p } = useChatRoomStore.getState()
+        conn.send({ type: 'participants', participants: Array.from(p.entries()) })
+        announcedRef.current.add(conn.peer)
+      })
     })
 
     newPeer.on('error', (err) => {
@@ -549,6 +570,9 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
       conn.on('open', () => {
         setupConn(conn, peerId, currentUsername, null, announcedRef)
         conn.send({ type: 'auth', hash: pwdHash || '' })
+        // Send announce immediately — don't wait for auth-ok
+        conn.send({ type: 'announce', username: currentUsername })
+        announcedRef.current.add(peerId)
         setStatus('connected')
         setStep('chatting')
         addSystemMsg('Connected to the room!')

@@ -13,7 +13,7 @@ import { useVideoStore } from '@/store/use-video-store'
 import { heroVariants } from '@/lib/animations'
 import { Video } from 'lucide-react'
 
-export function VideoCallView() {
+export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'join' }) {
   const {
     callStatus, callStartTime, setCallDuration, resetCall,
     isChatOpen, setChatOpen,
@@ -98,7 +98,7 @@ export function VideoCallView() {
               <div className="glass-card rounded-2xl p-3">
                 <VideoControls preCall />
               </div>
-              <VideoConnection />
+              <VideoConnection initialAction={initialAction} />
             </div>
           )}
 

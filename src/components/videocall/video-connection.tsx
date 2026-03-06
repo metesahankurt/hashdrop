@@ -8,7 +8,7 @@ import { useVideoStore, type ChatMessage } from '@/store/use-video-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { toast } from 'sonner'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
-import { getLocalMediaStream, stopMediaStream } from '@/lib/media-utils'
+import { getLocalMediaStreamWithFallback, stopMediaStream } from '@/lib/media-utils'
 import { QRCodeDisplay } from '@/components/transfer/qr-code-display'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { formatErrorForToast } from '@/lib/error-handler'
@@ -25,7 +25,7 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-export function VideoConnection() {
+export function VideoConnection({ initialAction }: { initialAction?: 'create' | 'join' } = {}) {
   const {
     peer, setPeer,
     callStatus, setCallStatus,
@@ -124,7 +124,7 @@ export function VideoConnection() {
   const [inputCode, setInputCode] = useState(incomingCode || '')
   const [joinPassword, setJoinPassword] = useState('')
   const [isCopied, setIsCopied] = useState(false)
-  const [showReceive, setShowReceive] = useState(!!incomingCode)
+  const [showReceive, setShowReceive] = useState(!!incomingCode || initialAction === 'join')
   const [showQR, setShowQR] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [codeExpiry, setCodeExpiry] = useState<number | null>(null)
@@ -270,9 +270,13 @@ export function VideoConnection() {
     const initPeer = async () => {
       try {
         setCallStatus('generating')
-        const stream = await getLocalMediaStream()
+        const { stream, hasVideo } = await getLocalMediaStreamWithFallback()
         if (!mountedRef.current) { stopMediaStream(stream); return }
         setLocalStream(stream)
+        if (!hasVideo) {
+          useVideoStore.getState().toggleCamera() // set isCameraOff = true
+          toast.info('No camera detected. Joining with audio only.')
+        }
 
         const newPeer = new Peer(peerId, {
           host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
@@ -331,7 +335,14 @@ export function VideoConnection() {
       } catch (err) {
         if (!mountedRef.current) return
         console.error('[VideoCall] Media error:', err)
-        toast.error('Camera/microphone access denied', { description: 'Please allow access in your browser settings.' })
+        const error = err as DOMException
+        if (error.name === 'NO_MEDIA_DEVICES') {
+          toast.error('No camera or microphone found', { description: 'Please connect a media device and try again.' })
+        } else if (error.name === 'NotAllowedError') {
+          toast.error('Camera/microphone access denied', { description: 'Please allow access in your browser settings.' })
+        } else {
+          toast.error('Media device error', { description: 'Could not access camera or microphone.' })
+        }
         setCallStatus('failed')
       }
     }
@@ -344,7 +355,7 @@ export function VideoConnection() {
     const { mediaConnections } = useVideoStore.getState()
     if (mediaConnections.size >= MAX_PEERS) { toast.error('Conference is full'); return }
     const outgoingStream = buildOutgoingStream()
-    if (!outgoingStream) { toast.error('Camera not ready. Please wait.'); return }
+    if (!outgoingStream) { toast.error('Media not ready. Please wait.'); return }
     setCallStatus('calling')
     const targetId = codeToCallPeerId(targetCode.trim())
 
