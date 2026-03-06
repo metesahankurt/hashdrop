@@ -5,7 +5,7 @@ import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, ArrowRight, Copy, Check, Clock,
-  Send, Users, X, QrCode, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff
+  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff
 } from 'lucide-react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
@@ -165,8 +165,6 @@ interface LiveChatRoomProps {
 function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomProps) {
   const { messages, participants, dataConnections, addMessage } = useChatRoomStore()
   const [input, setInput] = useState('')
-  const [showParticipants, setShowParticipants] = useState(false)
-  const [showCode, setShowCode] = useState(false)
   const [copied, setCopied] = useState(false)
   const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -219,85 +217,79 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 glass-card rounded-t-2xl shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-primary" />
+      {/* Header & Permanent Info Panel */}
+      <div className="flex flex-col glass-card rounded-t-2xl shrink-0 border-b-0 overflow-hidden">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between px-4 py-3 bg-black/10">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Chat Room</p>
+              <p className="text-xs text-muted">Secure Session</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Chat Room</p>
-            <p className="text-xs text-muted">{username}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {/* Room code toggle */}
-          <button
-            onClick={() => setShowCode(!showCode)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted hover:text-foreground glass-card rounded-lg transition-all"
-            title="Share room code"
-          >
-            <QrCode className={`w-3.5 h-3.5 ${showCode ? 'text-primary' : ''}`} />
-            <span className="hidden sm:inline">Invite</span>
-          </button>
-          {/* Participants count */}
-          <button onClick={() => setShowParticipants(!showParticipants)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-muted hover:text-foreground glass-card rounded-lg transition-all">
-            <Users className="w-3.5 h-3.5" />
-            <span>{1 + participantList.length}</span>
-          </button>
-          <button onClick={handleLeave} className="p-1.5 hover:bg-danger/20 rounded-lg transition-all text-muted hover:text-danger" title="Leave">
+          <button onClick={handleLeave} className="p-1.5 hover:bg-danger/20 rounded-lg transition-all text-muted hover:text-danger flex items-center gap-1.5 px-3" title="Leave Room">
+            <span className="text-xs font-medium hidden sm:inline">Leave</span>
             <X className="w-4 h-4" />
           </button>
         </div>
-      </div>
 
-      {/* Room code panel */}
-      <AnimatePresence>
-        {showCode && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="glass-card border-t-0 overflow-hidden shrink-0">
-            <div className="px-4 py-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-primary font-bold tracking-wide text-sm flex-1">{roomCode}</span>
-                <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-                  {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
+        {/* Always Visible Info Section */}
+        <div className="px-4 py-3 bg-black/20 border-t border-white/5 flex flex-col gap-3">
+          {/* Link Row */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-muted">Invite Link:</span>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full">
+              <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex items-center">
+                <a 
+                  href={`https://hashdrop.metesahankurt.cloud/?mode=chatroom&code=${roomCode}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="truncate text-xs text-primary hover:underline block w-full"
+                >
+                  https://hashdrop.metesahankurt.cloud/?mode=chatroom&code={roomCode}
+                </a>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto w-full sm:w-auto">
+                <button onClick={copyCode} className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg border-white/10 bg-white/5">
+                  {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>Copy</span>
                 </button>
                 {canShare && (
-                  <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all">
-                    <Share2 className="w-4 h-4 text-muted" />
+                  <button onClick={shareCode} className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg border-white/10 bg-white/5">
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share</span>
                   </button>
                 )}
               </div>
-              {timeLeft > 0 && (
-                <div className="flex items-center gap-1 text-xs text-muted">
-                  <Clock className="w-3 h-3" />
-                  <span>Code expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-                </div>
-              )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+          {/* Expiry Row */}
+          {timeLeft > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-muted">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Link expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+          )}
 
-      {/* Participants panel */}
-      <AnimatePresence>
-        {showParticipants && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="glass-card border-t-0 overflow-hidden shrink-0">
-            <div className="px-4 py-2 flex gap-2 flex-wrap">
-              <span className="text-xs glass-card px-2.5 py-1 rounded-full flex items-center gap-1.5">
+          {/* Participants Row */}
+          <div className="flex items-start sm:items-center gap-2 sm:gap-4">
+            <span className="text-xs font-medium text-muted shrink-0 mt-1.5 sm:mt-0">Participants:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              <span className="text-xs glass-card px-2.5 py-1 rounded-md flex items-center gap-1.5 border-primary/20 bg-primary/5">
                 <span className="w-1.5 h-1.5 bg-primary rounded-full" />{username} <span className="text-muted">(you)</span>
               </span>
               {participantList.map(([pid, uname]) => (
-                <span key={pid} className="text-xs glass-card px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span key={pid} className="text-xs glass-card px-2.5 py-1 rounded-md flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-primary/60 rounded-full" />{uname}
                 </span>
               ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      </div>
 
       {/* Messages */}
       <div 
