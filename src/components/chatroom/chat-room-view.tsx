@@ -512,13 +512,12 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
-  // Auto-start creating the room when component first mounts
+  // Auto-start creating the room when component first mounts or username becomes available
   useEffect(() => {
-    if (step === 'creating' && !isCreating && !incomingCode) {
+    if (step === 'creating' && !isCreating && !incomingCode && (username || initialUsername)) {
       createRoom(activeRoomCode, null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoomCode, step, isCreating, incomingCode])
+  }, [activeRoomCode, step, isCreating, incomingCode, username, initialUsername, createRoom])
 
   const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
     const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
