@@ -153,9 +153,11 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-      <footer className="fixed bottom-6 left-6 z-40">
-        <SignatureBadge />
-      </footer>
+      {appMode === "welcome" && (
+        <footer className="fixed bottom-6 left-6 z-40 hidden md:block">
+          <SignatureBadge />
+        </footer>
+      )}
     </>
   );
 }

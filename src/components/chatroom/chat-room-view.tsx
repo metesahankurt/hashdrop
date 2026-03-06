@@ -169,11 +169,18 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
   const [showCode, setShowCode] = useState(false)
   const [copied, setCopied] = useState(false)
   const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   // Only show remote participants (not self)
   const participantList = useMemo(() => Array.from(participants.entries()), [participants])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      })
+    }
+  }, [messages])
 
   const sendMessage = useCallback(() => {
     const text = input.trim()
@@ -211,7 +218,7 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col" style={{ height: 'calc(100vh - 120px)', minHeight: 480 }}>
+    <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 glass-card rounded-t-2xl shrink-0">
         <div className="flex items-center gap-3">
@@ -293,7 +300,10 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0"
+      >
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
             <MessageSquare className="w-10 h-10 text-muted/30" />
@@ -322,7 +332,6 @@ function LiveChatRoom({ username, roomCode, timeLeft, onLeave }: LiveChatRoomPro
             )
           })}
         </AnimatePresence>
-        <div ref={bottomRef} />
       </div>
 
       {/* Input */}
@@ -564,7 +573,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
+    <div className="h-dvh pt-[88px] pb-6 px-4 md:px-8 flex flex-col relative z-10 w-full overflow-hidden">
       <AnimatePresence mode="wait">
         {/* Creating: loading spinner while auto-creating */}
         {step === 'creating' && (
