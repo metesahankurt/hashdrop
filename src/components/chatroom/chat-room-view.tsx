@@ -598,7 +598,7 @@ export function ChatRoomView({ initialUsername }: { initialUsername?: string }) 
 
         {/* Live chat */}
         {step === 'chatting' && (
-          <motion.div key="chatting" className="w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <motion.div key="chatting" className="w-full h-full flex-1 flex flex-col min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <LiveChatRoom
               username={username || initialUsername || ''}
               roomCode={activeRoomCode}

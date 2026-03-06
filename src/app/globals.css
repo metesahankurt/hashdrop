@@ -9,6 +9,7 @@
 /* Smooth scrolling for anchor links */
 html {
   scroll-behavior: smooth;
+  overflow-y: scroll;
 }
 
 /* iOS momentum scrolling (only on body, not all elements) */
@@ -116,6 +117,8 @@ body::before {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+  transform: translateZ(0); /* Hardware acceleration */
 }
 
 .glass-card-hover:hover {
@@ -253,6 +256,8 @@ h3 {
 }
 
 /* Smooth text rendering */
-* {
+body {
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

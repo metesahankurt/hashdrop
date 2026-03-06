@@ -57,15 +57,15 @@ export function UsernameGate({ icon, title, highlight, description, hint, onConf
       {/* Input */}
       <div className="space-y-3">
         <div className="relative">
-          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
           <input
             type="text"
             placeholder="Your username..."
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleConfirm()}
-            className="glass-input glass-input-icon w-full text-base"
-            style={{ fontSize: '16px' }}
+            className="glass-input w-full text-base"
+            style={{ fontSize: '16px', paddingLeft: '2.5rem' }}
             maxLength={24}
             autoFocus
           />

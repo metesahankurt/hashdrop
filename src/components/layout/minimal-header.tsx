@@ -3,10 +3,11 @@
 import { motion } from 'framer-motion'
 import { HamburgerMenu } from './hamburger-menu'
 import { useEffect, useState } from 'react'
-import { Send, Video } from 'lucide-react'
+import { Send, Video, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useVideoStore } from '@/store/use-video-store'
+import { useChatRoomStore } from '@/store/use-chat-room-store'
 import { useAppStore, type AppMode } from '@/store/use-app-store'
 
 export function MinimalHeader() {
@@ -34,6 +35,8 @@ export function MinimalHeader() {
 
     // Reset video call if active
     resetCall()
+    // Reset chat room if active
+    useChatRoomStore.getState().resetRoom()
 
     // Go back to welcome
     setAppMode('welcome')
@@ -50,6 +53,9 @@ export function MinimalHeader() {
       if (conn) conn.close()
       if (peer) peer.destroy()
       fullReset()
+    }
+    if (appMode === 'chatroom') {
+      useChatRoomStore.getState().resetRoom()
     }
 
     setAppMode(mode)
@@ -85,28 +91,39 @@ export function MinimalHeader() {
         </div>
 
         {/* Center Navigation Tabs - Absolute centered */}
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 glass-card rounded-lg px-1 py-1 z-10">
+        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 glass-card rounded-lg px-1 py-1 z-10 w-max max-w-[50vw] sm:max-w-none justify-center">
           <button
             onClick={() => handleModeSwitch('transfer')}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-all ${
               appMode === 'transfer'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
           >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">File Transfer</span>
+            <Send className="w-4 h-4 shrink-0" />
+            <span className="hidden lg:inline">File Transfer</span>
           </button>
           <button
             onClick={() => handleModeSwitch('videocall')}
-            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-all ${
               appMode === 'videocall'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
           >
-            <Video className="w-4 h-4" />
-            <span className="hidden sm:inline">Video Call</span>
+            <Video className="w-4 h-4 shrink-0" />
+            <span className="hidden lg:inline">Video Call</span>
+          </button>
+          <button
+            onClick={() => handleModeSwitch('chatroom')}
+            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              appMode === 'chatroom'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 shrink-0" />
+            <span className="hidden lg:inline">Chat Room</span>
           </button>
         </nav>
 
