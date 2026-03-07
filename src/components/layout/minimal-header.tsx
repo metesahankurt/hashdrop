@@ -3,15 +3,16 @@
 import { HamburgerMenu } from './hamburger-menu'
 import { Send, Video, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useVideoStore } from '@/store/use-video-store'
 import { useChatRoomStore } from '@/store/use-chat-room-store'
-import { useAppStore, type AppMode } from '@/store/use-app-store'
 
 export function MinimalHeader() {
   const { fullReset, peer, conn } = useWarpStore()
   const resetCall = useVideoStore((s) => s.resetCall)
-  const { appMode, setAppMode } = useAppStore()
+  const pathname = usePathname()
+  const router = useRouter()
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -27,26 +28,26 @@ export function MinimalHeader() {
     useChatRoomStore.getState().resetRoom()
 
     // Go back to welcome
-    setAppMode('welcome')
+    router.push('/')
   }
 
-  const handleModeSwitch = (mode: AppMode) => {
-    if (mode === appMode) return
+  const handleModeSwitch = (path: string) => {
+    if (pathname === path) return
 
     // Clean up current mode before switching
-    if (appMode === 'videocall') {
+    if (pathname === '/videocall') {
       resetCall()
     }
-    if (appMode === 'transfer') {
+    if (pathname === '/transfer') {
       if (conn) conn.close()
       if (peer) peer.destroy()
       fullReset()
     }
-    if (appMode === 'chatroom') {
+    if (pathname === '/chatroom') {
       useChatRoomStore.getState().resetRoom()
     }
 
-    setAppMode(mode)
+    router.push(path)
   }
 
   return (
@@ -70,9 +71,9 @@ export function MinimalHeader() {
         {/* Center Navigation Tabs - Absolute centered */}
         <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 glass-card rounded-lg px-1 py-1 z-10 w-max max-w-[50vw] sm:max-w-none justify-center">
           <button
-            onClick={() => handleModeSwitch('transfer')}
+            onClick={() => handleModeSwitch('/transfer')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'transfer'
+              pathname === '/transfer'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
@@ -81,9 +82,9 @@ export function MinimalHeader() {
             <span className="hidden lg:inline">File Transfer</span>
           </button>
           <button
-            onClick={() => handleModeSwitch('videocall')}
+            onClick={() => handleModeSwitch('/videocall')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'videocall'
+              pathname === '/videocall'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
@@ -92,9 +93,9 @@ export function MinimalHeader() {
             <span className="hidden lg:inline">Video Call</span>
           </button>
           <button
-            onClick={() => handleModeSwitch('chatroom')}
+            onClick={() => handleModeSwitch('/chatroom')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'chatroom'
+              pathname === '/chatroom'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
