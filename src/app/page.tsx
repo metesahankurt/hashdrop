@@ -6,6 +6,7 @@ import { MinimalHeader } from "@/components/layout/minimal-header";
 import { SignatureBadge } from "@/components/ui/signature-badge";
 import { WelcomeScreen } from "@/components/welcome/welcome-screen";
 import { TransferView } from "@/components/transfer/transfer-view";
+import { TransferViewNew } from "@/components/transfer/transfer-view-new";
 import { VideoCallView } from "@/components/videocall/video-call-view";
 import { ChatRoomView } from "@/components/chatroom/chat-room-view";
 import { WithUsernameGate } from "@/components/ui/username-gate";
@@ -129,7 +130,7 @@ function AppContent() {
               mode="transfer"
               skipEntry={!!pendingCode}
             >
-              {(_username, action) => <TransferView initialAction={action} />}
+              {(_username, action) => <TransferViewNew initialAction={action} />}
             </WithUsernameGate>
           </motion.div>
         )}
