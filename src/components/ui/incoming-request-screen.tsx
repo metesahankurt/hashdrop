@@ -1,12 +1,13 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Send, Video, MessageSquare, Check, X, User, ArrowRight } from 'lucide-react'
+import { Send, Video, MessageSquare, Check, X, User, ArrowRight, Lock } from 'lucide-react'
 
 interface IncomingRequestScreenProps {
   mode: 'transfer' | 'videocall' | 'chatroom'
   from: string | null
   code: string
+  hasPassword?: boolean
   onAccept: () => void
   onDecline: () => void
 }
@@ -41,7 +42,7 @@ const modeConfig = {
   },
 }
 
-export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }: IncomingRequestScreenProps) {
+export function IncomingRequestScreen({ mode, from, code, hasPassword, onAccept, onDecline }: IncomingRequestScreenProps) {
   const cfg = modeConfig[mode]
   const Icon = cfg.icon
   const senderName = from || 'Someone'
@@ -87,6 +88,14 @@ export function IncomingRequestScreen({ mode, from, code, onAccept, onDecline }:
             <span className="text-xs text-muted">Code:</span>
             <span className="font-mono text-sm text-primary font-bold tracking-wide">{code}</span>
           </div>
+
+          {/* Password warning */}
+          {hasPassword && (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+              <Lock className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="text-xs font-medium text-yellow-400">Şifreli oda — katılmak için şifre gerekecek</span>
+            </div>
+          )}
         </div>
 
         {/* Action buttons */}

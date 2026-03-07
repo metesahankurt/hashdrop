@@ -45,12 +45,14 @@ function AppContent() {
   const [pendingMode, setPendingMode] = useState<'transfer' | 'videocall' | 'chatroom' | null>(null);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
+  const [pendingHasPassword, setPendingHasPassword] = useState(false);
 
   useEffect(() => {
     if (initialized) return;
     const code = searchParams.get("code");
     const mode = searchParams.get("mode");
     const from = searchParams.get("from");
+    const pwd = searchParams.get("pwd");
     const incoming = getIncomingMode(mode, code);
 
     if (incoming) {
@@ -58,6 +60,7 @@ function AppContent() {
       setPendingMode(incoming);
       setPendingCode(code);
       setPendingFrom(from);
+      setPendingHasPassword(pwd === '1');
     }
     setInitialized(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,6 +100,7 @@ function AppContent() {
           mode={pendingMode}
           from={pendingFrom}
           code={pendingCode}
+          hasPassword={pendingHasPassword}
           onAccept={handleAccept}
           onDecline={handleDecline}
         />
@@ -160,8 +164,15 @@ function AppContent() {
               hint="You will appear in the chat room with this name"
               mode="chatroom"
               skipEntry={!!pendingCode}
+              skipToJoin={!!pendingCode}
             >
-              {(username, action) => <ChatRoomView initialUsername={username} initialAction={action} />}
+              {(username, action) => (
+                <ChatRoomView
+                  initialUsername={username}
+                  initialAction={action}
+                  incomingHasPassword={pendingHasPassword}
+                />
+              )}
             </WithUsernameGate>
           </motion.div>
         )}

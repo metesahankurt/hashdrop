@@ -116,16 +116,18 @@ interface WithUsernameGateProps {
   mode?: 'transfer' | 'videocall' | 'chatroom'
   /** Skip entry screen (e.g. when opened from incoming link) */
   skipEntry?: boolean
+  /** When true, pre-select 'join' action (link invite flow) */
+  skipToJoin?: boolean
   children: (username: string, action?: 'create' | 'join') => ReactNode
 }
 
-export function WithUsernameGate({ icon, title, highlight, description, hint, mode, skipEntry, children }: WithUsernameGateProps) {
+export function WithUsernameGate({ icon, title, highlight, description, hint, mode, skipEntry, skipToJoin, children }: WithUsernameGateProps) {
   const { username: savedUsername } = useUsernameStore()
   const [confirmedUsername, setConfirmedUsername] = useState<string | null>(
     savedUsername || null
   )
   const [selectedAction, setSelectedAction] = useState<'create' | 'join' | null>(
-    skipEntry ? 'create' : null
+    skipToJoin ? 'join' : skipEntry ? 'create' : null
   )
 
   const showEntryScreen = mode && confirmedUsername && !selectedAction
