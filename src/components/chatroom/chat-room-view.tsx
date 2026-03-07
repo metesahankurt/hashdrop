@@ -279,9 +279,11 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
 
   const buildInviteUrl = () => {
     const { username: uname } = useUsernameStore.getState()
-    const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
-    const pwdParam = roomHasPassword ? '&pwd=1' : ''
-    return `${BASE_URL}/?mode=chatroom&code=${encodeURIComponent(roomCode)}${fromParam}${pwdParam}`
+    const fromParam = uname ? `?from=${encodeURIComponent(uname)}` : ''
+    const pwdParam = roomHasPassword
+      ? (fromParam ? '&pwd=1' : '?pwd=1')
+      : ''
+    return `${BASE_URL}/chatroom/${encodeURIComponent(roomCode)}${fromParam}${pwdParam}`
   }
 
   const copyCode = () => {
@@ -349,7 +351,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                   rel="noopener noreferrer"
                   className="truncate text-xs text-primary hover:underline block w-full"
                 >
-                  {BASE_URL}/?mode=chatroom&code={roomCode}{roomHasPassword ? '&pwd=1' : ''}
+                  {BASE_URL}/chatroom/{roomCode}{roomHasPassword ? '?pwd=1' : ''}
                 </a>
               </div>
               <div className="flex gap-2 shrink-0">
@@ -465,18 +467,22 @@ type Step = 'password-setup' | 'creating' | 'join' | 'chatting'
 export function ChatRoomView({
   initialUsername,
   initialAction,
+  incomingCode: incomingCodeProp,
   incomingHasPassword,
 }: {
   initialUsername?: string
   initialAction?: 'create' | 'join'
+  /** Room code passed directly from /chatroom/[code] route */
+  incomingCode?: string
   incomingHasPassword?: boolean
 }) {
   const searchParams = useSearchParams()
   const urlMode = searchParams?.get('mode')
   const urlCode = searchParams?.get('code')
   const urlPwd = searchParams?.get('pwd')
-  const incomingCode = urlMode === 'chatroom' ? urlCode : null
-  // Use prop if available (from page.tsx), fallback to URL param
+  // Prefer prop-based code (from /chatroom/[code] route), fallback to old ?mode=chatroom&code= format
+  const incomingCode = incomingCodeProp ?? (urlMode === 'chatroom' ? urlCode : null)
+  // Use prop if available, fallback to URL param
   const hasIncomingPassword = incomingHasPassword ?? (urlPwd === '1')
 
   const {

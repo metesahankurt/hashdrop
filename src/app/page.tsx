@@ -1,4 +1,4 @@
-"use client";
+'use client'
 
 import { Suspense, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -7,10 +7,9 @@ import { SignatureBadge } from "@/components/ui/signature-badge";
 import { WelcomeScreen } from "@/components/welcome/welcome-screen";
 import { TransferView } from "@/components/transfer/transfer-view";
 import { VideoCallView } from "@/components/videocall/video-call-view";
-import { ChatRoomView } from "@/components/chatroom/chat-room-view";
 import { WithUsernameGate } from "@/components/ui/username-gate";
 import { IncomingRequestScreen } from "@/components/ui/incoming-request-screen";
-import { Video, Send, MessageSquare } from "lucide-react";
+import { Video, Send } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/use-app-store";
 
@@ -29,9 +28,9 @@ const pageTransition = {
 };
 
 // Determine which mode an incoming link targets
-function getIncomingMode(mode: string | null, code: string | null): 'transfer' | 'videocall' | 'chatroom' | null {
+// Note: chatroom links now use /chatroom/[code] route directly
+function getIncomingMode(mode: string | null, code: string | null): 'transfer' | 'videocall' | null {
   if (mode === 'videocall' && code) return 'videocall'
-  if (mode === 'chatroom' && code) return 'chatroom'
   if (code && !mode) return 'transfer'
   return null
 }
@@ -42,25 +41,21 @@ function AppContent() {
   const [initialized, setInitialized] = useState(false);
 
   // Incoming link state
-  const [pendingMode, setPendingMode] = useState<'transfer' | 'videocall' | 'chatroom' | null>(null);
+  const [pendingMode, setPendingMode] = useState<'transfer' | 'videocall' | null>(null);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
-  const [pendingHasPassword, setPendingHasPassword] = useState(false);
 
   useEffect(() => {
     if (initialized) return;
     const code = searchParams.get("code");
     const mode = searchParams.get("mode");
     const from = searchParams.get("from");
-    const pwd = searchParams.get("pwd");
     const incoming = getIncomingMode(mode, code);
 
     if (incoming) {
-      // Show accept/decline screen instead of jumping straight in
       setPendingMode(incoming);
       setPendingCode(code);
       setPendingFrom(from);
-      setPendingHasPassword(pwd === '1');
     }
     setInitialized(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +86,7 @@ function AppContent() {
     );
   }
 
-  // Show incoming request screen for external link/QR opens
+  // Show incoming request screen for external link/QR opens (transfer & videocall only)
   if (pendingMode && pendingCode) {
     return (
       <>
@@ -100,7 +95,6 @@ function AppContent() {
           mode={pendingMode}
           from={pendingFrom}
           code={pendingCode}
-          hasPassword={pendingHasPassword}
           onAccept={handleAccept}
           onDecline={handleDecline}
         />
@@ -150,29 +144,6 @@ function AppContent() {
               skipEntry={!!pendingCode}
             >
               {(_username, action) => <VideoCallView initialAction={action} />}
-            </WithUsernameGate>
-          </motion.div>
-        )}
-
-        {appMode === "chatroom" && (
-          <motion.div key="chatroom" {...pageTransition}>
-            <WithUsernameGate
-              icon={<MessageSquare className="w-7 h-7 text-primary" />}
-              title="Chat"
-              highlight="Room"
-              description="Instant encrypted messaging rooms. Up to 5 people."
-              hint="You will appear in the chat room with this name"
-              mode="chatroom"
-              skipEntry={!!pendingCode}
-              skipToJoin={!!pendingCode}
-            >
-              {(username, action) => (
-                <ChatRoomView
-                  initialUsername={username}
-                  initialAction={action}
-                  incomingHasPassword={pendingHasPassword}
-                />
-              )}
             </WithUsernameGate>
           </motion.div>
         )}
