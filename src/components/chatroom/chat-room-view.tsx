@@ -258,9 +258,17 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Focus input on mount
+  // Focus input on mount — delayed slightly so keyboard on iOS doesn't fire immediately
   useEffect(() => {
-    inputRef.current?.focus()
+    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Scroll input into view when focused (iOS Safari keyboard fix)
+  const handleInputFocus = useCallback(() => {
+    setTimeout(() => {
+      inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 300)
   }, [])
 
   const sendMessage = useCallback(() => {
@@ -444,6 +452,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             placeholder="Mesaj yaz... (Enter)"
             className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl"
             style={{ fontSize: '16px' }}
+            onFocus={handleInputFocus}
           />
           <button
             type="button"
@@ -717,8 +726,37 @@ export function ChatRoomView({
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
+  // ── Visual Viewport tracking for mobile keyboard handling ──
+  const [vpHeight, setVpHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => setVpHeight(vv.height)
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  // Header height — MinimalHeader has py-5 + nav content ≈ 64px
+  const HEADER_H = 64
+  const containerH = vpHeight ? `${vpHeight - HEADER_H}px` : undefined
+
   return (
-    <div className="h-dvh pt-[88px] pb-6 px-4 md:px-8 flex flex-col relative z-10 w-full overflow-hidden">
+    <div
+      className="flex flex-col relative z-10 w-full overflow-hidden"
+      style={{
+        height: containerH ?? 'calc(100dvh - 64px)',
+        marginTop: HEADER_H,
+        paddingLeft: '1rem',
+        paddingRight: '1rem',
+        paddingBottom: '1.5rem',
+      }}
+    >
       <AnimatePresence mode="wait">
 
         {/* Password setup step */}

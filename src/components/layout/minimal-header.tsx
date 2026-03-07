@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter, usePathname } from 'next/navigation'
 import { HamburgerMenu } from './hamburger-menu'
 import { Send, Video, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
@@ -12,25 +13,35 @@ export function MinimalHeader() {
   const { fullReset, peer, conn } = useWarpStore()
   const resetCall = useVideoStore((s) => s.resetCall)
   const { appMode, setAppMode } = useAppStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
 
-    // Close file transfer connection if active
+    // Clean up connections
     if (conn) conn.close()
     if (peer) peer.destroy()
     fullReset()
-
-    // Reset video call if active
     resetCall()
-    // Reset chat room if active
     useChatRoomStore.getState().resetRoom()
 
-    // Go back to welcome
-    setAppMode('welcome')
+    // On route-based pages (e.g. /chatroom), navigate to homepage
+    if (pathname !== '/') {
+      router.push('/')
+    } else {
+      setAppMode('welcome')
+    }
   }
 
   const handleModeSwitch = (mode: AppMode) => {
+    // If clicking chatroom, use router (dedicated route)
+    if (mode === 'chatroom') {
+      useChatRoomStore.getState().resetRoom()
+      router.push('/chatroom')
+      return
+    }
+
     if (mode === appMode) return
 
     // Clean up current mode before switching
@@ -42,12 +53,19 @@ export function MinimalHeader() {
       if (peer) peer.destroy()
       fullReset()
     }
-    if (appMode === 'chatroom') {
+    if (appMode === 'chatroom' || pathname?.startsWith('/chatroom')) {
       useChatRoomStore.getState().resetRoom()
     }
 
     setAppMode(mode)
   }
+
+  // Determine active mode: prefer pathname for route-based pages
+  const activeMode: AppMode | null = pathname?.startsWith('/chatroom')
+    ? 'chatroom'
+    : appMode === 'welcome'
+    ? null
+    : appMode
 
   return (
     <header
@@ -72,7 +90,7 @@ export function MinimalHeader() {
           <button
             onClick={() => handleModeSwitch('transfer')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'transfer'
+              activeMode === 'transfer'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
@@ -83,7 +101,7 @@ export function MinimalHeader() {
           <button
             onClick={() => handleModeSwitch('videocall')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'videocall'
+              activeMode === 'videocall'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
@@ -94,7 +112,7 @@ export function MinimalHeader() {
           <button
             onClick={() => handleModeSwitch('chatroom')}
             className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              appMode === 'chatroom'
+              activeMode === 'chatroom'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
