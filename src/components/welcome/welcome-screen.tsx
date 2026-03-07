@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { Video, Send, MessageSquare, ArrowRight } from 'lucide-react'
 import { useAppStore } from '@/store/use-app-store'
 
@@ -44,6 +45,7 @@ function FeatureCard({ icon, title, description, cta, badge, onClick }: CardProp
 
 export function WelcomeScreen() {
   const setAppMode = useAppStore((s) => s.setAppMode)
+  const router = useRouter()
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
@@ -83,7 +85,7 @@ export function WelcomeScreen() {
           description="Encrypted instant messaging rooms. Up to 5 people. No camera, text only."
           cta="Enter room"
           badge="NEW"
-          onClick={() => setAppMode('chatroom')}
+          onClick={() => router.push('/chatroom')}
         />
       </div>
     </div>
