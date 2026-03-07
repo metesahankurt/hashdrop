@@ -726,36 +726,9 @@ export function ChatRoomView({
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
-  // ── Visual Viewport tracking for mobile keyboard handling ──
-  const [vpHeight, setVpHeight] = useState<number | null>(null)
-
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    const update = () => setVpHeight(vv.height)
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [])
-
-  // Header height — MinimalHeader has py-5 + nav content ≈ 64px
-  const HEADER_H = 64
-  const containerH = vpHeight ? `${vpHeight - HEADER_H}px` : undefined
-
   return (
-    <div
-      className="flex flex-col relative z-10 w-full overflow-hidden"
-      style={{
-        height: containerH ?? 'calc(100dvh - 64px)',
-        marginTop: HEADER_H,
-        paddingLeft: '1rem',
-        paddingRight: '1rem',
-        paddingBottom: '1.5rem',
-      }}
+    <div className="fixed left-0 right-0 bottom-0 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6"
+      style={{ top: 64 }}
     >
       <AnimatePresence mode="wait">
 
