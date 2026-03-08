@@ -99,7 +99,7 @@ export function IncomingRequestScreen({ mode, from, code, hasPassword, onAccept,
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-col-reverse sm:flex-row gap-3 w-full">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 w-full mt-4">
           {/* Decline */}
           <button
             onClick={onDecline}

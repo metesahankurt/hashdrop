@@ -48,13 +48,18 @@ function TransferContent() {
 
   const handleAccept = () => {
     setShowIncoming(false);
+    if (pendingCode) {
+      router.replace(`/transfer?action=join&code=${pendingCode}`);
+    } else {
+      router.push('/transfer');
+    }
   };
 
   const handleDecline = () => {
     setPendingCode(null);
     setPendingFrom(null);
     setShowIncoming(false);
-    router.push('/transfer');
+    router.replace('/transfer');
   };
 
   if (!initialized) {
