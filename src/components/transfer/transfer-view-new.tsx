@@ -13,7 +13,6 @@ import { useWarpStore } from '@/store/use-warp-store'
 import { heroVariants } from '@/lib/animations'
 import { useSearchParams } from 'next/navigation'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 'join' }) {
   const searchParams = useSearchParams()
   const transferCode = searchParams.get('code')
@@ -117,6 +116,7 @@ export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 
             }
           >
             <UnifiedTransferFlow
+              initialAction={initialAction}
               onFilesSelected={(files) => {
                 addLog(`Files selected: ${files.map(f => f.name).join(', ')}`, 'info')
               }}

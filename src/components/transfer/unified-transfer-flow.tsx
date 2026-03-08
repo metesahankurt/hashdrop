@@ -21,15 +21,24 @@ type ShareMode = 'file' | 'text'
 type ErrorType = 'network' | 'peer' | 'timeout' | 'ice' | 'general' | null
 
 interface UnifiedTransferFlowProps {
+  initialAction?: 'create' | 'join'
   onFilesSelected?: (files: File[]) => void
   onModeChange?: (mode: 'send' | 'receive') => void
 }
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
-export function UnifiedTransferFlow({ onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
+export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
   const { files, setFiles, status, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error } = useWarpStore()
-  const [currentStep, setCurrentStep] = useState<FlowStep>('select-mode')
+
+  // Derive initial step from initialAction (skip select-mode if already chosen)
+  const initialStep: FlowStep = initialAction === 'create'
+    ? 'upload'
+    : initialAction === 'join'
+    ? 'enter-code'
+    : 'select-mode'
+
+  const [currentStep, setCurrentStep] = useState<FlowStep>(initialStep)
   const [isCopied, setIsCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [generatedCode, setGeneratedCode] = useState<string>('')
@@ -40,6 +49,17 @@ export function UnifiedTransferFlow({ onFilesSelected, onModeChange }: UnifiedTr
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorType, setErrorType] = useState<ErrorType>(null)
   const [errorMessage, setErrorMessage] = useState<string>('')
+
+  // One-time initialization: set store mode based on initialAction (skips select-mode)
+  const initializedRef = useState(() => {
+    if (initialAction === 'create') {
+      setTimeout(() => setMode('send'), 0)
+    } else if (initialAction === 'join') {
+      setTimeout(() => setMode('receive'), 0)
+    }
+    return true
+  })[0]
+  void initializedRef // used only for initialization side-effect
 
   // Generate code when files are uploaded
   const generateAndSetCode = useCallback(() => {
