@@ -41,14 +41,18 @@ interface VideoChatProps {
 export function VideoChat({ onClose }: VideoChatProps) {
   const { chatMessages, dataConnections, addChatMessage, resetUnread } = useVideoStore()
   const [input, setInput] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     resetUnread()
   }, [resetUnread])
 
+  // Scroll to bottom on new messages — scroll the container, NOT the document
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [chatMessages])
 
   const sendMessage = useCallback(() => {
@@ -108,7 +112,7 @@ export function VideoChat({ onClose }: VideoChatProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2" style={{ minHeight: 0 }}>
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2" style={{ minHeight: 0 }}>
         {chatMessages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <MessageSquare className="w-8 h-8 text-muted/40" />
@@ -143,7 +147,6 @@ export function VideoChat({ onClose }: VideoChatProps) {
             </motion.div>
           ))}
         </AnimatePresence>
-        <div ref={bottomRef} />
       </div>
 
       {/* Input */}

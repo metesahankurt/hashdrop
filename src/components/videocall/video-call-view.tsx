@@ -252,7 +252,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
         </div>
       </div>
 
-      <VideoInfoSection />
+      {!isInCall && <VideoInfoSection />}
     </>
   )
 }

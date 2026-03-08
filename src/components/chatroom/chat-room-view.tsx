@@ -253,14 +253,19 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
   const inputRef = useRef<HTMLInputElement>(null)
   const participantList = useMemo(() => Array.from(participants.entries()), [participants])
 
-  // Scroll to bottom on new messages
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to bottom on new messages — scroll the container, NOT the document
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [messages])
 
-  // Focus input on mount — delayed slightly so keyboard on iOS doesn't fire immediately
+  // Focus input on mount — use preventScroll to stop mobile browsers from scrolling the page
   useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 80)
+    const t = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 80)
     return () => clearTimeout(t)
   }, [])
 
@@ -405,7 +410,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
       </div>
 
       {/* ── Messages ───────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
             <MessageSquare className="w-10 h-10 text-muted/30" />
@@ -726,13 +731,24 @@ export function ChatRoomView({
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
-  // Prevent body scroll when chat room is mounted
+  // Prevent body/document scroll when chat room is mounted (mobile Safari included)
   useEffect(() => {
+    const scrollY = window.scrollY
     document.documentElement.style.overflow = 'hidden'
     document.body.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    window.scrollTo(0, 0)
     return () => {
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
       document.documentElement.style.overflow = ''
       document.body.style.overflow = ''
+      window.scrollTo(0, scrollY)
     }
   }, [])
 
