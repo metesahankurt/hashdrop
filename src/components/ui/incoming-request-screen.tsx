@@ -77,16 +77,17 @@ export function IncomingRequestScreen({ mode, from, code, hasPassword, onAccept,
             <p className="text-muted text-sm">{cfg.description}</p>
           </div>
 
-          {/* Mode pill */}
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${cfg.bgColor} border ${cfg.borderColor}`}>
-            <Icon className={`w-3.5 h-3.5 ${cfg.color}`} />
-            <span className={`text-xs font-semibold ${cfg.color}`}>{cfg.label}</span>
-          </div>
+          {/* Mode & Code badges */}
+          <div className="flex flex-col items-center gap-3">
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${cfg.bgColor} border ${cfg.borderColor}`}>
+              <Icon className={`w-4 h-4 ${cfg.color}`} />
+              <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+            </div>
 
-          {/* Code display */}
-          <div className="glass-card rounded-xl px-4 py-2.5 inline-flex items-center gap-2">
-            <span className="text-xs text-muted">Code:</span>
-            <span className="font-mono text-sm text-primary font-bold tracking-wide">{code}</span>
+            <div className="glass-card rounded-xl px-5 py-3 inline-flex items-center gap-2.5">
+              <span className="text-sm text-muted">Code:</span>
+              <span className="font-mono text-base md:text-lg text-primary font-bold tracking-wide">{code}</span>
+            </div>
           </div>
 
           {/* Password warning */}
@@ -99,7 +100,7 @@ export function IncomingRequestScreen({ mode, from, code, hasPassword, onAccept,
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 w-full mt-4">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 w-full mt-6">
           {/* Decline */}
           <button
             onClick={onDecline}

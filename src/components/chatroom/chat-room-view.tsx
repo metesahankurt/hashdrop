@@ -264,11 +264,11 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
     return () => clearTimeout(t)
   }, [])
 
-  // Scroll input into view when focused (iOS Safari keyboard fix)
+  // On iOS Safari, the virtual keyboard can push the input out of view.
+  // Since the chat is in a fixed container, we only need to ensure
+  // the parent scrollable area shows the input — NOT scrollIntoView on the document.
   const handleInputFocus = useCallback(() => {
-    setTimeout(() => {
-      inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    }, 300)
+    // no-op: the fixed container handles visibility
   }, [])
 
   const sendMessage = useCallback(() => {
@@ -725,6 +725,16 @@ export function ChatRoomView({
       setStep('join')
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
+
+  // Prevent body scroll when chat room is mounted
+  useEffect(() => {
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.documentElement.style.overflow = ''
+      document.body.style.overflow = ''
+    }
+  }, [])
 
   return (
     <div className="fixed left-0 right-0 bottom-0 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6"
