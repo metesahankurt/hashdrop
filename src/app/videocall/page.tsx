@@ -92,6 +92,7 @@ function VideoCallContent() {
           hint="Your username will be shown to other participants"
           mode="videocall"
           skipEntry={!!pendingCode}
+          skipToJoin={!!pendingCode}
         >
           {(_username, action) => <VideoCallView initialAction={action} />}
         </WithUsernameGate>

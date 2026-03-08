@@ -13,7 +13,17 @@ function HomeRedirect() {
   useEffect(() => {
     const code = searchParams.get('code')
     if (code) {
-      router.replace(`/transfer?code=${code}`)
+      const mode = searchParams.get('mode')
+      const from = searchParams.get('from')
+      const fromParam = from ? `&from=${encodeURIComponent(from)}` : ''
+
+      if (mode === 'videocall') {
+        router.replace(`/videocall?code=${code}${fromParam}`)
+      } else if (mode === 'chatroom') {
+        router.replace(`/chatroom?code=${code}${fromParam}`)
+      } else {
+        router.replace(`/transfer?code=${code}${fromParam}`)
+      }
     }
   }, [searchParams, router])
   

@@ -489,8 +489,8 @@ export function ChatRoomView({
   const urlMode = searchParams?.get('mode')
   const urlCode = searchParams?.get('code')
   const urlPwd = searchParams?.get('pwd')
-  // Prefer prop-based code (from /chatroom/[code] route), fallback to old ?mode=chatroom&code= format
-  const incomingCode = incomingCodeProp ?? (urlMode === 'chatroom' ? urlCode : null)
+  // Prefer prop-based code (from /chatroom/[code] route), fallback to URL ?code= param
+  const incomingCode = incomingCodeProp ?? urlCode
   // Use prop if available, fallback to URL param
   const hasIncomingPassword = incomingHasPassword ?? (urlPwd === '1')
 
