@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { MinimalHeader } from "@/components/layout/minimal-header";
 import { SignatureBadge } from "@/components/ui/signature-badge";
 import { WelcomeScreen } from "@/components/welcome/welcome-screen";
-import { TransferView } from "@/components/transfer/transfer-view";
+import { TransferViewNew } from "@/components/transfer/transfer-view-new";
 import { VideoCallView } from "@/components/videocall/video-call-view";
 import { WithUsernameGate } from "@/components/ui/username-gate";
 import { IncomingRequestScreen } from "@/components/ui/incoming-request-screen";
@@ -127,7 +127,7 @@ function AppContent() {
               mode="transfer"
               skipEntry={!!pendingCode}
             >
-              {(_username, action) => <TransferView initialAction={action} />}
+              {(_username, action) => <TransferViewNew initialAction={action} />}
             </WithUsernameGate>
           </motion.div>
         )}

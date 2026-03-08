@@ -116,7 +116,7 @@ export default function RootLayout({
         {/* Minimal Background - Supabase Style */}
         <div className="fixed inset-0 -z-10 overflow-hidden">
           {/* Subtle dot pattern */}
-          <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(circle,#ffffff_1px,transparent_1px)] bg-[size:24px_24px]" />
+          <div className="absolute inset-0 opacity-[0.015] bg-[radial-gradient(circle,#ffffff_1px,transparent_1px)] bg-size-[24px_24px]" />
         </div>
         <main className="relative z-10 w-full min-h-screen flex flex-col overflow-x-hidden">
           {children}

@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation'
 import { Video, Send, MessageSquare, ArrowRight } from 'lucide-react'
-import { useAppStore } from '@/store/use-app-store'
 
 interface CardProps {
   icon: React.ReactNode
@@ -44,7 +43,6 @@ function FeatureCard({ icon, title, description, cta, badge, onClick }: CardProp
 }
 
 export function WelcomeScreen() {
-  const setAppMode = useAppStore((s) => s.setAppMode)
   const router = useRouter()
 
   return (
@@ -67,7 +65,7 @@ export function WelcomeScreen() {
           title="File Transfer"
           description="Blazing-fast, direct device-to-device file transfer. No cloud, no limits."
           cta="Start transfer"
-          onClick={() => setAppMode('transfer')}
+          onClick={() => router.push('/transfer')}
         />
 
         <FeatureCard
@@ -76,7 +74,7 @@ export function WelcomeScreen() {
           description="End-to-end encrypted video calls. Supports up to 5 participants."
           cta="Start a call"
           badge="NEW"
-          onClick={() => setAppMode('videocall')}
+          onClick={() => router.push('/videocall')}
         />
 
         <FeatureCard
