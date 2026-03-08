@@ -43,8 +43,8 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   // Lobby: answer the pending call
   const handleLobbyJoin = useCallback(() => {
     if (!pendingCall) return
-    const { localStream, isCameraOff, screenStream, isScreenSharing } = useVideoStore.getState()
-    if (!localStream) { pendingCall.answer(new MediaStream()); setPendingCall(null); return }
+    const { localStream, isCameraOff, screenStream, isScreenSharing, setCallStatus } = useVideoStore.getState()
+    if (!localStream) { pendingCall.answer(new MediaStream()); setPendingCall(null); setCallStatus('calling'); return }
     const outgoing = new MediaStream()
     const audioTrack = localStream.getAudioTracks()[0]
     const screenTrack = isScreenSharing ? (screenStream?.getVideoTracks()[0] || null) : null
@@ -54,6 +54,9 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
     if (audioTrack) outgoing.addTrack(audioTrack)
     pendingCall.answer(outgoing.getTracks().length ? outgoing : localStream)
     setPendingCall(null)
+    // Transition out of 'ringing' so lobby hides immediately
+    // 'connected' will be set by stream/ontrack handlers in VideoConnection
+    setCallStatus('calling')
   }, [pendingCall, setPendingCall])
 
   const handleLobbyDecline = useCallback(() => {
