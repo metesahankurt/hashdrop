@@ -3,7 +3,6 @@
 import { Suspense } from 'react'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { MinimalHeader } from '@/components/layout/minimal-header'
-import { SignatureBadge } from '@/components/ui/signature-badge'
 import { WithUsernameGate } from '@/components/ui/username-gate'
 import { ChatRoomView } from '@/components/chatroom/chat-room-view'
 
@@ -23,9 +22,6 @@ function ChatRoomPage() {
           <ChatRoomView initialUsername={username} initialAction={action} />
         )}
       </WithUsernameGate>
-      <footer className="fixed bottom-6 left-6 z-40 hidden md:block">
-        <SignatureBadge />
-      </footer>
     </>
   )
 }

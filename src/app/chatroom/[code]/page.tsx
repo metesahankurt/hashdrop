@@ -5,7 +5,6 @@ import { use } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { MinimalHeader } from '@/components/layout/minimal-header'
-import { SignatureBadge } from '@/components/ui/signature-badge'
 import { WithUsernameGate } from '@/components/ui/username-gate'
 import { IncomingRequestScreen } from '@/components/ui/incoming-request-screen'
 import { ChatRoomView } from '@/components/chatroom/chat-room-view'
@@ -75,9 +74,6 @@ function JoinRoomPage({ params }: PageProps) {
       }>
         <JoinRoomContent code={decodedCode} />
       </Suspense>
-      <footer className="fixed bottom-6 left-6 z-40 hidden md:block">
-        <SignatureBadge />
-      </footer>
     </>
   )
 }

@@ -1,6 +1,6 @@
 /**
  * Generates a cryptographically secure random Warp Code
- * Format: "Adjective-Noun" (e.g., "Cosmic-Falcon")
+ * Format: "Adjective-Noun" (e.g., "Cosmic-Falcon") -> "ADJECTIVE-NOUN"
  * Uses Web Crypto API for true randomness
  */
 
@@ -59,19 +59,19 @@ function getSecureRandomIndex(max: number): number {
 }
 
 /**
- * Generate a Warp Code with format: "Adjective-Noun"
- * Example: "Cosmic-Falcon", "Stellar-Phoenix"
+ * Generate a Warp Code with format: "ADJECTIVE-NOUN"
+ * Example: "COSMIC-FALCON", "STELLAR-PHOENIX"
  */
 export function generateSecureCode(): string {
   const adjIndex = getSecureRandomIndex(ADJECTIVES.length)
   const nounIndex = getSecureRandomIndex(NOUNS.length)
   
-  return `${ADJECTIVES[adjIndex]}-${NOUNS[nounIndex]}`
+  return `${ADJECTIVES[adjIndex].toUpperCase()}-${NOUNS[nounIndex].toUpperCase()}`
 }
 
 /**
  * Convert display code to PeerJS ID
- * Example: "Cosmic-Falcon" → "sr-warp-cosmic-falcon"
+ * Example: "COSMIC-FALCON" → "sr-warp-cosmic-falcon"
  */
 export function codeToPeerId(displayCode: string): string {
   return `sr-warp-${displayCode.toLowerCase()}`
@@ -79,7 +79,7 @@ export function codeToPeerId(displayCode: string): string {
 
 /**
  * Convert display code to PeerJS ID for video calls
- * Example: "Cosmic-Falcon" → "sr-call-cosmic-falcon"
+ * Example: "COSMIC-FALCON" → "sr-call-cosmic-falcon"
  */
 export function codeToCallPeerId(displayCode: string): string {
   return `sr-call-${displayCode.toLowerCase()}`
@@ -89,5 +89,5 @@ export function codeToCallPeerId(displayCode: string): string {
  * Validate code format
  */
 export function isValidCode(code: string): boolean {
-  return /^[A-Z][a-z]+-[A-Z][a-z]+$/.test(code)
+  return /^[A-Z]+-[A-Z]+$/.test(code)
 }

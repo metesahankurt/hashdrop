@@ -640,13 +640,13 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
                   onClick={() => setShowQR(false)}
                 >
                   <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 10, opacity: 0 }}
                     onClick={(e) => e.stopPropagation()}
                     className="glass-card rounded-2xl p-6 md:p-8 max-w-md w-full space-y-4"
                   >
@@ -663,7 +663,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
                       <QRCodeDisplay
                         code={generatedCode}
                         size={240}
-                        url={`${typeof window !== 'undefined' ? window.location.origin : 'https://hashdrop.metesahankurt.cloud'}?code=${generatedCode}&mode=transfer`}
+                        url={`${typeof window !== 'undefined' ? window.location.origin : 'https://hashdrop.metesahankurt.cloud'}/transfer?code=${generatedCode}`}
                       />
                     </div>
 

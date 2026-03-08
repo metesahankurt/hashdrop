@@ -46,6 +46,7 @@ const jsonLd = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
   interactiveWidget: 'resizes-content',
 }
 
