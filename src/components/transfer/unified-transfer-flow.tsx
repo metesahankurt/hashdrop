@@ -15,6 +15,7 @@ import { generateSecureCode, isValidCode } from '@/lib/code-generator'
 import { getPreferences } from '@/lib/preferences'
 import { QRCodeDisplay } from './qr-code-display'
 import { ErrorRecoveryModal } from '@/components/ui/error-recovery-modal'
+import { useSearchParams } from 'next/navigation'
 
 type FlowStep = 'select-mode' | 'upload' | 'share-code' | 'enter-code' | 'connecting' | 'transferring'
 type ShareMode = 'file' | 'text'
@@ -42,7 +43,8 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
   const [isCopied, setIsCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
 
-  const [inputCode, setInputCode] = useState<string>('')
+  const searchParams = useSearchParams()
+  const [inputCode, setInputCode] = useState<string>(searchParams.get('code') || '')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [shareMode, setShareMode] = useState<ShareMode>('file')
   const [textInput, setTextInput] = useState('')
