@@ -23,6 +23,26 @@ export function VideoDisplay() {
 
   const localUsername = useUsernameStore((s) => s.username)
 
+  // Track portrait detection — re-check when video dimensions become available
+  const [isPortrait, setIsPortrait] = useState(false)
+  useEffect(() => {
+    if (!localStream) { setIsPortrait(false); return }
+    const track = localStream.getVideoTracks()[0]
+    if (!track) { setIsPortrait(false); return }
+    // Check immediately
+    setIsPortrait(isPortraitTrack(track))
+    // Re-check periodically until dimensions are available (mobile cameras may delay)
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      const portrait = isPortraitTrack(track)
+      setIsPortrait(portrait)
+      const settings = track.getSettings()
+      if ((settings.width && settings.height) || attempts > 20) clearInterval(interval)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [localStream])
+
   // Lightbox state
   const [lightboxStream, setLightboxStream] = useState<MediaStream | null>(null)
   const [lightboxLabel, setLightboxLabel] = useState('')
@@ -72,7 +92,7 @@ export function VideoDisplay() {
 
   if (isPreCall) {
     return (
-      <div className="relative w-full aspect-video max-h-[70vh] rounded-2xl overflow-hidden glass-card">
+      <div className={`relative w-full max-h-[70vh] rounded-2xl overflow-hidden glass-card ${isPortrait && !isScreenSharing ? 'aspect-[3/4] max-w-sm mx-auto' : 'aspect-video'}`}>
         {isScreenSharing && screenStream ? (
           <ScreenPreview stream={screenStream} />
         ) : localStream && !isCameraOff ? (
@@ -255,6 +275,19 @@ export function VideoDisplay() {
 
 function LocalVideoEl({ stream, videoRef }: { stream: MediaStream; videoRef: (node: HTMLVideoElement | null) => void }) {
   const track = stream.getVideoTracks()[0] || null
+  const [portrait, setPortrait] = useState(false)
+  useEffect(() => {
+    if (!track) { setPortrait(false); return }
+    setPortrait(isPortraitTrack(track))
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      setPortrait(isPortraitTrack(track))
+      const s = track.getSettings()
+      if ((s.width && s.height) || attempts > 20) clearInterval(interval)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [track])
   return (
     <video
       ref={videoRef}
@@ -263,7 +296,7 @@ function LocalVideoEl({ stream, videoRef }: { stream: MediaStream; videoRef: (no
       playsInline
       className="w-full h-full"
       style={{
-        objectFit: isPortraitTrack(track) ? 'contain' : 'cover',
+        objectFit: portrait ? 'contain' : 'cover',
         transform: 'scaleX(-1)',
       }}
     />
@@ -272,9 +305,22 @@ function LocalVideoEl({ stream, videoRef }: { stream: MediaStream; videoRef: (no
 
 function RemoteVideoEl({ stream, muted, track }: { stream: MediaStream; muted: boolean; track: MediaStreamTrack | null }) {
   const ref = useRef<HTMLVideoElement>(null)
+  const [portrait, setPortrait] = useState(false)
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream
   }, [stream])
+  useEffect(() => {
+    if (!track) { setPortrait(false); return }
+    setPortrait(isPortraitTrack(track))
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      setPortrait(isPortraitTrack(track))
+      const s = track.getSettings()
+      if ((s.width && s.height) || attempts > 20) clearInterval(interval)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [track])
   return (
     <video
       ref={ref}
@@ -282,7 +328,7 @@ function RemoteVideoEl({ stream, muted, track }: { stream: MediaStream; muted: b
       playsInline
       muted={muted}
       className="w-full h-full"
-      style={{ objectFit: isPortraitTrack(track) ? 'contain' : 'cover' }}
+      style={{ objectFit: portrait ? 'contain' : 'cover' }}
     />
   )
 }

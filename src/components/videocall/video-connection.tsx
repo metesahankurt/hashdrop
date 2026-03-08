@@ -289,6 +289,17 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         const state = pc.iceConnectionState
         if (state === 'connected' || state === 'completed') {
           if (tryFinalize() && callTimeout) clearTimeout(callTimeout)
+        } else if (state === 'failed' || state === 'closed') {
+          console.log(`[VideoCall] ${side} (${remotePeerId}): ICE ${state} — removing peer`)
+          call.close()
+        } else if (state === 'disconnected') {
+          // Transient — give 5s to recover, then drop
+          setTimeout(() => {
+            if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+              console.log(`[VideoCall] ${side} (${remotePeerId}): ICE still disconnected after 5s — removing peer`)
+              call.close()
+            }
+          }, 5000)
         }
       }
       // Check if already connected (e.g. handlers attached after negotiation)
@@ -315,11 +326,14 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
 
     call.on('close', () => {
       console.log(`[VideoCall] ${side} (${remotePeerId}): closed`)
-      if (!mountedRef.current) return
+      const { peerUsernames } = useVideoStore.getState()
+      const peerName = peerUsernames.get(remotePeerId) || 'A peer'
       removeMediaConnection(remotePeerId)
       removeRemoteStreams(remotePeerId)
+      removePeerUsername(remotePeerId)
       const { mediaConnections } = useVideoStore.getState()
       if (mediaConnections.size === 0) { setCallStatus('ended'); toast.info('Call ended') }
+      else { toast.info(`${peerName} disconnected`) }
     })
 
     call.on('error', (err) => {
@@ -328,7 +342,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       const errorInfo = formatErrorForToast(err, 'call-failed')
       toast.error(errorInfo.title, { description: errorInfo.description })
     })
-  }, [finalizeConnection, rebuildRemoteStreamsForPeer, setRemoteStreams, addMediaConnection, removeMediaConnection, removeRemoteStreams, setCallStatus, setCallStartTime])
+  }, [finalizeConnection, rebuildRemoteStreamsForPeer, setRemoteStreams, addMediaConnection, removeMediaConnection, removeRemoteStreams, setCallStatus, setCallStartTime, removePeerUsername])
 
   // ---------- Initialize peer ----------
   useEffect(() => {
