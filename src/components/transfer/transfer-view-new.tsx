@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { UnifiedTransferFlow } from '@/components/transfer/unified-transfer-flow'
 import { TransferStatus } from '@/components/transfer/transfer-status'
+import { ConnectionManager } from '@/components/transfer/connection-manager'
 import { InfoSection } from '@/components/ui/info-section'
 import { TransferHistory } from '@/components/ui/transfer-history'
 import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
@@ -124,6 +125,7 @@ export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 
                 addLog(`Mode changed to: ${mode}`, 'info')
               }}
             />
+            <ConnectionManager headless={true} initialAction={initialAction} />
           </Suspense>
 
           {/* Transfer Status - Show when transferring */}

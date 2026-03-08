@@ -29,7 +29,7 @@ interface UnifiedTransferFlowProps {
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
 export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
-  const { files, setFiles, status, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error } = useWarpStore()
+  const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode } = useWarpStore()
 
   // Derive initial step from initialAction (skip select-mode if already chosen)
   const initialStep: FlowStep = initialAction === 'create'
@@ -41,7 +41,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
   const [currentStep, setCurrentStep] = useState<FlowStep>(initialStep)
   const [isCopied, setIsCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState<string>('')
+
   const [inputCode, setInputCode] = useState<string>('')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [shareMode, setShareMode] = useState<ShareMode>('file')
@@ -66,7 +66,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
     const newCode = generateSecureCode()
     const expiry = Date.now() + CODE_EXPIRY_MS
 
-    setGeneratedCode(newCode)
+    setDisplayCode(newCode)
     setCodeExpiry(expiry)
 
     // Auto-copy if enabled
@@ -81,7 +81,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
     addLog(`Generated transfer code: ${newCode}`, 'success')
     return newCode
-  }, [setCodeExpiry, addLog])
+  }, [setCodeExpiry, setDisplayCode, addLog])
 
   // File drop handler
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -178,10 +178,10 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
       setCurrentStep('select-mode')
       setMode(null)
       setFiles([])
-      setGeneratedCode('')
+      setDisplayCode(null)
       toast.info('Ready to try again')
     }
-  }, [errorType, addLog, setMode, setFiles])
+  }, [errorType, addLog, setMode, setFiles, setDisplayCode])
 
   const handleCloseError = useCallback(() => {
     setShowErrorModal(false)
@@ -268,7 +268,8 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
     addLog(`Attempting to connect with code: ${trimmedCode}`, 'info')
     setCurrentStep('connecting')
-    // Connection logic will be handled by parent component
+    setClientInputCode(trimmedCode)
+    setStatus('connecting')
   }
 
   // Update step based on status
@@ -572,7 +573,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               <div className="relative">
                 <div className="glass-card rounded-xl p-6 text-center border-primary/30 bg-primary/5">
                   <div className="text-3xl md:text-4xl font-bold text-primary tracking-wider font-mono uppercase">
-                    {generatedCode || 'LOADING...'}
+                    {displayCode || 'LOADING...'}
                   </div>
                 </div>
 
@@ -589,8 +590,8 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               {/* Actions */}
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => handleCopyCode(generatedCode)}
-                  disabled={!generatedCode}
+                  onClick={() => handleCopyCode(displayCode || '')}
+                  disabled={!displayCode}
                   className="glass-btn-primary flex items-center justify-center gap-2 disabled:opacity-50 py-3 md:py-4 touch-manipulation active:scale-95 transition-transform"
                 >
                   {isCopied ? (
@@ -608,7 +609,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
                 <button
                   onClick={() => setShowQR(true)}
-                  disabled={!generatedCode}
+                  disabled={!displayCode}
                   className="glass-btn flex items-center justify-center gap-2 disabled:opacity-50 py-3 md:py-4 touch-manipulation active:scale-95 transition-transform"
                 >
                   <QrCode className="w-4 h-4" />
@@ -619,7 +620,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               {/* Refresh code */}
               <button
                 onClick={handleRefreshCode}
-                disabled={!generatedCode}
+                disabled={!displayCode}
                 className="w-full text-sm text-muted hover:text-foreground transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -633,8 +634,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               </div>
             </div>
 
-            {/* QR Code Modal (No animation for performance) */}
-            {showQR && generatedCode && (
+            {showQR && displayCode && (
               <div
                 className="fixed inset-0 bg-background/98 z-[100] flex items-center justify-center p-4"
                 onClick={() => setShowQR(false)}
@@ -654,15 +654,15 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
                     <div className="flex justify-center">
                       <QRCodeDisplay
-                        code={generatedCode}
+                        code={displayCode}
                         size={240}
-                        url={`${typeof window !== 'undefined' ? window.location.origin : 'https://hashdrop.metesahankurt.cloud'}/transfer?code=${generatedCode}&from=${encodeURIComponent(localStorage.getItem('hd_username') || 'Someone')}`}
+                        url={`${typeof window !== 'undefined' ? window.location.origin : 'https://hashdrop.metesahankurt.cloud'}/transfer?code=${displayCode}&from=${encodeURIComponent(localStorage.getItem('hd_username') || 'Someone')}`}
                       />
                     </div>
 
                     <div className="text-center">
                       <p className="text-sm font-mono text-primary font-semibold">
-                        {generatedCode}
+                        {displayCode}
                       </p>
                     </div>
 

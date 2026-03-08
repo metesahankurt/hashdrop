@@ -45,22 +45,23 @@ interface ConnectionManagerProps {
   onOpenHistory?: () => void
   onOpenStats?: () => void
   initialAction?: 'create' | 'join'
+  headless?: boolean
 }
 
-export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }: ConnectionManagerProps = {}) {
+export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, headless }: ConnectionManagerProps = {}) {
   const {
     setMyId, peer, setPeer,
     setConn, setStatus, status,
     mode, setMode, setFile,
     setError, setProgress, setIsPeerReady, setReadyToDownload,
     codeExpiry, setCodeExpiry, setFileHash,
-    setTransferStartTime, setTransferredBytes, addLog, resetPeerKeepFiles
+    setTransferStartTime, setTransferredBytes, addLog, resetPeerKeepFiles,
+    displayCode, setDisplayCode, clientInputCode
   } = useWarpStore()
 
   const searchParams = useSearchParams()
   const [inputCode, setInputCode] = useState('')
   const [isCopied, setIsCopied] = useState(false)
-  const [generatedInfo, setGeneratedInfo] = useState<{displayCode: string, peerId: string} | null>(null)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [showReceive, setShowReceive] = useState(initialAction === 'join')
   const [showQR, setShowQR] = useState(false)
@@ -89,7 +90,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
   const refreshCode = useCallback(() => {
     // Generate new code
     const newDisplayCode = generateSecureCode()
-    const newPeerId = codeToPeerId(newDisplayCode)
     const newExpiry = Date.now() + CODE_EXPIRY_MS
 
     // Reset peer while keeping files
@@ -97,30 +97,29 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
     resetPeerKeepFiles()
 
     // Set new code info
-    setGeneratedInfo({ displayCode: newDisplayCode, peerId: newPeerId })
+    setDisplayCode(newDisplayCode)
     setCodeExpiry(newExpiry)
     setShowQR(false)
 
     toast.success('New code generated! Peer connection reset.')
     addLog(`New code generated: ${newDisplayCode}`, 'success')
-  }, [addLog, resetPeerKeepFiles, setCodeExpiry])
+  }, [addLog, resetPeerKeepFiles, setCodeExpiry, setDisplayCode])
 
   // Generate code and set expiry on mount
   useEffect(() => {
-    if (!generatedInfo) {
-      const displayCode = generateSecureCode()
-      const peerId = codeToPeerId(displayCode)
+    if (!displayCode && !headless) {
+      const newDisplayCode = generateSecureCode()
       const expiry = Date.now() + CODE_EXPIRY_MS
 
-      setGeneratedInfo({ displayCode, peerId })
+      setDisplayCode(newDisplayCode)
       setCodeExpiry(expiry)
 
       // Auto-copy code if enabled
       const preferences = getPreferences()
       if (preferences.autoCopyCode) {
-        navigator.clipboard.writeText(displayCode).then(() => {
+        navigator.clipboard.writeText(newDisplayCode).then(() => {
           toast.success('Code auto-copied to clipboard!', {
-            description: displayCode,
+            description: newDisplayCode,
             duration: 2000
           })
         }).catch(() => {
@@ -151,8 +150,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
     return () => clearInterval(interval)
   }, [codeExpiry, setCodeExpiry, addLog, refreshCode])
 
-  const displayCode = generatedInfo?.displayCode || ''
-  const peerId = generatedInfo?.peerId
+  const peerId = displayCode ? codeToPeerId(displayCode) : undefined
 
   // ... (Chunking constants and Data Handler remain same) ...
 
@@ -617,8 +615,17 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
       }, 500)
     }
   }, [searchParams, autoConnected, peer, status, connect, addLog])
+
+  // Auto-connect from UnifiedTransferFlow (clientInputCode)
+  useEffect(() => {
+    if (clientInputCode && peer && status === 'connecting' && !hasActiveConnection) {
+      console.log('[ConnectionManager] Auto-connecting from store state:', clientInputCode)
+      connect(clientInputCode)
+    }
+  }, [clientInputCode, peer, status, hasActiveConnection, connect])
   
   const copyCode = () => {
+    if (!displayCode) return
     navigator.clipboard.writeText(displayCode)
     setIsCopied(true)
     toast.success('Code Copied!')
@@ -646,6 +653,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction }:
   const isJoinMode = initialAction === 'join'
   const isCreateMode = initialAction === 'create' || !initialAction
   const [showQRScanner, setShowQRScanner] = useState(false)
+
+  if (headless) return null
 
   return (
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
