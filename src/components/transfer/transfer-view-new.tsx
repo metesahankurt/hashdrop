@@ -1,23 +1,20 @@
 'use client'
 
 import { Suspense, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { UnifiedTransferFlow } from '@/components/transfer/unified-transfer-flow'
 import { TransferStatus } from '@/components/transfer/transfer-status'
 import { ConnectionManager } from '@/components/transfer/connection-manager'
-import { InfoSection } from '@/components/ui/info-section'
 import { TransferHistory } from '@/components/ui/transfer-history'
 import { KeyboardShortcutsModal } from '@/components/ui/keyboard-shortcuts-modal'
 import { StatisticsDashboard } from '@/components/ui/statistics-dashboard'
 import { ConsoleDisplay } from '@/components/ui/console-display'
 import { useWarpStore } from '@/store/use-warp-store'
-import { heroVariants } from '@/lib/animations'
 import { useSearchParams } from 'next/navigation'
 
 export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 'join' }) {
   const searchParams = useSearchParams()
   const transferCode = searchParams.get('code')
-  const { status, file, addLog, mode } = useWarpStore()
+  const { addLog, mode } = useWarpStore()
   const [showHistory, setShowHistory] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -76,35 +73,11 @@ export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const showHeroTitle = status === 'idle' && !file && !mode
-
   return (
     <>
       <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
         {/* Centered Main Content */}
         <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col justify-center gap-8 md:gap-12">
-          {/* Hero Section - Only show when truly idle */}
-          <AnimatePresence mode="wait">
-            {showHeroTitle && (
-              <motion.div
-                key="hero"
-                variants={heroVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="text-center space-y-4 md:space-y-5"
-              >
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.1]">
-                  Share files at{' '}
-                  <span className="text-primary font-bold">lightspeed</span>
-                </h1>
-                <p className="text-lg md:text-xl text-muted max-w-lg mx-auto leading-relaxed">
-                  Secure peer-to-peer transfer. No cloud. No limits.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* Console Display - Show when active */}
           {mode && <ConsoleDisplay />}
 
@@ -132,9 +105,6 @@ export function TransferViewNew({ initialAction }: { initialAction?: 'create' | 
           <TransferStatus />
         </div>
       </div>
-
-      {/* Informational Section - Only show when idle */}
-      {!mode && <InfoSection />}
 
       {/* Transfer History Modal */}
       <TransferHistory

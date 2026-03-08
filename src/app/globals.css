@@ -10,11 +10,17 @@
 html {
   scroll-behavior: smooth;
   overflow-y: scroll;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* iOS momentum scrolling (only on body, not all elements) */
 body {
   -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Minimal scrollbar styling */
@@ -36,6 +42,7 @@ body {
 }
 
 :root {
+  overflow-x: hidden;
   /* Supabase-Inspired Clean Theme */
   --background: #0d0d0d;
   --foreground: #ededed;

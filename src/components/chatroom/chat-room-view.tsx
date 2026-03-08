@@ -69,15 +69,15 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
         <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
           <Lock className="w-7 h-7 text-primary" />
         </div>
-        <h2 className="text-xl font-semibold text-foreground">Oda Şifresi</h2>
-        <p className="text-xs text-muted">Şifre belirleyerek odana yalnızca davet ettiğin kişilerin girmesini sağla.<br />İsteğe bağlı — atlayabilirsin.</p>
+        <h2 className="text-xl font-semibold text-foreground">Room Password</h2>
+        <p className="text-xs text-muted">Set a password so only invited people can join your room.<br />Optional — you can skip it.</p>
       </div>
 
       <div className="glass-card rounded-2xl p-5 space-y-4">
         <div className="relative">
           <input
             type={showPwd ? 'text' : 'password'}
-            placeholder="Şifre belirle (opsiyonel)"
+            placeholder="Set a password (optional)"
             value={password}
             onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSet()}
@@ -95,7 +95,7 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
             onClick={handleSkip}
             className="glass-btn flex-1 py-2.5 rounded-xl text-sm text-muted hover:text-foreground"
           >
-            Atla
+            Skip
           </button>
           <button
             onClick={handleSet}
@@ -103,7 +103,7 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
             className="glass-btn-primary flex-1 py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
-            Şifreli Oluştur
+            Create Protected Room
           </button>
         </div>
       </div>
@@ -152,7 +152,7 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto flex flex-col items-center gap-4 py-12">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted text-sm">Odaya bağlanılıyor: <span className="text-primary font-mono">{initialCode}</span></p>
+        <p className="text-muted text-sm">Connecting to room: <span className="text-primary font-mono">{initialCode}</span></p>
       </motion.div>
     )
   }
@@ -165,8 +165,8 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Odaya Katıl</h2>
-          <p className="text-xs text-muted"><span className="text-primary">{username}</span> olarak katılıyorsun</p>
+          <h2 className="text-lg font-semibold text-foreground">Join Room</h2>
+          <p className="text-xs text-muted">Joining as <span className="text-primary">{username}</span></p>
         </div>
       </div>
 
@@ -175,7 +175,7 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Oda kodu (ör. Cosmic-Falcon)"
+            placeholder="Room code (e.g. Cosmic-Falcon)"
             value={inputCode}
             onChange={e => setInputCode(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleJoin()}
@@ -193,7 +193,7 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
         {initialCode && incomingHasPassword && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-400">
             <Lock className="w-3.5 h-3.5 shrink-0" />
-            Bu oda şifre korumalı. Katılmak için şifreyi gir.
+            This room is password protected. Enter the password to join.
           </div>
         )}
 
@@ -201,7 +201,7 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
         <div className="relative">
           <input
             type={showPwd ? 'text' : 'password'}
-            placeholder={incomingHasPassword ? 'Oda şifresini gir' : 'Şifre (varsa)'}
+            placeholder={incomingHasPassword ? 'Enter room password' : 'Password (if any)'}
             value={joinPassword}
             onChange={e => setJoinPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleJoin()}
@@ -219,13 +219,13 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
           disabled={!inputCode.trim() || isJoining || (!!incomingHasPassword && !joinPassword.trim())}
           className="glass-btn-primary w-full py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
         >
-          {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Odaya Katıl <ArrowRight className="w-4 h-4" /></>}
+          {isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Join Room <ArrowRight className="w-4 h-4" /></>}
         </button>
       </div>
 
       {showQRScanner && (
         <QrScanner
-          onCodeScanned={(code) => { setInputCode(code); setShowQRScanner(false); toast.success('QR tarandı!') }}
+          onCodeScanned={(code) => { setInputCode(code); setShowQRScanner(false); toast.success('QR scanned!') }}
           onClose={() => setShowQRScanner(false)}
         />
       )}
@@ -302,15 +302,15 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
   const copyCode = () => {
     navigator.clipboard.writeText(buildInviteUrl())
     setCopied(true)
-    toast.success(roomHasPassword ? 'Şifreli davet linki kopyalandı!' : 'Davet linki kopyalandı!')
+    toast.success(roomHasPassword ? 'Protected invite link copied!' : 'Invite link copied!')
     setTimeout(() => setCopied(false), 2000)
   }
 
   const shareCode = async () => {
     try {
       await navigator.share({
-        title: 'HashDrop Chat Odası',
-        text: `Odaya katıl: ${roomCode}${roomHasPassword ? ' (şifreli)' : ''}`,
+        title: 'HashDrop Chat Room',
+        text: `Join room: ${roomCode}${roomHasPassword ? ' (protected)' : ''}`,
         url: buildInviteUrl(),
       })
     } catch { /* ignore */ }
@@ -332,7 +332,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                 <p className="text-sm font-semibold text-foreground">Chat Room</p>
                 {roomHasPassword && (
                   <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/25 text-yellow-400">
-                    <Lock className="w-2.5 h-2.5" /> Şifreli
+                    <Lock className="w-2.5 h-2.5" /> Protected
                   </span>
                 )}
               </div>
@@ -341,9 +341,9 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
           </div>
           <button onClick={handleLeave}
             className="p-1.5 hover:bg-danger/20 rounded-lg transition-all text-muted hover:text-danger flex items-center gap-1.5 px-3"
-            title="Odadan Ayrıl"
+            title="Leave Room"
           >
-            <span className="text-xs font-medium hidden sm:inline">Ayrıl</span>
+            <span className="text-xs font-medium hidden sm:inline">Leave</span>
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -353,7 +353,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
           {/* Invite link row */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-medium text-muted">Davet Linki</span>
+              <span className="text-xs font-medium text-muted">Invite Link</span>
               {roomHasPassword && <Lock className="w-3 h-3 text-yellow-400" />}
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
@@ -371,13 +371,13 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                 <button onClick={copyCode}
                   className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg">
                   {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Kopyala</span>
+                  <span>Copy</span>
                 </button>
                 {canShare && (
                   <button onClick={shareCode}
                     className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg">
                     <Share2 className="w-3.5 h-3.5" />
-                    <span>Paylaş</span>
+                    <span>Share</span>
                   </button>
                 )}
               </div>
@@ -388,16 +388,16 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
           {timeLeft > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-muted">
               <Clock className="w-3.5 h-3.5" />
-              <span>Link {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')} içinde sona erer</span>
+              <span>Link expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
             </div>
           )}
 
           {/* Participants */}
           <div className="flex items-start sm:items-center gap-2">
-            <span className="text-xs font-medium text-muted shrink-0 mt-1 sm:mt-0">Katılımcılar:</span>
+            <span className="text-xs font-medium text-muted shrink-0 mt-1 sm:mt-0">Participants:</span>
             <div className="flex gap-1.5 flex-wrap">
               <span className="text-xs glass-card px-2.5 py-1 rounded-md flex items-center gap-1.5 border-primary/20 bg-primary/5">
-                <span className="w-1.5 h-1.5 bg-primary rounded-full" />{username} <span className="text-muted">(sen)</span>
+                <span className="w-1.5 h-1.5 bg-primary rounded-full" />{username} <span className="text-muted">(you)</span>
               </span>
               {participantList.map(([pid, uname]) => (
                 <span key={pid} className="text-xs glass-card px-2.5 py-1 rounded-md flex items-center gap-1.5">
@@ -414,7 +414,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
             <MessageSquare className="w-10 h-10 text-muted/30" />
-            <p className="text-sm text-muted">Oda hazır! İlk mesajı sen gönder.</p>
+            <p className="text-sm text-muted">Room is ready! Send the first message.</p>
           </div>
         )}
         <AnimatePresence initial={false}>
@@ -454,7 +454,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
               if (e.nativeEvent.isComposing) return
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
             }}
-            placeholder="Mesaj yaz... (Enter)"
+            placeholder="Type a message... (Enter)"
             className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl"
             style={{ fontSize: '16px' }}
             onFocus={handleInputFocus}
@@ -572,7 +572,7 @@ export function ChatRoomView({
         const { participants: existingP } = useChatRoomStore.getState()
         const alreadyKnown = existingP.has(remotePeerId)
         addParticipant(remotePeerId, data.username)
-        if (!alreadyKnown) addSystemMsg(`${data.username} odaya katıldı`)
+        if (!alreadyKnown) addSystemMsg(`${data.username} joined the room`)
         if (!announcedRef.current.has(remotePeerId)) {
           announcedRef.current.add(remotePeerId)
           conn.send({ type: 'announce', username: localUsername })
@@ -593,12 +593,12 @@ export function ChatRoomView({
       } else if (data.type === 'leave' && data.username) {
         removeParticipant(remotePeerId)
         removeDataConnection(remotePeerId)
-        addSystemMsg(`${data.username} odadan ayrıldı`)
+        addSystemMsg(`${data.username} left the room`)
       } else if (data.type === 'announce-broadcast' && data.username && data.peerId) {
         const { participants: existingP2 } = useChatRoomStore.getState()
         if (!existingP2.has(data.peerId)) {
           addParticipant(data.peerId, data.username)
-          addSystemMsg(`${data.username} odaya katıldı`)
+          addSystemMsg(`${data.username} joined the room`)
         }
       } else if (data.type === 'auth') {
         if (localPwdHash) {
@@ -608,7 +608,7 @@ export function ChatRoomView({
           conn.send({ type: 'auth-ok' })
         }
       } else if (data.type === 'auth-rejected') {
-        toast.error('Yanlış şifre — erişim reddedildi')
+        toast.error('Wrong password - access denied')
         handleLeave()
       }
     })
@@ -618,7 +618,7 @@ export function ChatRoomView({
       const uname = participants.get(remotePeerId)
       removeParticipant(remotePeerId)
       removeDataConnection(remotePeerId)
-      if (uname) addSystemMsg(`${uname} odadan ayrıldı`)
+      if (uname) addSystemMsg(`${uname} left the room`)
     })
 
     conn.on('error', err => console.error('[ChatRoom]', err))
@@ -652,7 +652,7 @@ export function ChatRoomView({
       setStatus('connected')
       setStep('chatting')
       setIsCreating(false)
-      addSystemMsg(pwdHash ? 'Şifreli oda oluşturuldu! Davet linkini paylaş.' : 'Oda hazır! Davet linkini paylaş.')
+      addSystemMsg(pwdHash ? 'Protected room created! Share the invite link.' : 'Room is ready! Share the invite link.')
     })
 
     newPeer.on('connection', (conn) => {
@@ -668,8 +668,8 @@ export function ChatRoomView({
     })
 
     newPeer.on('error', (err) => {
-      if (err.type === 'unavailable-id') toast.error('Bu kod kullanımda, tekrar dene.')
-      else toast.error('Bağlantı hatası')
+      if (err.type === 'unavailable-id') toast.error('This code is already in use, try again.')
+      else toast.error('Connection error')
       setStatus('failed')
       setIsCreating(false)
       setStep('password-setup')
@@ -714,18 +714,18 @@ export function ChatRoomView({
         announcedRef.current.add(hostPeerId)
         setStatus('connected')
         setStep('chatting')
-        addSystemMsg('Odaya bağlandın!')
+        addSystemMsg('Connected to room!')
       })
 
       conn.on('error', () => {
-        toast.error('Odaya bağlanılamadı. Kod doğru mu?')
+        toast.error('Could not join room. Is the code correct?')
         setStatus('failed')
         setStep('join')
       })
     })
 
     newPeer.on('error', () => {
-      toast.error('Bağlantı hatası. Tekrar dene.')
+      toast.error('Connection error. Please try again.')
       setStatus('failed')
       setStep('join')
     })
@@ -753,9 +753,7 @@ export function ChatRoomView({
   }, [])
 
   return (
-    <div className="fixed left-0 right-0 bottom-0 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6"
-      style={{ top: 64 }}
-    >
+    <div className="fixed left-0 right-0 bottom-0 top-20 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6">
       <AnimatePresence mode="wait">
 
         {/* Password setup step */}
@@ -770,7 +768,7 @@ export function ChatRoomView({
               onClick={() => setStep('join')}
               className="mt-6 text-xs text-muted hover:text-foreground underline transition-colors"
             >
-              Var olan bir odaya katıl
+              Join an existing room
             </motion.button>
           </motion.div>
         )}
@@ -780,7 +778,7 @@ export function ChatRoomView({
           <motion.div key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="flex-1 flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm text-muted">Oda oluşturuluyor...</p>
+            <p className="text-sm text-muted">Creating room...</p>
           </motion.div>
         )}
 

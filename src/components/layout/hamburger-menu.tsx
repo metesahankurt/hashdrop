@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, ChevronDown, Zap, Shield, Video, ArrowRight, Cpu, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getPreferences, toggleAutoCopyCode, toggleAutoDownload, toggleErrorNotifications } from '@/lib/preferences'
@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 export function HamburgerMenu() {
   const [isOpen, setIsOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [autoCopyEnabled, setAutoCopyEnabled] = useState(() => getPreferences().autoCopyCode)
   const [autoDownloadEnabled, setAutoDownloadEnabled] = useState(() => getPreferences().autoDownload)
   const [errorNotificationsEnabled, setErrorNotificationsEnabled] = useState(() => getPreferences().errorNotifications)
@@ -141,6 +142,83 @@ export function HamburgerMenu() {
                       }`} />
                     </div>
                   </button>
+                </div>
+
+                <div className="border-t border-border/30 pt-5" />
+
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setAboutOpen((prev) => !prev)}
+                    className="w-full flex items-center justify-between text-left py-2 px-3 rounded-lg hover:bg-white/5 transition-colors"
+                  >
+                    <span className="text-sm text-foreground">About HashDrop</span>
+                    <ChevronDown className={`w-4 h-4 text-muted transition-transform ${aboutOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  <AnimatePresence initial={false}>
+                    {aboutOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="glass-card rounded-xl p-3 space-y-4">
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-muted uppercase tracking-wider">Features</p>
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-2 text-xs text-muted">
+                                <Zap className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                                <span>Direct P2P transfer and calls with low latency.</span>
+                              </div>
+                              <div className="flex items-start gap-2 text-xs text-muted">
+                                <Shield className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                                <span>No cloud storage, no server-side file retention.</span>
+                              </div>
+                              <div className="flex items-start gap-2 text-xs text-muted">
+                                <Video className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                                <span>Encrypted video calls with optional screen sharing.</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-muted uppercase tracking-wider">How It Works</p>
+                            <div className="space-y-1.5 text-xs text-muted">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center text-[10px] font-semibold">1</span>
+                                <span>Create a transfer or call code</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center text-[10px] font-semibold">2</span>
+                                <span>Share the code with your peer</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center text-[10px] font-semibold">3</span>
+                                <span>Connect directly and start instantly</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <p className="text-[11px] text-muted uppercase tracking-wider">Tech Stack</p>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
+                                <Cpu className="w-3 h-3" /> WebRTC
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
+                                <ArrowRight className="w-3 h-3" /> PeerJS
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
+                                <Lock className="w-3 h-3" /> E2E Crypto
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 <div className="border-t border-border/30 pt-5" />

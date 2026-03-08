@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Video, Mic, MicOff, VideoOff, Check, X, User } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
 import { useUsernameStore } from '@/store/use-username-store'
-import { getLocalMediaStreamWithFallback } from '@/lib/media-utils'
+import { getLocalMediaStreamWithFallback, isPortraitTrack } from '@/lib/media-utils'
 
 interface VideoLobbyProps {
   /** Called when user confirms joining */
@@ -18,6 +18,7 @@ export function VideoLobby({ onJoin, onDecline }: VideoLobbyProps) {
   const { localStream, setLocalStream, isCameraOff, isMicMuted, toggleCamera, toggleMic } = useVideoStore()
   const { username } = useUsernameStore()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [isPortrait, setIsPortrait] = useState(false)
 
   // Ensure we have a local stream for preview
   useEffect(() => {
@@ -37,6 +38,27 @@ export function VideoLobby({ onJoin, onDecline }: VideoLobbyProps) {
       videoRef.current.srcObject = localStream
     }
   }, [localStream])
+
+  useEffect(() => {
+    if (!localStream || isCameraOff) {
+      setIsPortrait(false)
+      return
+    }
+    const track = localStream.getVideoTracks()[0]
+    if (!track) {
+      setIsPortrait(false)
+      return
+    }
+    setIsPortrait(isPortraitTrack(track))
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts++
+      setIsPortrait(isPortraitTrack(track))
+      const settings = track.getSettings()
+      if ((settings.width && settings.height) || attempts > 20) clearInterval(interval)
+    }, 200)
+    return () => clearInterval(interval)
+  }, [localStream, isCameraOff])
 
   const handleJoin = useCallback(() => {
     onJoin()
@@ -59,14 +81,14 @@ export function VideoLobby({ onJoin, onDecline }: VideoLobbyProps) {
       </div>
 
       {/* Camera preview */}
-      <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-white/5 border border-border">
+      <div className={`relative w-full rounded-2xl overflow-hidden bg-white/5 border border-border ${isPortrait ? 'aspect-[3/4] max-w-sm mx-auto' : 'aspect-video'}`}>
         {localStream && !isCameraOff ? (
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
-            className="w-full h-full object-cover scale-x-[-1]"
+            className={`w-full h-full scale-x-[-1] ${isPortrait ? 'object-contain' : 'object-cover'}`}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

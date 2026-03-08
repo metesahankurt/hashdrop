@@ -611,8 +611,8 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
             )}
 
             {/* Password protection toggle */}
-            <div className="mt-2 text-left w-full max-w-xs mx-auto">
-              <label className="flex items-center gap-2 cursor-pointer group">
+            <div className="mt-2 w-full max-w-xs mx-auto text-center">
+              <label className="inline-flex items-center gap-2 cursor-pointer group mx-auto">
                 <div
                   onClick={() => setEnablePassword(!enablePassword)}
                   className={`w-8 h-4 rounded-full transition-all flex-shrink-0 ${enablePassword ? 'bg-primary' : 'bg-white/20'}`}

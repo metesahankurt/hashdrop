@@ -102,7 +102,7 @@ export function VideoDisplay() {
             muted
             playsInline
             className="w-full h-full"
-            style={{ objectFit: 'cover', transform: 'scaleX(-1)' }}
+            style={{ objectFit: isPortrait ? 'contain' : 'cover', transform: 'scaleX(-1)' }}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-4">
@@ -144,11 +144,10 @@ export function VideoDisplay() {
   if (activeScreenStream) {
     return (
       <>
-        <div className="w-full flex flex-col md:flex-row gap-2" style={{ minHeight: '60vh' }}>
+        <div className="w-full h-full min-h-0 flex flex-col md:flex-row gap-2">
           {/* Main area: screen share — clickable to expand */}
           <div
-            className="flex-1 rounded-2xl overflow-hidden glass-card bg-black relative group cursor-pointer"
-            style={{ minHeight: '55vw', maxHeight: '75vh' }}
+            className="flex-1 min-h-0 rounded-2xl overflow-hidden glass-card bg-black relative group cursor-pointer"
             onClick={() => openLightbox(activeScreenStream, screenOwnerLabel)}
           >
             <ScreenVideo stream={activeScreenStream} muted={!!localScreenStream} />
@@ -161,8 +160,7 @@ export function VideoDisplay() {
 
           {/* Side / bottom strip: participant cameras */}
           <div
-            className="flex md:flex-col flex-row gap-2 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:w-44"
-            style={{ maxHeight: '75vh' }}
+            className="flex md:flex-col flex-row gap-2 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:w-44 md:h-full md:min-h-0"
           >
             {/* Local */}
             <div
@@ -222,10 +220,10 @@ export function VideoDisplay() {
 
   return (
     <>
-      <div className={`w-full grid gap-2 ${gridClass}`} style={{ minHeight: '55vh', maxHeight: '80vh' }}>
+      <div className={`w-full h-full min-h-0 grid gap-2 auto-rows-fr ${gridClass}`}>
         {/* Local tile */}
         <div
-          className="rounded-2xl overflow-hidden glass-card bg-black relative aspect-video group cursor-pointer"
+          className="rounded-2xl overflow-hidden glass-card bg-black relative min-h-0 group cursor-pointer"
           onClick={() => localStream ? openLightbox(localStream, localLabel, true) : null}
         >
           {localStream && !isCameraOff ? (
@@ -246,7 +244,7 @@ export function VideoDisplay() {
           return (
             <div
               key={pid}
-              className="rounded-2xl overflow-hidden glass-card bg-black relative aspect-video group cursor-pointer"
+              className="rounded-2xl overflow-hidden glass-card bg-black relative min-h-0 group cursor-pointer"
               onClick={() => camStream ? openLightbox(camStream, peerLabel) : null}
             >
               {camStream ? (
@@ -345,7 +343,7 @@ function ScreenVideo({ stream, muted }: { stream: MediaStream; muted: boolean })
       playsInline
       muted={muted}
       className="w-full h-full"
-      style={{ objectFit: 'contain' }}
+      style={{ objectFit: 'cover' }}
     />
   )
 }

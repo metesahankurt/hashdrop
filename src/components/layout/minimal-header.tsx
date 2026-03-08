@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { HamburgerMenu } from './hamburger-menu'
 import { Send, Video, MessageSquare } from 'lucide-react'
@@ -9,10 +10,18 @@ import { useVideoStore } from '@/store/use-video-store'
 import { useChatRoomStore } from '@/store/use-chat-room-store'
 
 export function MinimalHeader() {
+  const [isScrolled, setIsScrolled] = useState(false)
   const { fullReset, peer, conn } = useWarpStore()
   const resetCall = useVideoStore((s) => s.resetCall)
   const router = useRouter()
   const pathname = usePathname()
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -58,10 +67,14 @@ export function MinimalHeader() {
 
   return (
     <header
-      className="fixed top-0 left-0 right-0 z-30 px-4 md:px-8 py-5 bg-background/60 backdrop-blur-md"
+      className={`fixed top-0 left-0 right-0 z-30 h-20 px-4 md:px-8 transition-all duration-200 ${
+        isScrolled
+          ? 'bg-background/45 backdrop-blur-md border-b border-white/10'
+          : 'bg-transparent backdrop-blur-0 border-b border-transparent'
+      }`}
       style={{ isolation: 'isolate' }}
     >
-      <div className="relative flex items-center justify-between max-w-7xl mx-auto">
+      <div className="relative h-full flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo - Left */}
         <div className="flex items-center relative z-10">
           <Link
