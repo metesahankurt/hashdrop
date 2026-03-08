@@ -74,7 +74,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
   // ---------- Data channel helpers ----------
   const setupDataConnection = useCallback((conn: DataConnection, remotePeerId: string) => {
     conn.on('data', (raw) => {
-      const data = raw as { type: string; payload?: ChatMessage; hash?: string; username?: string }
+      const data = raw as { type: string; payload?: ChatMessage; hash?: string; username?: string; sdp?: { type: RTCSdpType; sdp: string }; active?: boolean }
       if (data.type === 'chat' && data.payload) {
         const { peerUsernames } = useVideoStore.getState()
         const senderName = peerUsernames.get(remotePeerId) || 'Peer'
@@ -114,12 +114,43 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         mediaConnections.forEach(conn => { try { conn.close() } catch { /* */ } })
         dataConnections.forEach(conn => { try { conn.close() } catch { /* */ } })
         setCallStatus('ready')
+      } else if (data.type === 'renegotiate-offer' && data.sdp) {
+        // Remote peer added/removed a track (e.g. screen share) — handle SDP renegotiation via data channel
+        const mc = useVideoStore.getState().mediaConnections.get(remotePeerId)
+        const pc = mc?.peerConnection
+        if (pc) {
+          (async () => {
+            try {
+              await pc.setRemoteDescription(new RTCSessionDescription(data.sdp!))
+              const answer = await pc.createAnswer()
+              await pc.setLocalDescription(answer)
+              conn.send({ type: 'renegotiate-answer', sdp: { type: answer.type!, sdp: answer.sdp! } })
+            } catch (err) {
+              console.error('[VideoCall] Renegotiation offer handling failed:', err)
+            }
+          })()
+        }
+      } else if (data.type === 'renegotiate-answer' && data.sdp) {
+        // Got answer back from our renegotiation offer
+        const mc = useVideoStore.getState().mediaConnections.get(remotePeerId)
+        const pc = mc?.peerConnection
+        if (pc) {
+          pc.setRemoteDescription(new RTCSessionDescription(data.sdp)).catch(err => {
+            console.error('[VideoCall] Renegotiation answer handling failed:', err)
+          })
+        }
+      } else if (data.type === 'screen-share' && data.active === false) {
+        // Remote peer stopped screen sharing — clear their screen stream
+        const existing = useVideoStore.getState().remoteStreams.get(remotePeerId)
+        if (existing) {
+          setRemoteStreams(remotePeerId, { ...existing, screen: null })
+        }
       }
     })
     conn.on('close', () => { removeDataConnection(remotePeerId); removePeerUsername(remotePeerId) })
     conn.on('error', (err) => console.error('[DataConn] Error:', err))
     addDataConnection(remotePeerId, conn)
-  }, [addChatMessage, addDataConnection, removeDataConnection, resetCall, addPeerUsername, removePeerUsername])
+  }, [addChatMessage, addDataConnection, removeDataConnection, resetCall, addPeerUsername, removePeerUsername, setRemoteStreams])
 
   // ---------- States ----------
   const searchParams = useSearchParams()

@@ -20,22 +20,52 @@ export function VideoControls({ onEndCall, onToggleChat, preCall = false }: Vide
     unreadCount, isChatOpen,
   } = useVideoStore()
 
-  const addScreenTrackToAll = useCallback((track: MediaStreamTrack, stream: MediaStream) => {
-    mediaConnections.forEach((conn) => {
+  const addScreenTrackToAll = useCallback(async (track: MediaStreamTrack, stream: MediaStream) => {
+    const { dataConnections } = useVideoStore.getState()
+    for (const [peerId, conn] of mediaConnections) {
       const pc = conn.peerConnection
-      if (!pc) return
+      if (!pc) continue
       const alreadySending = pc.getSenders().some(s => s.track?.id === track.id)
-      if (!alreadySending) pc.addTrack(track, stream)
-    })
+      if (alreadySending) continue
+      // Suppress PeerJS's onnegotiationneeded to avoid conflicting SDP offers
+      pc.onnegotiationneeded = () => {}
+      pc.addTrack(track, stream)
+      // Manual SDP renegotiation via data channel (works even if signaling server is disconnected)
+      const dc = dataConnections.get(peerId)
+      if (dc?.open) {
+        try {
+          const offer = await pc.createOffer()
+          await pc.setLocalDescription(offer)
+          dc.send({ type: 'renegotiate-offer', sdp: { type: offer.type, sdp: offer.sdp } })
+        } catch (err) {
+          console.error('[ScreenShare] Renegotiation failed for', peerId, err)
+        }
+      }
+    }
   }, [mediaConnections])
 
-  const removeScreenTrackFromAll = useCallback((track: MediaStreamTrack) => {
-    mediaConnections.forEach((conn) => {
+  const removeScreenTrackFromAll = useCallback(async (track: MediaStreamTrack) => {
+    const { dataConnections } = useVideoStore.getState()
+    for (const [peerId, conn] of mediaConnections) {
       const pc = conn.peerConnection
-      if (!pc) return
+      if (!pc) continue
       const sender = pc.getSenders().find(s => s.track?.id === track.id)
-      if (sender) pc.removeTrack(sender)
-    })
+      if (!sender) continue
+      pc.onnegotiationneeded = () => {}
+      pc.removeTrack(sender)
+      // Signal screen share stop + renegotiate
+      const dc = dataConnections.get(peerId)
+      if (dc?.open) {
+        dc.send({ type: 'screen-share', active: false })
+        try {
+          const offer = await pc.createOffer()
+          await pc.setLocalDescription(offer)
+          dc.send({ type: 'renegotiate-offer', sdp: { type: offer.type, sdp: offer.sdp } })
+        } catch (err) {
+          console.error('[ScreenShare] Renegotiation (remove) failed for', peerId, err)
+        }
+      }
+    }
   }, [mediaConnections])
 
   const handleScreenShare = useCallback(async () => {
@@ -43,7 +73,7 @@ export function VideoControls({ onEndCall, onToggleChat, preCall = false }: Vide
       const { screenStream: currentScreen } = useVideoStore.getState()
       if (currentScreen) {
         const screenTrack = currentScreen.getVideoTracks()[0]
-        if (screenTrack) { removeScreenTrackFromAll(screenTrack); screenTrack.stop() }
+        if (screenTrack) { await removeScreenTrackFromAll(screenTrack); screenTrack.stop() }
       }
       setScreenStream(null)
       setIsScreenSharing(false)
@@ -59,9 +89,9 @@ export function VideoControls({ onEndCall, onToggleChat, preCall = false }: Vide
       setIsScreenSharing(true)
       const screenTrack = capturedStream.getVideoTracks()[0]
       if (screenTrack) {
-        addScreenTrackToAll(screenTrack, capturedStream)
-        screenTrack.onended = () => {
-          removeScreenTrackFromAll(screenTrack)
+        await addScreenTrackToAll(screenTrack, capturedStream)
+        screenTrack.onended = async () => {
+          await removeScreenTrackFromAll(screenTrack)
           setScreenStream(null)
           setIsScreenSharing(false)
           toast.info('Screen sharing stopped')
