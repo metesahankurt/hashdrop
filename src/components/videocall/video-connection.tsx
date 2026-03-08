@@ -142,8 +142,9 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
   const [passwordInput, setPasswordInput] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const mountedRef = useRef(true)
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false } }, [])
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; if (retryTimerRef.current) clearTimeout(retryTimerRef.current) } }, [])
   useEffect(() => { setCanShare(typeof navigator !== 'undefined' && !!navigator.share) }, [])
 
   useEffect(() => {
@@ -222,12 +223,13 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     call: MediaConnection,
     remotePeerId: string,
     side: string,
-    onTimeout?: () => void
+    onTimeout?: () => void,
+    timeoutMs = 30000
   ) => {
     const { tryFinalize, connectedRef } = finalizeConnection(call, remotePeerId, side)
     const callTimeout = onTimeout ? setTimeout(() => {
       if (!connectedRef.done) { call.close(); if (onTimeout) onTimeout() }
-    }, 30000) : null
+    }, timeoutMs) : null
 
     call.on('stream', (remoteStream) => {
       if (callTimeout) clearTimeout(callTimeout)
@@ -363,7 +365,23 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
           else { const ei = formatErrorForToast(err, 'connection-failed'); toast.error(ei.title, { description: ei.description }); setCallStatus('failed') }
         })
 
-        newPeer.on('disconnected', () => console.warn('[VideoCall] DISCONNECTED'))
+        newPeer.on('disconnected', () => {
+          console.warn('[VideoCall] DISCONNECTED from signaling server')
+          if (mountedRef.current && !newPeer.destroyed) {
+            const tryReconnect = (attempt = 1) => {
+              if (newPeer.destroyed || !newPeer.disconnected) return
+              console.log(`[VideoCall] Reconnect attempt ${attempt}...`)
+              try { newPeer.reconnect() } catch { /* ignore */ }
+              // If still disconnected after 3s, retry (up to 5 attempts)
+              if (attempt < 5) {
+                setTimeout(() => {
+                  if (!newPeer.destroyed && newPeer.disconnected) tryReconnect(attempt + 1)
+                }, 3000)
+              }
+            }
+            setTimeout(() => tryReconnect(), 1000)
+          }
+        })
         newPeer.on('close', () => console.warn('[VideoCall] Peer CLOSED'))
       } catch (err) {
         if (!mountedRef.current) return
@@ -382,6 +400,19 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     initPeer()
   }, [peerId, peer, setPeer, setCallStatus, setLocalStream, refreshCode, buildOutgoingStream, attachCallHandlers, setupDataConnection, enablePassword, passwordInput, setCallPasswordHash, setPendingCall])
 
+  // ---------- Reconnect on visibility change (mobile background recovery) ----------
+  useEffect(() => {
+    if (!peer) return
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !peer.destroyed && peer.disconnected) {
+        console.log('[VideoCall] Page visible, peer disconnected — reconnecting...')
+        try { peer.reconnect() } catch { /* ignore */ }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [peer])
+
   // ---------- Connect to peer (caller) ----------
   const connectToCall = useCallback(async (targetCode: string) => {
     if (!peer) { toast.error('Initializing connection... Please wait.'); return }
@@ -392,26 +423,56 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     setCallStatus('calling')
     const targetId = codeToCallPeerId(targetCode.trim())
 
-    // Open data channel first (for auth + chat)
-    const dataConn = peer.connect(targetId, { reliable: true })
-    dataConn.on('open', async () => {
-      setupDataConnection(dataConn, targetId)
-      // Send password if required
-      if (joinPassword) {
-        const hash = await hashPassword(joinPassword)
-        dataConn.send({ type: 'auth', hash })
-      } else {
-        dataConn.send({ type: 'auth', hash: '' })
+    const MAX_CALL_ATTEMPTS = 3
+    const RETRY_DELAY = 10_000 // 10 seconds per attempt
+    let attempt = 0
+
+    const attemptCall = () => {
+      if (!mountedRef.current || !peer || peer.destroyed) return
+      const { callStatus: currentStatus } = useVideoStore.getState()
+      if (currentStatus === 'connected') return // already connected from previous attempt
+
+      attempt++
+      console.log(`[VideoCall] Call attempt ${attempt}/${MAX_CALL_ATTEMPTS} to ${targetId}`)
+
+      // Open data channel (for auth + chat)
+      const dataConn = peer.connect(targetId, { reliable: true })
+      dataConn.on('open', async () => {
+        setupDataConnection(dataConn, targetId)
+        if (joinPassword) {
+          const hash = await hashPassword(joinPassword)
+          dataConn.send({ type: 'auth', hash })
+        } else {
+          dataConn.send({ type: 'auth', hash: '' })
+        }
+      })
+
+      const call = peer.call(targetId, outgoingStream)
+      if (!call) {
+        if (attempt < MAX_CALL_ATTEMPTS) {
+          retryTimerRef.current = setTimeout(attemptCall, RETRY_DELAY)
+        } else {
+          toast.error('Failed to initiate call')
+          setCallStatus('failed')
+        }
+        return
       }
-    })
 
-    const call = peer.call(targetId, outgoingStream)
-    if (!call) { toast.error('Failed to initiate call'); setCallStatus('failed'); return }
+      attachCallHandlers(call, targetId, 'CALLER', () => {
+        // Timeout for this attempt — retry if attempts remain
+        const { callStatus: cs } = useVideoStore.getState()
+        if (cs === 'connected') return
+        if (attempt < MAX_CALL_ATTEMPTS) {
+          console.log(`[VideoCall] Attempt ${attempt} timed out, retrying...`)
+          retryTimerRef.current = setTimeout(attemptCall, 1000)
+        } else {
+          setCallStatus('failed')
+          toast.error('Call timeout', { description: 'Could not reach the other peer.', duration: 6000 })
+        }
+      }, RETRY_DELAY)
+    }
 
-    attachCallHandlers(call, targetId, 'CALLER', () => {
-      setCallStatus('failed')
-      toast.error('Call timeout', { description: 'Could not reach the other peer.', duration: 6000 })
-    })
+    attemptCall()
   }, [peer, setCallStatus, buildOutgoingStream, attachCallHandlers, setupDataConnection, joinPassword])
 
   useEffect(() => {
