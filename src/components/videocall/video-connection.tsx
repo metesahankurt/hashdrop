@@ -105,8 +105,15 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         const { username: localUsername } = useUsernameStore.getState()
         if (localUsername) conn.send({ type: 'announce', username: localUsername })
       } else if (data.type === 'auth-rejected') {
-        toast.error('Wrong password — kicked from call')
-        resetCall()
+        toast.error('Wrong password', { description: 'Please enter the correct password to join.' })
+        setPasswordRequired(true)
+        setIsJoining(false)
+        setHasAutoJoined(true)
+        // Close only media/data for this attempt, keep peer alive for retry
+        const { mediaConnections, dataConnections } = useVideoStore.getState()
+        mediaConnections.forEach(conn => { try { conn.close() } catch { /* */ } })
+        dataConnections.forEach(conn => { try { conn.close() } catch { /* */ } })
+        setCallStatus('ready')
       }
     })
     conn.on('close', () => { removeDataConnection(remotePeerId); removePeerUsername(remotePeerId) })
@@ -116,15 +123,15 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
 
   // ---------- States ----------
   const searchParams = useSearchParams()
-  const urlMode = searchParams?.get('mode')
   const urlCode = searchParams?.get('code')
-  const incomingCode = urlMode === 'videocall' ? urlCode : null
+  const incomingCode = urlCode || null
 
   const [generatedInfo, setGeneratedInfo] = useState<{ displayCode: string; peerId: string } | null>(null)
   const [inputCode, setInputCode] = useState(incomingCode || '')
   const [joinPassword, setJoinPassword] = useState('')
   const [isCopied, setIsCopied] = useState(false)
   const [showReceive, setShowReceive] = useState(!!incomingCode || initialAction === 'join')
+  const [passwordRequired, setPasswordRequired] = useState(false)
   const [showQR, setShowQR] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [codeExpiry, setCodeExpiry] = useState<number | null>(null)
@@ -514,7 +521,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         )}
 
         {/* Incoming code auto-join (from URL) */}
-        {incomingCode && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle') && (
+        {incomingCode && !passwordRequired && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle') && (
           <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center gap-4 py-12">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
             <p className="text-sm text-foreground">Joining call {incomingCode}...</p>
@@ -522,8 +529,8 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
           </div>
         )}
 
-        {/* JOIN MODE: Clean standalone join card */}
-        {isJoinMode && !incomingCode && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle' || callStatus === 'failed') && (
+        {/* JOIN MODE: Clean standalone join card (also shown when password is required after failed auto-join) */}
+        {(isJoinMode || passwordRequired) && (!incomingCode || passwordRequired) && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle' || callStatus === 'failed') && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
