@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { VideoConnection } from './video-connection'
 import { VideoDisplay } from './video-display'
@@ -14,6 +15,7 @@ import { heroVariants } from '@/lib/animations'
 import { Video } from 'lucide-react'
 
 export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'join' }) {
+  const router = useRouter()
   const {
     callStatus, callStartTime, setCallDuration, resetCall,
     isChatOpen, setChatOpen,
@@ -33,7 +35,10 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
     return () => { resetCall() }
   }, [resetCall])
 
-  const handleEndCall = () => resetCall()
+  const handleEndCall = () => {
+    resetCall()
+    router.push('/')
+  }
 
   const isInCall = callStatus === 'connected'
   const isRinging = callStatus === 'ringing'
@@ -94,7 +99,24 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
       const pc = answeredCall.peerConnection
       if (!pc) { setTimeout(waitForPc, 50); return }
 
-      pc.addEventListener('track', () => finalize())
+      pc.addEventListener('track', () => {
+        finalize()
+        // Rebuild remote streams for screen share track changes
+        const { setRemoteStreams: setStreams } = useVideoStore.getState()
+        const receivers = pc.getReceivers()
+        const audioTracks = receivers.map(r => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === 'audio')
+        const videoTracks = receivers.map(r => r.track).filter((t): t is MediaStreamTrack => !!t && t.kind === 'video')
+        const camTrack = videoTracks[0] || null
+        const scrTrack = videoTracks[1] || null
+        const build = (vt: MediaStreamTrack | null) => {
+          if (!vt) return null
+          const s = new MediaStream()
+          s.addTrack(vt)
+          audioTracks.forEach(t => s.addTrack(t))
+          return s
+        }
+        setStreams(remotePeerId, { camera: build(camTrack), screen: build(scrTrack) })
+      })
       pc.addEventListener('iceconnectionstatechange', () => {
         if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
           finalize()

@@ -247,6 +247,9 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     const setupPcHandlers = (pc: RTCPeerConnection) => {
       pc.ontrack = (event) => {
         console.log(`[VideoCall] ${side} (${remotePeerId}) ontrack:`, event.track.kind)
+        // Always rebuild remote streams when tracks change (screen share start/stop)
+        rebuildRemoteStreamsForPeer(remotePeerId, pc)
+        // Also finalize initial connection if not yet done
         if (tryFinalize(true) && callTimeout) clearTimeout(callTimeout)
       }
       pc.oniceconnectionstatechange = () => {
