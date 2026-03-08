@@ -150,7 +150,17 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     return () => clearInterval(interval)
   }, [codeExpiry, setCodeExpiry, addLog, refreshCode])
 
-  const peerId = displayCode ? codeToPeerId(displayCode) : undefined
+  // For receivers in headless join mode, generate a random peer ID
+  // They don't need a display code but need a Peer instance to connect outward
+  const receiverPeerId = useMemo(() => {
+    if (headless && initialAction === 'join' && !displayCode) {
+      return `sr-warp-recv-${Math.random().toString(36).substring(2, 10)}`
+    }
+    return undefined
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [headless, initialAction])
+
+  const peerId = displayCode ? codeToPeerId(displayCode) : receiverPeerId
 
   // ... (Chunking constants and Data Handler remain same) ...
 

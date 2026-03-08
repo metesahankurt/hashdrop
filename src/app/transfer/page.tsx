@@ -97,6 +97,7 @@ function TransferContent() {
           hint="Your username will be visible to the other party"
           mode="transfer"
           skipEntry={!!pendingCode}
+          skipToJoin={!!pendingCode}
         >
           {(_username, action) => <TransferViewNew initialAction={action} />}
         </WithUsernameGate>

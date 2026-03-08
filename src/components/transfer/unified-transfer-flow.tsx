@@ -32,9 +32,15 @@ const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
   const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode } = useWarpStore()
 
+  const searchParams = useSearchParams()
+  const codeFromUrl = searchParams.get('code') || ''
+
   // Derive initial step from initialAction (skip select-mode if already chosen)
+  // When joining with a code from URL (QR scan), skip straight to 'connecting'
   const initialStep: FlowStep = initialAction === 'create'
     ? 'upload'
+    : (initialAction === 'join' && codeFromUrl)
+    ? 'connecting'
     : initialAction === 'join'
     ? 'enter-code'
     : 'select-mode'
@@ -43,8 +49,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
   const [isCopied, setIsCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
 
-  const searchParams = useSearchParams()
-  const [inputCode, setInputCode] = useState<string>(searchParams.get('code') || '')
+  const [inputCode, setInputCode] = useState<string>(codeFromUrl)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [shareMode, setShareMode] = useState<ShareMode>('file')
   const [textInput, setTextInput] = useState('')
@@ -53,11 +58,18 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
   const [errorMessage, setErrorMessage] = useState<string>('')
 
   // One-time initialization: set store mode based on initialAction (skips select-mode)
+  // When joining with a URL code, also trigger connecting state for ConnectionManager
   const initializedRef = useState(() => {
     if (initialAction === 'create') {
       setTimeout(() => setMode('send'), 0)
     } else if (initialAction === 'join') {
       setTimeout(() => setMode('receive'), 0)
+      if (codeFromUrl) {
+        setTimeout(() => {
+          setClientInputCode(codeFromUrl)
+          setStatus('connecting')
+        }, 0)
+      }
     }
     return true
   })[0]
