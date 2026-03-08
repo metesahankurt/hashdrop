@@ -241,17 +241,40 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       toast.success('Call connected!')
     })
 
-    if (call.peerConnection) {
-      call.peerConnection.ontrack = (event) => {
+    // Set up native peerConnection handlers (ontrack, ICE state)
+    // For incoming calls, peerConnection may not exist yet (created on answer()),
+    // so poll until it's available
+    const setupPcHandlers = (pc: RTCPeerConnection) => {
+      pc.ontrack = (event) => {
         console.log(`[VideoCall] ${side} (${remotePeerId}) ontrack:`, event.track.kind)
         if (tryFinalize(true) && callTimeout) clearTimeout(callTimeout)
       }
-      call.peerConnection.oniceconnectionstatechange = () => {
-        const state = call.peerConnection.iceConnectionState
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState
         if (state === 'connected' || state === 'completed') {
           if (tryFinalize() && callTimeout) clearTimeout(callTimeout)
         }
       }
+      // Check if already connected (e.g. handlers attached after negotiation)
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        if (tryFinalize() && callTimeout) clearTimeout(callTimeout)
+      }
+    }
+
+    if (call.peerConnection) {
+      setupPcHandlers(call.peerConnection)
+    } else {
+      // Poll for peerConnection (created after answer() for incoming calls)
+      let attempts = 0
+      const pollPc = setInterval(() => {
+        attempts++
+        if (call.peerConnection) {
+          clearInterval(pollPc)
+          setupPcHandlers(call.peerConnection)
+        } else if (attempts > 100 || connectedRef.done) { // 10s max or already connected
+          clearInterval(pollPc)
+        }
+      }, 100)
     }
 
     call.on('close', () => {
