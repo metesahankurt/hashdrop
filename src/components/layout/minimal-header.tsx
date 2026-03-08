@@ -7,65 +7,54 @@ import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useVideoStore } from '@/store/use-video-store'
 import { useChatRoomStore } from '@/store/use-chat-room-store'
-import { useAppStore, type AppMode } from '@/store/use-app-store'
 
 export function MinimalHeader() {
   const { fullReset, peer, conn } = useWarpStore()
   const resetCall = useVideoStore((s) => s.resetCall)
-  const { appMode, setAppMode } = useAppStore()
   const router = useRouter()
   const pathname = usePathname()
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
 
-    // Clean up connections
+    // Clean up all connections before going home
     if (conn) conn.close()
     if (peer) peer.destroy()
     fullReset()
     resetCall()
     useChatRoomStore.getState().resetRoom()
-
-    // On route-based pages (e.g. /chatroom), navigate to homepage
-    if (pathname !== '/') {
-      router.push('/')
-    } else {
-      setAppMode('welcome')
-    }
+    router.push('/')
   }
 
-  const handleModeSwitch = (mode: AppMode) => {
-    // If clicking chatroom, use router (dedicated route)
+  const handleModeSwitch = (mode: 'transfer' | 'videocall' | 'chatroom') => {
+    // All three features use dedicated routes
+    if (mode === 'transfer') {
+      if (conn) conn.close()
+      if (peer) peer.destroy()
+      fullReset()
+      router.push('/transfer')
+      return
+    }
+    if (mode === 'videocall') {
+      resetCall()
+      router.push('/videocall')
+      return
+    }
     if (mode === 'chatroom') {
       useChatRoomStore.getState().resetRoom()
       router.push('/chatroom')
       return
     }
-
-    if (mode === appMode) return
-
-    // Clean up current mode before switching
-    if (appMode === 'videocall') {
-      resetCall()
-    }
-    if (appMode === 'transfer') {
-      if (conn) conn.close()
-      if (peer) peer.destroy()
-      fullReset()
-    }
-    if (appMode === 'chatroom' || pathname?.startsWith('/chatroom')) {
-      useChatRoomStore.getState().resetRoom()
-    }
-
-    setAppMode(mode)
   }
 
-  // Determine active mode: prefer pathname for route-based pages
-  const activeMode: AppMode | null = pathname?.startsWith('/chatroom')
+  // Determine active mode from pathname
+  const activeMode = pathname?.startsWith('/transfer')
+    ? 'transfer'
+    : pathname?.startsWith('/videocall')
+    ? 'videocall'
+    : pathname?.startsWith('/chatroom')
     ? 'chatroom'
-    : appMode === 'welcome'
-    ? null
-    : appMode
+    : null
 
   return (
     <header
