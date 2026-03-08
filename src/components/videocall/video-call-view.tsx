@@ -43,7 +43,11 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   // Lobby: answer the pending call
   const handleLobbyJoin = useCallback(() => {
     if (!pendingCall) return
-    const { localStream, isCameraOff, screenStream, isScreenSharing, setCallStatus } = useVideoStore.getState()
+    const {
+      localStream, isCameraOff, screenStream, isScreenSharing,
+      setCallStatus, setCallStartTime, addMediaConnection, setRemoteStreams,
+    } = useVideoStore.getState()
+
     if (!localStream) { pendingCall.answer(new MediaStream()); setPendingCall(null); setCallStatus('calling'); return }
     const outgoing = new MediaStream()
     const audioTrack = localStream.getAudioTracks()[0]
@@ -52,11 +56,56 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
     if (cameraTrack) outgoing.addTrack(cameraTrack)
     if (screenTrack) outgoing.addTrack(screenTrack)
     if (audioTrack) outgoing.addTrack(audioTrack)
-    pendingCall.answer(outgoing.getTracks().length ? outgoing : localStream)
+
+    const answeredCall = pendingCall
+    const remotePeerId = answeredCall.peer
+    answeredCall.answer(outgoing.getTracks().length ? outgoing : localStream)
+
     setPendingCall(null)
-    // Transition out of 'ringing' so lobby hides immediately
-    // 'connected' will be set by stream/ontrack handlers in VideoConnection
     setCallStatus('calling')
+
+    // After answer(), peerConnection is created by PeerJS.
+    // Set up robust connection detection directly here.
+    const finalize = () => {
+      const { callStatus: current } = useVideoStore.getState()
+      if (current === 'connected') return // already done
+
+      const pc = answeredCall.peerConnection
+      if (pc) {
+        const receivers = pc.getReceivers()
+        const videoTrack = receivers.find(r => r.track?.kind === 'video')?.track
+        const audioTrack = receivers.find(r => r.track?.kind === 'audio')?.track
+        if (videoTrack || audioTrack) {
+          const cameraStream = videoTrack ? new MediaStream([videoTrack, ...(audioTrack ? [audioTrack] : [])]) : null
+          setRemoteStreams(remotePeerId, { camera: cameraStream, screen: null })
+        }
+      }
+
+      addMediaConnection(remotePeerId, answeredCall)
+      setCallStatus('connected')
+      setCallStartTime(Date.now())
+    }
+
+    // Strategy 1: PeerJS stream event
+    answeredCall.on('stream', () => finalize())
+
+    // Strategy 2: Poll for peerConnection and set up native handlers
+    const waitForPc = () => {
+      const pc = answeredCall.peerConnection
+      if (!pc) { setTimeout(waitForPc, 50); return }
+
+      pc.addEventListener('track', () => finalize())
+      pc.addEventListener('iceconnectionstatechange', () => {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          finalize()
+        }
+      })
+      // Already connected?
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        finalize()
+      }
+    }
+    waitForPc()
   }, [pendingCall, setPendingCall])
 
   const handleLobbyDecline = useCallback(() => {
