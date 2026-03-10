@@ -370,7 +370,11 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         })
 
         const connectionTimeout = setTimeout(() => {
-          if (!newPeer.id) { newPeer.destroy(); if (mountedRef.current) { toast.error('Could not connect to network.'); setCallStatus('failed') } }
+          newPeer.destroy(); 
+          if (mountedRef.current) { 
+            toast.error('Could not connect to network.', { description: 'Signaling server timeout.' }); 
+            setCallStatus('failed'); 
+          }
         }, 30000)
 
         newPeer.on('open', (id) => {
@@ -523,6 +527,13 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
   useEffect(() => {
     if (incomingCode && peer && !hasAutoJoined) {
       setHasAutoJoined(true)
+      
+      // On mobile devices, Safari and Chrome restrict WebRTC AudioContext and autoplay 
+      // without explicit user interaction. We bypass auto-join and show the join button.
+      if (typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        return
+      }
+
       setIsJoining(true)
       connectToCall(incomingCode)
     }
@@ -652,17 +663,21 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
           </motion.div>
         )}
 
-        {/* Incoming code auto-join (from URL) */}
-        {incomingCode && !passwordRequired && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle') && (
+        {/* Incoming code auto-join (loading state) */}
+        {incomingCode && !passwordRequired && (callStatus === 'generating' || callStatus === 'idle' || (callStatus === 'ready' && isJoining)) && (
           <div className="glass-card p-6 rounded-xl flex flex-col items-center justify-center gap-4 py-12">
             <Loader2 className="w-10 h-10 text-primary animate-spin" />
-            <p className="text-sm text-foreground">Joining call {incomingCode}...</p>
-            <p className="text-xs text-muted">Initializing camera and microphone</p>
+            <p className="text-sm text-foreground">
+              {callStatus === 'generating' ? 'Initializing camera...' : `Joining call ${incomingCode}...`}
+            </p>
+            {callStatus === 'generating' && <p className="text-xs text-muted">Please allow camera and mic access</p>}
           </div>
         )}
 
-        {/* JOIN MODE: Clean standalone join card (also shown when password is required after failed auto-join) */}
-        {(isJoinMode || passwordRequired) && (!incomingCode || passwordRequired) && (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle' || callStatus === 'failed') && (
+        {/* JOIN MODE: Clean standalone join card (also shown when password is required after failed auto-join or forced mobile gesture) */}
+        {(isJoinMode || incomingCode || passwordRequired) && 
+         (!incomingCode || passwordRequired || (callStatus === 'ready' && !isJoining) || callStatus === 'failed') && 
+         (callStatus === 'ready' || callStatus === 'generating' || callStatus === 'idle' || callStatus === 'failed') && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
