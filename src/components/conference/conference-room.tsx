@@ -62,7 +62,9 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
     return (
       <>
         <AudioRenderer />
-        <ConferenceWaiting />
+        <div className="fixed inset-0 top-0 flex flex-col bg-background z-40 overflow-y-auto">
+          <ConferenceWaiting />
+        </div>
       </>
     )
   }
@@ -72,7 +74,7 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
   return (
     <>
       <AudioRenderer />
-      <div className="fixed inset-0 top-0 flex flex-col bg-background z-20">
+      <div className="fixed inset-0 top-0 flex flex-col bg-background z-40">
         <div className="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4">
           {/* Admit panel — host only */}
           {role === 'host' && waitingParticipants.length > 0 && (

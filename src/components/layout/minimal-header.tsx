@@ -26,9 +26,11 @@ export function MinimalHeader() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Hide navbar when inside a conference room or waiting room
+  // Hide navbar when conference is connecting or active (fullscreen UI)
   const isConferenceFullscreen =
-    conferenceStatus === 'in-room' || conferenceStatus === 'waiting'
+    conferenceStatus === 'connecting' ||
+    conferenceStatus === 'in-room' ||
+    conferenceStatus === 'waiting'
 
   if (isConferenceFullscreen) return null
 
