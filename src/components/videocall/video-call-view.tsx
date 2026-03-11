@@ -23,7 +23,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   } = useVideoStore()
 
   useEffect(() => {
-    if (callStatus !== 'connected' || !callStartTime) return
+    if ((callStatus !== 'connected' && callStatus !== 'waiting') || !callStartTime) return
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - callStartTime) / 1000)
       setCallDuration(elapsed)
@@ -40,7 +40,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
     router.push('/')
   }
 
-  const isInCall = callStatus === 'connected'
+  const isInCall = callStatus === 'connected' || callStatus === 'waiting'
   const isRinging = callStatus === 'ringing'
   const isPreCall = callStatus === 'idle' || callStatus === 'generating' || callStatus === 'ready' || callStatus === 'calling'
   // Only treat as post-call if an actual call was made (callStartTime set) OR call ended normally

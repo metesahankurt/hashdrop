@@ -10,6 +10,7 @@ const statusConfig: Record<VideoCallStatus, { label: string; color: string }> = 
   ready: { label: 'Waiting for peer...', color: 'text-primary' },
   calling: { label: 'Calling...', color: 'text-primary' },
   ringing: { label: 'Ringing...', color: 'text-primary' },
+  waiting: { label: 'Waiting for others...', color: 'text-primary' },
   connected: { label: 'Connected', color: 'text-success' },
   ended: { label: 'Call ended', color: 'text-muted' },
   failed: { label: 'Connection failed', color: 'text-danger' },
@@ -46,7 +47,7 @@ export function CallStatus() {
         {config.label}
       </span>
 
-      {callStatus === 'connected' && callDuration > 0 && (
+      {(callStatus === 'connected' || callStatus === 'waiting') && callDuration > 0 && (
         <span className="text-sm text-muted font-mono ml-1">
           {formatDuration(callDuration)}
         </span>

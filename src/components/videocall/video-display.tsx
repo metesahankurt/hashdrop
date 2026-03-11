@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { CameraOff, User, MonitorUp } from 'lucide-react'
+import { CameraOff, User, MonitorUp, Users } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { isPortraitTrack } from '@/lib/media-utils'
@@ -88,7 +88,7 @@ export function VideoDisplay() {
   }, [localStream])
 
   // ----- PRE-CALL VIEW -----
-  const isPreCall = callStatus !== 'connected'
+  const isPreCall = callStatus !== 'connected' && callStatus !== 'waiting'
 
   if (isPreCall) {
     return (
@@ -217,6 +217,7 @@ export function VideoDisplay() {
   // Case 2: No screen share → responsive grid
   const totalParticipants = 1 + remotePeerIds.length
   const gridClass = getGridClass(totalParticipants)
+  const isWaiting = callStatus === 'waiting' && remotePeerIds.length === 0
 
   return (
     <>
@@ -233,6 +234,13 @@ export function VideoDisplay() {
           )}
           <TileLabel label={localLabel} isLocal />
           <ExpandHint />
+          {/* Waiting overlay — shown when alone in the room */}
+          {isWaiting && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5 pointer-events-none">
+              <Users className="w-3.5 h-3.5 text-primary animate-pulse" />
+              <span className="text-xs text-white/80 whitespace-nowrap">Waiting for others to join...</span>
+            </div>
+          )}
         </div>
 
         {/* Remote tiles */}

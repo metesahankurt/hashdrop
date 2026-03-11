@@ -597,53 +597,93 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
   const isJoinMode = initialAction === 'join'
   const isCreateMode = initialAction === 'create' || !initialAction
 
-  if (callStatus === 'connected' || callStatus === 'ended') return null
+  if (callStatus === 'connected' || callStatus === 'waiting' || callStatus === 'ended') return null
 
   return (
     <>
       <div className="w-full flex flex-col items-center gap-6 md:gap-8">
-        {/* Code Display — only when creating */}
+        {/* Code Display + Invite Card — only when creating */}
         {isCreateMode && (callStatus === 'ready' || callStatus === 'generating') && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="text-center space-y-3 w-full">
-            <p className="text-sm text-muted">Share this code to start a video call (up to 5 participants)</p>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="w-full space-y-3">
 
-            <div className="inline-flex items-center gap-2 glass-card rounded-lg px-3 py-2.5 glow-primary">
-              <span className="font-mono text-xl md:text-2xl text-primary font-bold tracking-wide">{displayCode || '---'}</span>
-              <div className="flex gap-1.5">
-                <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all" title="Copy code">
-                  {isCopied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4 text-muted hover:text-foreground" />}
-                </button>
-                {canShare && (
-                  <button onClick={shareCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all" title="Share code">
-                    <Share2 className="w-4 h-4 text-muted hover:text-foreground" />
+            {/* Invite card — Google Meet style */}
+            <div className="glass-card rounded-2xl p-4 space-y-3 glow-primary">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted">Your meeting is ready</p>
+                <div className="flex items-center gap-1">
+                  {timeLeft !== null && timeLeft > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] text-muted">
+                      <Clock className="w-3 h-3" />
+                      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
+                  <button onClick={refreshCode} className="p-1 hover:bg-white/10 rounded-md transition-all ml-1" title="New code">
+                    <RefreshCw className="w-3.5 h-3.5 text-muted hover:text-foreground" />
                   </button>
-                )}
+                </div>
+              </div>
+
+              {/* Code */}
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5">
+                <span className="flex-1 font-mono text-xl font-bold text-primary tracking-widest">{displayCode || '---'}</span>
                 <button onClick={() => setShowQR(!showQR)} className="p-1.5 hover:bg-white/10 rounded-md transition-all" title={showQR ? 'Hide QR' : 'Show QR'}>
-                  <QrCode className={`w-4 h-4 ${showQR ? 'text-primary' : 'text-muted hover:text-foreground'}`} />
-                </button>
-                <button onClick={refreshCode} className="p-1.5 hover:bg-white/10 rounded-md transition-all" title="New code">
-                  <RefreshCw className="w-4 h-4 text-muted hover:text-foreground" />
+                  <QrCode className={`w-4 h-4 ${showQR ? 'text-primary' : 'text-muted'}`} />
                 </button>
               </div>
+
+              {/* QR */}
+              <AnimatePresence>
+                {showQR && displayCode && (() => {
+                  const { username } = useUsernameStore.getState()
+                  const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
+                  return <QRCodeDisplay code={displayCode} size={160} url={`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`} />
+                })()}
+              </AnimatePresence>
+
+              {/* Invite link row */}
+              <div className="flex items-center gap-2 bg-black/20 rounded-xl px-3 py-2 text-xs text-muted truncate">
+                <span className="truncate flex-1">
+                  hashdrop.metesahankurt.cloud?mode=videocall&code=<span className="text-primary font-medium">{displayCode}</span>
+                </span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2">
+                <button
+                  onClick={copyCode}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl glass-btn text-sm font-medium transition-all"
+                >
+                  {isCopied ? <><Check className="w-4 h-4 text-primary" /><span className="text-primary">Copied!</span></> : <><Copy className="w-4 h-4" /><span>Copy Link</span></>}
+                </button>
+                {canShare ? (
+                  <button
+                    onClick={shareCode}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl glass-btn text-sm font-medium transition-all"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>Share</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Start Call — enter room solo, invite others from inside */}
+              {callStatus === 'ready' && (
+                <button
+                  onClick={() => {
+                    setCallStatus('waiting')
+                    setCallStartTime(Date.now())
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl glass-btn-primary text-sm font-semibold transition-all"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  Start Call
+                </button>
+              )}
             </div>
 
-            <AnimatePresence>
-              {showQR && displayCode && (() => {
-                const { username } = useUsernameStore.getState()
-                const fromParam = username ? `&from=${encodeURIComponent(username)}` : ''
-                return <QRCodeDisplay code={displayCode} size={180} url={`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`} />
-              })()}
-            </AnimatePresence>
-
-            {timeLeft !== null && timeLeft > 0 && (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-muted">
-                <Clock className="w-3 h-3" />
-                <span>Expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
-              </div>
-            )}
-
             {/* Password protection toggle */}
-            <div className="mt-2 w-full max-w-xs mx-auto text-center">
+            <div className="text-center">
               <label className="inline-flex items-center gap-2 cursor-pointer group mx-auto">
                 <div
                   onClick={() => setEnablePassword(!enablePassword)}
@@ -658,7 +698,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
 
               <AnimatePresence>
                 {enablePassword && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-2">
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-2 max-w-xs mx-auto">
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}

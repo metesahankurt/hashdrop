@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Peer, MediaConnection, DataConnection } from 'peerjs'
 
-export type VideoCallStatus = 'idle' | 'generating' | 'ready' | 'calling' | 'ringing' | 'connected' | 'ended' | 'failed'
+export type VideoCallStatus = 'idle' | 'generating' | 'ready' | 'waiting' | 'calling' | 'ringing' | 'connected' | 'ended' | 'failed'
 
 export interface RemotePeerStreams {
   camera: MediaStream | null
