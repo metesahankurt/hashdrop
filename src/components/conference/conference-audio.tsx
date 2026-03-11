@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRoomContext } from '@livekit/components-react'
-import { Track, RoomEvent } from 'livekit-client'
+import { RoomEvent } from 'livekit-client'
 import { useConferenceStore } from '@/store/use-conference-store'
 
 // Attaches remote audio tracks to the DOM for playback, respects speaker mute
@@ -14,16 +14,15 @@ export function AudioRenderer() {
     if (!room) return
 
     const attachAudio = () => {
-      room.remoteParticipants.forEach((participant) => {
-        participant.audioTrackPublications.forEach((pub) => {
-          if (pub.track && !pub.isMuted) {
-            const elements = pub.track.attachedElements
-            if (elements.length === 0) {
+      try {
+        room.remoteParticipants.forEach((participant) => {
+          participant.audioTrackPublications.forEach((pub) => {
+            if (pub.track && !pub.isMuted) {
               pub.track.attach()
             }
-          }
+          })
         })
-      })
+      } catch { /* ignore */ }
     }
 
     const handleTrack = () => attachAudio()
@@ -40,15 +39,18 @@ export function AudioRenderer() {
   // Apply speaker mute/unmute to all attached audio elements
   useEffect(() => {
     if (!room) return
-    room.remoteParticipants.forEach((participant) => {
-      participant.audioTrackPublications.forEach((pub) => {
-        if (pub.track) {
-          pub.track.attachedElements.forEach((el) => {
-            ;(el as HTMLMediaElement).muted = isSpeakerMuted
-          })
-        }
+    try {
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((pub) => {
+          if (pub.track) {
+            const elements = (pub.track as { attachedElements?: HTMLMediaElement[] }).attachedElements
+            if (Array.isArray(elements)) {
+              elements.forEach((el) => { el.muted = isSpeakerMuted })
+            }
+          }
+        })
       })
-    })
+    } catch { /* ignore */ }
   }, [room, isSpeakerMuted])
 
   return null

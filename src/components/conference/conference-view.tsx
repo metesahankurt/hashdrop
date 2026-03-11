@@ -89,7 +89,7 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
       </AnimatePresence>
 
       {/* LiveKit Room — mounts when token is ready */}
-      {(isConnecting || isInRoom) && token && (
+      {(isConnecting || isInRoom) && token && LK_URL && (
         <LiveKitRoom
           token={token}
           serverUrl={LK_URL}
@@ -97,10 +97,19 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
           onDisconnected={handleDisconnect}
           onError={(err) => {
             console.error('[Conference] LiveKit error:', err)
+            setStatus('ended')
           }}
         >
           <ConferenceRoomInner onLeave={handleLeave} />
         </LiveKitRoom>
+      )}
+
+      {/* LiveKit not configured */}
+      {(isConnecting || isInRoom) && token && !LK_URL && (
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-4 text-center">
+          <p className="text-sm text-muted">Conference server not configured.<br />Please set up the LiveKit environment variables.</p>
+          <button onClick={() => reset()} className="glass-btn px-4 py-2 rounded-xl text-sm">Back</button>
+        </div>
       )}
     </>
   )

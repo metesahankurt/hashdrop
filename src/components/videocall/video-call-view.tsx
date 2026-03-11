@@ -11,7 +11,7 @@ import { VideoLobby } from './video-lobby'
 import { CallStatus } from './call-status'
 import { VideoInvitePanel } from './video-invite-panel'
 import { useVideoStore } from '@/store/use-video-store'
-import { Video } from 'lucide-react'
+import { Video, WifiOff, RefreshCw } from 'lucide-react'
 
 export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'join' }) {
   const router = useRouter()
@@ -43,7 +43,10 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   const isInCall = callStatus === 'connected'
   const isRinging = callStatus === 'ringing'
   const isPreCall = callStatus === 'idle' || callStatus === 'generating' || callStatus === 'ready' || callStatus === 'calling'
-  const isPostCall = callStatus === 'ended' || callStatus === 'failed'
+  // Only treat as post-call if an actual call was made (callStartTime set) OR call ended normally
+  const isPostCall = callStatus === 'ended' || (callStatus === 'failed' && callStartTime !== null)
+  // Signaling server init failure (before any call was attempted)
+  const isInitFailed = callStatus === 'failed' && callStartTime === null
 
   useEffect(() => {
     if (!isInCall) return
@@ -213,8 +216,28 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
             )}
           </AnimatePresence>
 
+          {/* Signaling server init failure — retry prompt */}
+          {isInitFailed && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mx-auto">
+                <WifiOff className="w-7 h-7 text-yellow-400" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-lg font-semibold text-foreground">Server Unavailable</h3>
+                <p className="text-sm text-muted">Could not connect to the signaling server.<br />It may be starting up — please retry in a moment.</p>
+              </div>
+              <button
+                onClick={() => { resetCall() }}
+                className="glass-btn-primary px-6 py-3 rounded-xl text-sm flex items-center gap-2 mx-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retry
+              </button>
+            </motion.div>
+          )}
+
           {/* Pre-call connection UI - explicitly always rendered to keep logic active */}
-          <div className={isPostCall ? "hidden" : "w-full space-y-4"}>
+          <div className={isPostCall || isInitFailed ? "hidden" : "w-full space-y-4"}>
             {isPreCall && (
               <>
                 <VideoDisplay />

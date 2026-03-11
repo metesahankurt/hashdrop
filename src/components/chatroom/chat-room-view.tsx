@@ -48,12 +48,14 @@ function LinkText({ text }: { text: string }) {
 // PASSWORD SETUP SCREEN — shown when creating a room
 // ============================================================
 interface PasswordSetupScreenProps {
+  roomCode: string
   onConfirm: (hash: string | null) => void
 }
 
-function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
+function PasswordSetupScreen({ roomCode, onConfirm }: PasswordSetupScreenProps) {
   const [password, setPassword] = useState('')
   const [showPwd, setShowPwd] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const handleSkip = () => onConfirm(null)
   const handleSet = async () => {
@@ -63,32 +65,49 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
     onConfirm(hash)
   }
 
+  const copyCode = () => {
+    navigator.clipboard.writeText(roomCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
       className="w-full max-w-md mx-auto space-y-5">
       <div className="text-center space-y-2">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
-          <Lock className="w-7 h-7 text-primary" />
+          <MessageSquare className="w-7 h-7 text-primary" />
         </div>
-        <h2 className="text-xl font-semibold text-foreground">Room Password</h2>
-        <p className="text-xs text-muted">Set a password so only invited people can join your room.<br />Optional — you can skip it.</p>
+        <h2 className="text-xl font-semibold text-foreground">Create Chat Room</h2>
+        <p className="text-xs text-muted">Your room code is ready. Optionally add a password.</p>
+      </div>
+
+      {/* Room code preview */}
+      <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+        <span className="flex-1 font-mono text-lg font-bold text-primary tracking-widest">{roomCode}</span>
+        <button onClick={copyCode} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" title="Copy code">
+          {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
+        </button>
       </div>
 
       <div className="glass-card rounded-2xl p-5 space-y-4">
-        <div className="relative">
-          <input
-            type={showPwd ? 'text' : 'password'}
-            placeholder="Set a password (optional)"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSet()}
-            className="glass-input w-full text-sm pr-9"
-            style={{ fontSize: '16px' }}
-            autoFocus
-          />
-          <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
-            {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+        <div className="space-y-1">
+          <p className="text-xs text-muted flex items-center gap-1.5"><Lock className="w-3 h-3" /> Password (optional)</p>
+          <div className="relative">
+            <input
+              type={showPwd ? 'text' : 'password'}
+              placeholder="Leave empty for no password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSet()}
+              className="glass-input w-full text-sm pr-9"
+              style={{ fontSize: '16px' }}
+              autoFocus
+            />
+            <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
+              {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2">
@@ -96,7 +115,7 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
             onClick={handleSkip}
             className="glass-btn flex-1 py-2.5 rounded-xl text-sm text-muted hover:text-foreground"
           >
-            Skip
+            No Password
           </button>
           <button
             onClick={handleSet}
@@ -104,7 +123,7 @@ function PasswordSetupScreen({ onConfirm }: PasswordSetupScreenProps) {
             className="glass-btn-primary flex-1 py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
-            Create Protected Room
+            Set Password
           </button>
         </div>
       </div>
@@ -774,7 +793,7 @@ export function ChatRoomView({
         {step === 'password-setup' && (
           <motion.div key="password-setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="flex-1 flex flex-col items-center justify-center">
-            <PasswordSetupScreen onConfirm={handlePasswordSetupConfirm} />
+            <PasswordSetupScreen roomCode={pendingRoomCode} onConfirm={handlePasswordSetupConfirm} />
             <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
