@@ -113,7 +113,7 @@ interface WithUsernameGateProps {
   description: string
   hint?: string
   /** Which mode this gate is for (enables entry screen) */
-  mode?: 'transfer' | 'videocall' | 'chatroom'
+  mode?: 'transfer' | 'videocall' | 'chatroom' | 'conference'
   /** Skip entry screen (e.g. when opened from incoming link) */
   skipEntry?: boolean
   /** When true, pre-select 'join' action (link invite flow) */
