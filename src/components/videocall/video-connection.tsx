@@ -38,7 +38,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     addChatMessage,
     callPasswordHash, setCallPasswordHash,
     addPeerUsername, removePeerUsername,
-    setPendingCall,
+    setPendingCall, setCallInviteUrl,
   } = useVideoStore()
 
   const buildOutgoingStream = useCallback(() => {
@@ -184,6 +184,9 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       const peerId = codeToCallPeerId(displayCode)
       setGeneratedInfo({ displayCode, peerId })
       setCodeExpiry(Date.now() + CODE_EXPIRY_MS)
+      const { username: uname } = useUsernameStore.getState()
+      const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
+      setCallInviteUrl(`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -205,8 +208,11 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     setGeneratedInfo({ displayCode: newDisplayCode, peerId: newPeerId })
     setCodeExpiry(Date.now() + CODE_EXPIRY_MS)
     setShowQR(false)
+    const { username: uname } = useUsernameStore.getState()
+    const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
+    setCallInviteUrl(`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${newDisplayCode}${fromParam}`)
     toast.success('New video call code generated!')
-  }, [resetCall])
+  }, [resetCall, setCallInviteUrl])
 
   useEffect(() => {
     if (!codeExpiry) return

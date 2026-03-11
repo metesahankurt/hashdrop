@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
-import { Mic, MicOff, Camera, CameraOff, PhoneOff, MonitorUp, MonitorOff, Volume2, VolumeOff, MessageSquare } from 'lucide-react'
+import { Mic, MicOff, Camera, CameraOff, PhoneOff, MonitorUp, MonitorOff, Volume2, VolumeOff, MessageSquare, Link2 } from 'lucide-react'
 import { useVideoStore } from '@/store/use-video-store'
 import { toast } from 'sonner'
 
@@ -17,7 +17,7 @@ export function VideoControls({ onEndCall, onToggleChat, preCall = false }: Vide
     toggleMic, toggleCamera, toggleSpeaker,
     mediaConnections,
     screenStream, setScreenStream, setIsScreenSharing,
-    unreadCount, isChatOpen,
+    unreadCount, isChatOpen, isInviteOpen, setInviteOpen,
   } = useVideoStore()
 
   const addScreenTrackToAll = useCallback(async (track: MediaStreamTrack, stream: MediaStream) => {
@@ -159,6 +159,17 @@ export function VideoControls({ onEndCall, onToggleChat, preCall = false }: Vide
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
+        </button>
+      )}
+
+      {/* Invite info — only in-call */}
+      {!preCall && (
+        <button
+          onClick={() => setInviteOpen(!isInviteOpen)}
+          className={`w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all ${isInviteOpen ? 'bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30' : 'glass-card hover:bg-white/10 text-foreground'}`}
+          title="Meeting Info"
+        >
+          <Link2 className="w-5 h-5" />
         </button>
       )}
 

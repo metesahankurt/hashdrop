@@ -35,9 +35,15 @@ interface ConferenceState {
   isMicMuted: boolean
   isCameraOff: boolean
   isScreenSharing: boolean
+  isSpeakerMuted: boolean
   isChatOpen: boolean
   isParticipantsOpen: boolean
+  isInviteOpen: boolean
   pinnedIdentity: string | null // pinned/spotlight participant
+
+  // Call timer
+  callStartTime: number | null
+  callDuration: number
 
   // Waiting room (host sees these)
   waitingParticipants: WaitingParticipant[]
@@ -52,8 +58,12 @@ interface ConferenceState {
   setMicMuted: (v: boolean) => void
   setCameraOff: (v: boolean) => void
   setScreenSharing: (v: boolean) => void
+  setSpeakerMuted: (v: boolean) => void
   setChatOpen: (v: boolean) => void
   setParticipantsOpen: (v: boolean) => void
+  setInviteOpen: (v: boolean) => void
+  setCallStartTime: (t: number | null) => void
+  setCallDuration: (d: number) => void
   setPinnedIdentity: (id: string | null) => void
   addWaitingParticipant: (p: WaitingParticipant) => void
   removeWaitingParticipant: (identity: string) => void
@@ -72,9 +82,13 @@ const initialState = {
   isMicMuted: false,
   isCameraOff: false,
   isScreenSharing: false,
+  isSpeakerMuted: false,
   isChatOpen: false,
   isParticipantsOpen: false,
+  isInviteOpen: false,
   pinnedIdentity: null,
+  callStartTime: null,
+  callDuration: 0,
   waitingParticipants: [] as WaitingParticipant[],
   chatMessages: [] as ConferenceChatMessage[],
   unreadCount: 0,
@@ -91,11 +105,15 @@ export const useConferenceStore = create<ConferenceState>((set, get) => ({
   setMicMuted: (isMicMuted) => set({ isMicMuted }),
   setCameraOff: (isCameraOff) => set({ isCameraOff }),
   setScreenSharing: (isScreenSharing) => set({ isScreenSharing }),
+  setSpeakerMuted: (isSpeakerMuted) => set({ isSpeakerMuted }),
 
   setChatOpen: (v) =>
     set({ isChatOpen: v, unreadCount: v ? 0 : get().unreadCount }),
 
   setParticipantsOpen: (v) => set({ isParticipantsOpen: v }),
+  setInviteOpen: (v) => set({ isInviteOpen: v }),
+  setCallStartTime: (t) => set({ callStartTime: t }),
+  setCallDuration: (d) => set({ callDuration: d }),
   setPinnedIdentity: (id) => set({ pinnedIdentity: id }),
 
   addWaitingParticipant: (p) => {

@@ -29,7 +29,7 @@ export function useConferenceLogic() {
     role, username, identity,
     isMicMuted, isCameraOff,
     setStatus, addWaitingParticipant, removeWaitingParticipant,
-    addChatMessage,
+    addChatMessage, setCallStartTime,
   } = useConferenceStore()
 
   // Send join-request data message to all connected participants (host)
@@ -60,6 +60,7 @@ export function useConferenceLogic() {
     const handleConnected = async () => {
       if (role === 'host') {
         setStatus('in-room')
+        setCallStartTime(Date.now())
         await publishTracks()
       } else {
         // Participant joins waiting room
@@ -153,6 +154,7 @@ export function useConferenceLogic() {
       const perms = localParticipant.permissions
       if (perms?.canPublish && role !== 'host') {
         setStatus('in-room')
+        setCallStartTime(Date.now())
         await publishTracks()
         toast.success('You have been admitted to the meeting!')
       }

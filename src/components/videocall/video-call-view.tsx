@@ -9,6 +9,7 @@ import { VideoControls } from './video-controls'
 import { VideoChat } from './video-chat'
 import { VideoLobby } from './video-lobby'
 import { CallStatus } from './call-status'
+import { VideoInvitePanel } from './video-invite-panel'
 import { useVideoStore } from '@/store/use-video-store'
 import { Video } from 'lucide-react'
 
@@ -17,6 +18,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   const {
     callStatus, callStartTime, setCallDuration, resetCall,
     isChatOpen, setChatOpen,
+    isInviteOpen, setInviteOpen,
     pendingCall, setPendingCall,
   } = useVideoStore()
 
@@ -169,7 +171,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
               </div>
 
               <AnimatePresence>
-                {isChatOpen && (
+                {(isChatOpen || isInviteOpen) && (
                   <motion.div
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: 320 }}
@@ -178,7 +180,12 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
                     className="shrink-0 overflow-hidden h-full"
                   >
                     <div className="w-80 h-full">
-                      <VideoChat onClose={() => setChatOpen(false)} />
+                      {isChatOpen && (
+                        <VideoChat onClose={() => setChatOpen(false)} />
+                      )}
+                      {isInviteOpen && !isChatOpen && (
+                        <VideoInvitePanel onClose={() => setInviteOpen(false)} />
+                      )}
                     </div>
                   </motion.div>
                 )}

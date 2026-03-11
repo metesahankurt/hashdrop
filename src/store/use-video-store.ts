@@ -40,6 +40,10 @@ interface VideoState {
   // Password
   callPasswordHash: string | null
 
+  // Invite panel
+  isInviteOpen: boolean
+  callInviteUrl: string | null
+
   // Peer usernames (for tile labels)
   peerUsernames: Map<string, string>
 
@@ -72,6 +76,10 @@ interface VideoState {
   // Password actions
   setCallPasswordHash: (hash: string | null) => void
 
+  // Invite panel actions
+  setInviteOpen: (open: boolean) => void
+  setCallInviteUrl: (url: string | null) => void
+
   // Peer username actions
   addPeerUsername: (peerId: string, username: string) => void
   removePeerUsername: (peerId: string) => void
@@ -103,6 +111,8 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   isChatOpen: false,
 
   callPasswordHash: null,
+  isInviteOpen: false,
+  callInviteUrl: null,
   peerUsernames: new Map(),
   pendingCall: null,
 
@@ -192,6 +202,8 @@ export const useVideoStore = create<VideoState>((set, get) => ({
   },
 
   setCallPasswordHash: (hash) => set({ callPasswordHash: hash }),
+  setInviteOpen: (open) => set({ isInviteOpen: open }),
+  setCallInviteUrl: (url) => set({ callInviteUrl: url }),
 
   addPeerUsername: (peerId, username) => {
     const m = new Map(get().peerUsernames)
@@ -233,6 +245,8 @@ export const useVideoStore = create<VideoState>((set, get) => ({
       unreadCount: 0,
       isChatOpen: false,
       callPasswordHash: null,
+      isInviteOpen: false,
+      callInviteUrl: null,
       peerUsernames: new Map(),
     })
   },

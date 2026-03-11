@@ -10,6 +10,7 @@ import { ConferenceChat } from './conference-chat'
 import { ConferenceParticipants } from './conference-participants'
 import { ConferenceAdmitPanel } from './conference-admit-panel'
 import { ConferenceWaiting } from './conference-waiting'
+import { ConferenceInvitePanel } from './conference-invite-panel'
 import { AudioRenderer } from './conference-audio'
 
 interface ConferenceRoomProps {
@@ -22,9 +23,20 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
 
   const {
     status, role, waitingParticipants,
-    isChatOpen, isParticipantsOpen,
-    setChatOpen, setParticipantsOpen,
+    isChatOpen, isParticipantsOpen, isInviteOpen,
+    setChatOpen, setParticipantsOpen, setInviteOpen,
+    callStartTime, setCallDuration,
   } = useConferenceStore()
+
+  // Call duration timer
+  useEffect(() => {
+    if (!callStartTime) return
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - callStartTime) / 1000)
+      setCallDuration(elapsed)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [callStartTime, setCallDuration])
 
   // Prevent body scroll
   useEffect(() => {
@@ -55,6 +67,8 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
     )
   }
 
+  const hasSidePanel = isChatOpen || isParticipantsOpen || isInviteOpen
+
   return (
     <>
       <AudioRenderer />
@@ -76,7 +90,7 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
 
             {/* Side panels */}
             <AnimatePresence>
-              {(isChatOpen || isParticipantsOpen) && (
+              {hasSidePanel && (
                 <motion.div
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: 320 }}
@@ -90,6 +104,9 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
                     )}
                     {isParticipantsOpen && !isChatOpen && (
                       <ConferenceParticipants onClose={() => setParticipantsOpen(false)} />
+                    )}
+                    {isInviteOpen && !isChatOpen && !isParticipantsOpen && (
+                      <ConferenceInvitePanel onClose={() => setInviteOpen(false)} />
                     )}
                   </div>
                 </motion.div>

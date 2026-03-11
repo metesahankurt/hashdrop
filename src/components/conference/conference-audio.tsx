@@ -3,10 +3,12 @@
 import { useEffect } from 'react'
 import { useRoomContext } from '@livekit/components-react'
 import { Track, RoomEvent } from 'livekit-client'
+import { useConferenceStore } from '@/store/use-conference-store'
 
-// Attaches remote audio tracks to the DOM for playback
+// Attaches remote audio tracks to the DOM for playback, respects speaker mute
 export function AudioRenderer() {
   const room = useRoomContext()
+  const { isSpeakerMuted } = useConferenceStore()
 
   useEffect(() => {
     if (!room) return
@@ -15,7 +17,10 @@ export function AudioRenderer() {
       room.remoteParticipants.forEach((participant) => {
         participant.audioTrackPublications.forEach((pub) => {
           if (pub.track && !pub.isMuted) {
-            pub.track.attach()
+            const elements = pub.track.attachedElements
+            if (elements.length === 0) {
+              pub.track.attach()
+            }
           }
         })
       })
@@ -31,6 +36,20 @@ export function AudioRenderer() {
       room.off(RoomEvent.TrackUnsubscribed, handleTrack)
     }
   }, [room])
+
+  // Apply speaker mute/unmute to all attached audio elements
+  useEffect(() => {
+    if (!room) return
+    room.remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((pub) => {
+        if (pub.track) {
+          pub.track.attachedElements.forEach((el) => {
+            ;(el as HTMLMediaElement).muted = isSpeakerMuted
+          })
+        }
+      })
+    })
+  }, [room, isSpeakerMuted])
 
   return null
 }

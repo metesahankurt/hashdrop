@@ -8,13 +8,21 @@ import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useVideoStore } from '@/store/use-video-store'
 import { useChatRoomStore } from '@/store/use-chat-room-store'
+import { useConferenceStore } from '@/store/use-conference-store'
 
 export function MinimalHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
   const { fullReset, peer, conn } = useWarpStore()
   const resetCall = useVideoStore((s) => s.resetCall)
+  const conferenceStatus = useConferenceStore((s) => s.status)
   const router = useRouter()
   const pathname = usePathname()
+
+  // Hide navbar when inside a conference room or waiting room
+  const isConferenceFullscreen =
+    conferenceStatus === 'in-room' || conferenceStatus === 'waiting'
+
+  if (isConferenceFullscreen) return null
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 8)

@@ -5,8 +5,9 @@ import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, ArrowRight, Copy, Check, Clock,
-  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, ShieldCheck
+  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, ShieldCheck, QrCode
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
@@ -248,6 +249,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
   const { messages, participants, dataConnections, addMessage } = useChatRoomStore()
   const [input, setInput] = useState('')
   const [copied, setCopied] = useState(false)
+  const [showQr, setShowQr] = useState(false)
   const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -380,8 +382,20 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                     <span>Share</span>
                   </button>
                 )}
+                <button
+                  onClick={() => setShowQr(!showQr)}
+                  className={`glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg ${showQr ? 'text-primary border-primary/30' : ''}`}
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">QR</span>
+                </button>
               </div>
             </div>
+            {showQr && (
+              <div className="flex justify-center p-3 bg-white rounded-xl mt-1">
+                <QRCodeSVG value={buildInviteUrl()} size={140} />
+              </div>
+            )}
           </div>
 
           {/* Expiry */}
