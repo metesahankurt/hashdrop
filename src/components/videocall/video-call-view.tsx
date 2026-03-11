@@ -156,88 +156,92 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
     resetCall()
   }, [pendingCall, setPendingCall, resetCall])
 
-  if (isInCall) {
-    return (
-      <div className="fixed left-0 right-0 bottom-0 top-20 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-4 md:pb-6">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-7xl mx-auto h-full flex flex-col gap-3">
-          <CallStatus />
+  return (
+    <>
+      {isInCall && (
+        <div className="fixed left-0 right-0 bottom-0 top-20 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-4 md:pb-6 bg-background">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-7xl mx-auto h-full flex flex-col gap-3">
+            <CallStatus />
 
-          <div className="flex-1 min-h-0 flex gap-3 items-stretch">
-            <div className="flex-1 min-w-0 min-h-0">
-              <VideoDisplay />
+            <div className="flex-1 min-h-0 flex gap-3 items-stretch">
+              <div className="flex-1 min-w-0 min-h-0">
+                <VideoDisplay />
+              </div>
+
+              <AnimatePresence>
+                {isChatOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 320 }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="shrink-0 overflow-hidden h-full"
+                  >
+                    <div className="w-80 h-full">
+                      <VideoChat onClose={() => setChatOpen(false)} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <AnimatePresence>
-              {isChatOpen && (
-                <motion.div
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 320 }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.25 }}
-                  className="shrink-0 overflow-hidden h-full"
-                >
-                  <div className="w-80 h-full">
-                    <VideoChat onClose={() => setChatOpen(false)} />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div className="glass-card rounded-2xl p-4 shrink-0">
+              <VideoControls
+                onEndCall={handleEndCall}
+                onToggleChat={() => setChatOpen(!isChatOpen)}
+              />
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      <div className={isInCall ? "hidden" : "min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10"}>
+        <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col justify-center gap-8 md:gap-12">
+          {/* Lobby — incoming call waiting for user confirmation */}
+          <AnimatePresence mode="wait">
+            {isRinging && (
+              <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <VideoLobby onJoin={handleLobbyJoin} onDecline={handleLobbyDecline} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Pre-call connection UI - explicitly always rendered to keep logic active */}
+          <div className={isPostCall ? "hidden" : "w-full space-y-4"}>
+            {isPreCall && (
+              <>
+                <VideoDisplay />
+                <div className="glass-card rounded-2xl p-3">
+                  <VideoControls preCall />
+                </div>
+              </>
+            )}
+            <div className={isPreCall ? "" : "hidden"}>
+              <VideoConnection initialAction={initialAction} />
+            </div>
           </div>
 
-          <div className="glass-card rounded-2xl p-4 shrink-0">
-            <VideoControls
-              onEndCall={handleEndCall}
-              onToggleChat={() => setChatOpen(!isChatOpen)}
-            />
-          </div>
-        </motion.div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 py-16 md:py-20 relative z-10">
-      <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col justify-center gap-8 md:gap-12">
-        {/* Lobby — incoming call waiting for user confirmation */}
-        <AnimatePresence mode="wait">
-          {isRinging && (
-            <motion.div key="lobby" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <VideoLobby onJoin={handleLobbyJoin} onDecline={handleLobbyDecline} />
+          {/* Post-call */}
+          {isPostCall && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-6">
+              <div className="w-16 h-16 rounded-full bg-white/5 border border-border flex items-center justify-center mx-auto">
+                <Video className="w-8 h-8 text-muted" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold text-foreground">
+                  {callStatus === 'ended' ? 'Call Ended' : 'Connection Failed'}
+                </h2>
+                <p className="text-sm text-muted">
+                  {callStatus === 'ended' ? 'Your video call has ended.' : 'Could not establish a connection. Please try again.'}
+                </p>
+              </div>
+              <button onClick={handleEndCall} className="glass-btn-primary px-6 py-3 rounded-xl text-sm">
+                Start New Call
+              </button>
             </motion.div>
           )}
-        </AnimatePresence>
-
-        {/* Pre-call connection UI */}
-        {isPreCall && (
-          <div className="w-full space-y-4">
-            <VideoDisplay />
-            <div className="glass-card rounded-2xl p-3">
-              <VideoControls preCall />
-            </div>
-            <VideoConnection initialAction={initialAction} />
-          </div>
-        )}
-
-        {/* Post-call */}
-        {isPostCall && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center space-y-6">
-            <div className="w-16 h-16 rounded-full bg-white/5 border border-border flex items-center justify-center mx-auto">
-              <Video className="w-8 h-8 text-muted" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-foreground">
-                {callStatus === 'ended' ? 'Call Ended' : 'Connection Failed'}
-              </h2>
-              <p className="text-sm text-muted">
-                {callStatus === 'ended' ? 'Your video call has ended.' : 'Could not establish a connection. Please try again.'}
-              </p>
-            </div>
-            <button onClick={handleEndCall} className="glass-btn-primary px-6 py-3 rounded-xl text-sm">
-              Start New Call
-            </button>
-          </motion.div>
-        )}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

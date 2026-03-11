@@ -16,7 +16,7 @@ import type { MediaConnection, DataConnection } from 'peerjs'
 import { useSearchParams } from 'next/navigation'
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000
-const MAX_PEERS = 4
+const MAX_PEERS = 5
 
 async function hashPassword(password: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(password)
@@ -229,7 +229,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       if (connectedRef.done || !mountedRef.current) return false
       if (!call.peerConnection) return false
       connectedRef.done = true
-      console.log(`[VideoCall] ${side} (${remotePeerId}): CONNECTED via ${reason}!`)
+      console.log(`[VideoCall][DEBUG] ${side} (${remotePeerId}): CONNECTED via ${reason}!`)
       rebuildRemoteStreamsForPeer(remotePeerId, call.peerConnection)
       addMediaConnection(remotePeerId, call)
       setCallStatus('connected')
@@ -263,6 +263,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     }, timeoutMs) : null
 
     call.on('stream', (remoteStream) => {
+      console.log(`[VideoCall][DEBUG] ${side} (${remotePeerId}): stream received from remote`)
       if (callTimeout) clearTimeout(callTimeout)
       if (connectedRef.done || !mountedRef.current) return
       connectedRef.done = true
@@ -279,7 +280,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     // so poll until it's available
     const setupPcHandlers = (pc: RTCPeerConnection) => {
       pc.ontrack = (event) => {
-        console.log(`[VideoCall] ${side} (${remotePeerId}) ontrack:`, event.track.kind)
+        console.log(`[VideoCall][DEBUG] ${side} (${remotePeerId}) ontrack:`, event.track.kind)
         // Always rebuild remote streams when tracks change (screen share start/stop)
         rebuildRemoteStreamsForPeer(remotePeerId, pc)
         // Also finalize initial connection if not yet done
@@ -287,6 +288,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       }
       pc.oniceconnectionstatechange = () => {
         const state = pc.iceConnectionState
+        console.log(`[VideoCall][DEBUG] ${side} (${remotePeerId}) ICE connection state changed to: ${state}`)
         if (state === 'connected' || state === 'completed') {
           if (tryFinalize() && callTimeout) clearTimeout(callTimeout)
         } else if (state === 'failed' || state === 'closed') {
@@ -380,7 +382,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         newPeer.on('open', (id) => {
           clearTimeout(connectionTimeout)
           if (!mountedRef.current) return
-          console.log('[VideoCall] Connected to signaling server:', id)
+          console.log(`[VideoCall][DEBUG] Connected to signaling server with ID:`, id)
           setPeer(newPeer)
           setCallStatus('ready')
 
@@ -397,9 +399,19 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
 
         // Incoming media calls — store for lobby confirmation
         newPeer.on('call', (call) => {
-          if (!mountedRef.current) return
+          console.log(`[VideoCall][DEBUG] Received incoming call attempt from peer: ${call.peer}`)
+          if (!mountedRef.current) {
+            console.warn(`[VideoCall][DEBUG] Ignoring incoming call because component is unmounted!`)
+            return
+          }
           const { mediaConnections } = useVideoStore.getState()
-          if (mediaConnections.size >= MAX_PEERS) { call.close(); return }
+          if (mediaConnections.size >= MAX_PEERS) {
+            console.warn(`[VideoCall][DEBUG] Conference is full (${mediaConnections.size}/${MAX_PEERS}). Rejecting call from ${call.peer}.`)
+            call.close();
+            toast.error('Call rejected: Room is full')
+            return
+          }
+          console.log(`[VideoCall][DEBUG] Setting call status to ringing for peer: ${call.peer}`)
           // Attach event handlers now so stream/close/error work post-answer
           attachCallHandlers(call, call.peer, 'RECEIVER')
           // Store call for lobby — user must click Join to answer()
@@ -477,12 +489,15 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     let attempt = 0
 
     const attemptCall = () => {
-      if (!mountedRef.current || !peer || peer.destroyed) return
+      if (!mountedRef.current || !peer || peer.destroyed) {
+        console.warn(`[VideoCall][DEBUG] Cannot attempt call, peer is destroyed or unmounted.`)
+        return
+      }
       const { callStatus: currentStatus } = useVideoStore.getState()
       if (currentStatus === 'connected') return // already connected from previous attempt
 
       attempt++
-      console.log(`[VideoCall] Call attempt ${attempt}/${MAX_CALL_ATTEMPTS} to ${targetId}`)
+      console.log(`[VideoCall][DEBUG] Call attempt ${attempt}/${MAX_CALL_ATTEMPTS} to target: ${targetId}`)
 
       // Open data channel (for auth + chat)
       const dataConn = peer.connect(targetId, { reliable: true })
