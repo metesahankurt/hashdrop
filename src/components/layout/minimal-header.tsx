@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { HamburgerMenu } from './hamburger-menu'
-import { Send, Video, MessageSquare } from 'lucide-react'
+import { Send, Video, MessageSquare, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useVideoStore } from '@/store/use-video-store'
@@ -18,12 +18,7 @@ export function MinimalHeader() {
   const router = useRouter()
   const pathname = usePathname()
 
-  // Hide navbar when inside a conference room or waiting room
-  const isConferenceFullscreen =
-    conferenceStatus === 'in-room' || conferenceStatus === 'waiting'
-
-  if (isConferenceFullscreen) return null
-
+  // ALL hooks must be called before any conditional return
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 8)
     onScroll()
@@ -31,10 +26,14 @@ export function MinimalHeader() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // Hide navbar when inside a conference room or waiting room
+  const isConferenceFullscreen =
+    conferenceStatus === 'in-room' || conferenceStatus === 'waiting'
+
+  if (isConferenceFullscreen) return null
+
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
-
-    // Clean up all connections before going home
     if (conn) conn.close()
     if (peer) peer.destroy()
     fullReset()
@@ -43,8 +42,7 @@ export function MinimalHeader() {
     router.push('/')
   }
 
-  const handleModeSwitch = (mode: 'transfer' | 'videocall' | 'chatroom') => {
-    // All three features use dedicated routes
+  const handleModeSwitch = (mode: 'transfer' | 'videocall' | 'chatroom' | 'conference') => {
     if (mode === 'transfer') {
       if (conn) conn.close()
       if (peer) peer.destroy()
@@ -62,15 +60,20 @@ export function MinimalHeader() {
       router.push('/chatroom')
       return
     }
+    if (mode === 'conference') {
+      router.push('/conference')
+      return
+    }
   }
 
-  // Determine active mode from pathname
   const activeMode = pathname?.startsWith('/transfer')
     ? 'transfer'
     : pathname?.startsWith('/videocall')
     ? 'videocall'
     : pathname?.startsWith('/chatroom')
     ? 'chatroom'
+    : pathname?.startsWith('/conference')
+    ? 'conference'
     : null
 
   return (
@@ -95,11 +98,11 @@ export function MinimalHeader() {
           </Link>
         </div>
 
-        {/* Center Navigation Tabs - Absolute centered */}
-        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 glass-card rounded-lg px-1 py-1 z-10 w-max max-w-[50vw] sm:max-w-none justify-center">
+        {/* Center Navigation Tabs */}
+        <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-0.5 sm:gap-1 glass-card rounded-lg px-1 py-1 z-10 w-max max-w-[70vw] sm:max-w-none justify-center">
           <button
             onClick={() => handleModeSwitch('transfer')}
-            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeMode === 'transfer'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
@@ -110,7 +113,7 @@ export function MinimalHeader() {
           </button>
           <button
             onClick={() => handleModeSwitch('videocall')}
-            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeMode === 'videocall'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
@@ -121,7 +124,7 @@ export function MinimalHeader() {
           </button>
           <button
             onClick={() => handleModeSwitch('chatroom')}
-            className={`flex items-center gap-2 px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeMode === 'chatroom'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
@@ -129,6 +132,17 @@ export function MinimalHeader() {
           >
             <MessageSquare className="w-4 h-4 shrink-0" />
             <span className="hidden lg:inline">Chat Room</span>
+          </button>
+          <button
+            onClick={() => handleModeSwitch('conference')}
+            className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeMode === 'conference'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted hover:text-foreground hover:bg-white/5'
+            }`}
+          >
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="hidden lg:inline">Conference</span>
           </button>
         </nav>
 
