@@ -10,6 +10,9 @@ export interface RoomMessage {
   timestamp: number
   isLocal: boolean
   isSystem?: boolean
+  fileUrl?: string
+  fileName?: string
+  fileMime?: string
 }
 
 interface ChatRoomState {

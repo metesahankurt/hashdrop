@@ -21,6 +21,9 @@ export interface ConferenceChatMessage {
   fromLabel: string
   text: string
   timestamp: number
+  fileUrl?: string
+  fileName?: string
+  fileMime?: string
 }
 
 interface ConferenceState {

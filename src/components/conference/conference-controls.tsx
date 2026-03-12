@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react'
 import { useRoomContext, useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Video, VideoOff, Monitor, MonitorOff,
-  MessageSquare, Users, PhoneOff, Volume2, VolumeOff, Link2, Settings,
+  MessageSquare, Users, PhoneOff, Volume2, VolumeOff, Link2, Settings, RefreshCw,
 } from 'lucide-react'
 import { useConferenceStore } from '@/store/use-conference-store'
 import { ConferenceDeviceSettings } from './conference-device-settings'
@@ -62,6 +62,19 @@ export function ConferenceControls({ onLeave }: ConferenceControlsProps) {
     }
   }, [localParticipant, isScreenSharing, setScreenSharing])
 
+  const switchScreenSource = useCallback(async () => {
+    if (!localParticipant) return
+    try {
+      await localParticipant.setScreenShareEnabled(false)
+      setScreenSharing(false)
+      await new Promise(r => setTimeout(r, 200))
+      await localParticipant.setScreenShareEnabled(true)
+      setScreenSharing(true)
+    } catch {
+      setScreenSharing(false)
+    }
+  }, [localParticipant, setScreenSharing])
+
   const participantCount = room.numParticipants
 
   return (
@@ -107,6 +120,14 @@ export function ConferenceControls({ onLeave }: ConferenceControlsProps) {
           icon={isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
           title={isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
         />
+        {isScreenSharing && (
+          <CtrlBtn
+            onClick={switchScreenSource}
+            active={false}
+            icon={<RefreshCw className="w-4 h-4" />}
+            title="Switch screen source (brief interruption)"
+          />
+        )}
 
         {/* End call */}
         <button

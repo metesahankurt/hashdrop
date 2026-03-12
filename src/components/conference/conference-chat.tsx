@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useLocalParticipant } from '@livekit/components-react'
-import { Send, X } from 'lucide-react'
+import { Send, X, Paperclip, Loader2 } from 'lucide-react'
 import { useConferenceStore } from '@/store/use-conference-store'
+import { toast } from 'sonner'
 import { clsx } from 'clsx'
 
 export function ConferenceChat({ onClose }: { onClose: () => void }) {
   const [draft, setDraft] = useState('')
+  const [isSending, setIsSending] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { localParticipant } = useLocalParticipant()
   const { chatMessages, username, addChatMessage } = useConferenceStore()
 
@@ -31,6 +34,59 @@ export function ConferenceChat({ onClose }: { onClose: () => void }) {
         timestamp: Date.now(),
       })
     } catch { /* ignore */ }
+  }
+
+  const sendFile = async (file: File) => {
+    if (!localParticipant) return
+    const MAX = 5 * 1024 * 1024
+    if (file.size > MAX) {
+      toast.error('File too large (max 5MB)')
+      return
+    }
+    setIsSending(true)
+    const fileId = crypto.randomUUID()
+    const CHUNK_BYTES = 9000
+    const totalChunks = Math.ceil(file.size / CHUNK_BYTES)
+
+    const enc = (obj: unknown) => new TextEncoder().encode(JSON.stringify(obj))
+
+    try {
+      await localParticipant.publishData(
+        enc({ type: 'file-start', fileId, filename: file.name, mimeType: file.type || 'application/octet-stream', totalChunks, totalSize: file.size, sender: username || 'You' }),
+        { reliable: true }
+      )
+
+      for (let i = 0; i < totalChunks; i++) {
+        const slice = file.slice(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES)
+        const ab = await slice.arrayBuffer()
+        const bytes = new Uint8Array(ab)
+        let binary = ''
+        for (let j = 0; j < bytes.byteLength; j++) binary += String.fromCharCode(bytes[j])
+        const b64 = btoa(binary)
+        await localParticipant.publishData(enc({ type: 'file-chunk', fileId, index: i, data: b64 }), { reliable: true })
+      }
+
+      await localParticipant.publishData(enc({ type: 'file-end', fileId }), { reliable: true })
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        addChatMessage({
+          id: `file-${fileId}-local`,
+          from: 'local',
+          fromLabel: username || 'You',
+          text: `📎 ${file.name}`,
+          timestamp: Date.now(),
+          fileUrl: reader.result as string,
+          fileName: file.name,
+          fileMime: file.type || 'application/octet-stream',
+        })
+      }
+      reader.readAsDataURL(file)
+    } catch {
+      // silent
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleKey = (e: React.KeyboardEvent) => {
@@ -65,6 +121,23 @@ export function ConferenceChat({ onClose }: { onClose: () => void }) {
               )}
             >
               {msg.text}
+              {msg.fileUrl && msg.fileMime?.startsWith('image/') && (
+                <img
+                  src={msg.fileUrl}
+                  alt={msg.fileName}
+                  className="mt-1 max-w-[200px] max-h-[200px] rounded-lg object-contain cursor-pointer"
+                  onClick={() => window.open(msg.fileUrl, '_blank')}
+                />
+              )}
+              {msg.fileUrl && !msg.fileMime?.startsWith('image/') && (
+                <a
+                  href={msg.fileUrl}
+                  download={msg.fileName}
+                  className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                >
+                  <Paperclip className="w-3 h-3" />{msg.fileName}
+                </a>
+              )}
             </div>
           </div>
         ))}
@@ -73,6 +146,17 @@ export function ConferenceChat({ onClose }: { onClose: () => void }) {
 
       <div className="px-3 py-3 border-t border-white/8 flex gap-2">
         <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,.pdf,.doc,.docx,.zip,.txt"
+          className="hidden"
+          onChange={e => {
+            const f = e.target.files?.[0]
+            if (f) sendFile(f)
+            e.target.value = ''
+          }}
+        />
+        <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKey}
@@ -80,6 +164,14 @@ export function ConferenceChat({ onClose }: { onClose: () => void }) {
           className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-primary/50"
           style={{ fontSize: '16px' }}
         />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isSending}
+          className="p-2 rounded-xl bg-white/5 border border-white/10 text-muted hover:text-foreground hover:bg-white/10 transition-colors disabled:opacity-40"
+          title="Attach file"
+        >
+          {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+        </button>
         <button
           onClick={send}
           disabled={!draft.trim()}

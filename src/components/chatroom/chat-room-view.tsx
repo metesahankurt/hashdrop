@@ -5,7 +5,7 @@ import Peer from 'peerjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, ArrowRight, Copy, Check, Clock,
-  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, ShieldCheck, QrCode
+  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, ShieldCheck, QrCode, Paperclip
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
@@ -270,8 +270,10 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
   const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
+  const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const participantList = useMemo(() => Array.from(participants.entries()), [participants])
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -305,6 +307,55 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
     dataConnections.forEach(conn => { try { conn.send({ type: 'chat', payload: { ...msg, isLocal: false } }) } catch { /* ignore */ } })
     setInput('')
   }, [input, username, addMessage, dataConnections])
+
+  const sendFileToRoom = useCallback(async (file: File) => {
+    const MAX = 5 * 1024 * 1024
+    if (file.size > MAX) {
+      toast.error('File too large (max 5MB)')
+      return
+    }
+    setIsSending(true)
+    const fileId = crypto.randomUUID()
+    const CHUNK_BYTES = 9000
+    const totalChunks = Math.ceil(file.size / CHUNK_BYTES)
+
+    try {
+      const startMsg = { type: 'file-start', fileId, filename: file.name, mimeType: file.type || 'application/octet-stream', totalChunks, totalSize: file.size, sender: username }
+      dataConnections.forEach(conn => { try { conn.send(startMsg) } catch { /* ignore */ } })
+
+      for (let i = 0; i < totalChunks; i++) {
+        const slice = file.slice(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES)
+        const ab = await slice.arrayBuffer()
+        const bytes = new Uint8Array(ab)
+        let binary = ''
+        for (let j = 0; j < bytes.byteLength; j++) binary += String.fromCharCode(bytes[j])
+        const b64 = btoa(binary)
+        const chunkMsg = { type: 'file-chunk', fileId, index: i, data: b64 }
+        dataConnections.forEach(conn => { try { conn.send(chunkMsg) } catch { /* ignore */ } })
+      }
+
+      dataConnections.forEach(conn => { try { conn.send({ type: 'file-end', fileId }) } catch { /* ignore */ } })
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        addMessage({
+          id: `file-${fileId}-local`,
+          from: username,
+          text: `📎 ${file.name}`,
+          timestamp: Date.now(),
+          isLocal: true,
+          fileUrl: reader.result as string,
+          fileName: file.name,
+          fileMime: file.type || 'application/octet-stream',
+        })
+      }
+      reader.readAsDataURL(file)
+    } catch {
+      toast.error('Failed to send file')
+    } finally {
+      setIsSending(false)
+    }
+  }, [username, addMessage, dataConnections])
 
   const handleLeave = () => {
     dataConnections.forEach(conn => { try { conn.send({ type: 'leave', username }) } catch { /* ignore */ } })
@@ -465,7 +516,29 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                 className={`flex flex-col ${msg.isLocal ? 'items-end' : 'items-start'}`}>
                 {!msg.isLocal && <span className="text-xs text-primary font-medium ml-1 mb-0.5">{msg.from}</span>}
                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${msg.isLocal ? 'bg-primary/20 border border-primary/30 rounded-br-sm' : 'glass-card rounded-bl-sm'}`}>
-                  <LinkText text={msg.text} />
+                  {msg.fileUrl ? (
+                    <>
+                      <span>{msg.text}</span>
+                      {msg.fileMime?.startsWith('image/') ? (
+                        <img
+                          src={msg.fileUrl}
+                          alt={msg.fileName}
+                          className="mt-1 max-w-[200px] max-h-[160px] object-contain rounded-lg cursor-pointer"
+                          onClick={() => window.open(msg.fileUrl, '_blank')}
+                        />
+                      ) : (
+                        <a
+                          href={msg.fileUrl}
+                          download={msg.fileName}
+                          className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        >
+                          <Paperclip className="w-3 h-3" />{msg.fileName}
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <LinkText text={msg.text} />
+                  )}
                 </div>
                 <span className="text-[10px] text-muted mt-0.5 px-1">{formatTime(msg.timestamp)}</span>
               </motion.div>
@@ -478,6 +551,17 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
       {/* ── Input ──────────────────────────────────────── */}
       <div className="glass-card border-t-0 rounded-b-2xl px-3 py-3 shrink-0">
         <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,.pdf,.doc,.docx,.zip,.txt"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0]
+              if (f) sendFileToRoom(f)
+              e.target.value = ''
+            }}
+          />
           <input
             ref={inputRef}
             type="text"
@@ -492,6 +576,15 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             style={{ fontSize: '16px' }}
             onFocus={handleInputFocus}
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSending}
+            className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40"
+            title="Attach file"
+          >
+            {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+          </button>
           <button
             type="button"
             onClick={sendMessage}
@@ -579,6 +672,16 @@ export function ChatRoomView({
     addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
   }, [addMessage])
 
+  type PendingChatFile = {
+    chunks: string[]
+    totalChunks: number
+    filename: string
+    mimeType: string
+    sender: string
+    receivedCount: number
+  }
+  const pendingFilesRef = useRef<Map<string, PendingChatFile>>(new Map())
+
   const handleLeave = useCallback(() => {
     resetRoom()
     setStep('password-setup')
@@ -588,7 +691,7 @@ export function ChatRoomView({
 
   const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null, announcedRef: React.MutableRefObject<Set<string>>) => {
     conn.on('data', (raw) => {
-      const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][]; peerId?: string }
+      const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][]; peerId?: string } & Record<string, unknown>
 
       if (data.type === 'chat' && data.payload) {
         addMessage({ ...data.payload, isLocal: false })
@@ -629,9 +732,52 @@ export function ChatRoomView({
         addSystemMsg(`${data.username} left the room`)
       } else if (data.type === 'announce-broadcast' && data.username && data.peerId) {
         const { participants: existingP2 } = useChatRoomStore.getState()
-        if (!existingP2.has(data.peerId)) {
-          addParticipant(data.peerId, data.username)
+        if (!existingP2.has(data.peerId as string)) {
+          addParticipant(data.peerId as string, data.username as string)
           addSystemMsg(`${data.username} joined the room`)
+        }
+      } else if (data.type === 'file-start' && data.fileId) {
+        pendingFilesRef.current.set(data.fileId as string, {
+          chunks: new Array(data.totalChunks as number).fill(''),
+          totalChunks: data.totalChunks as number,
+          filename: data.filename as string,
+          mimeType: (data.mimeType as string) || 'application/octet-stream',
+          sender: data.sender as string,
+          receivedCount: 0,
+        })
+        const { peer: lp2, dataConnections: dc2 } = useChatRoomStore.getState()
+        if (lp2?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
+          dc2.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
+        }
+      } else if (data.type === 'file-chunk' && data.fileId) {
+        const pf = pendingFilesRef.current.get(data.fileId as string)
+        if (pf) {
+          pf.chunks[data.index as number] = data.data as string
+          pf.receivedCount++
+        }
+        const { peer: lp3, dataConnections: dc3 } = useChatRoomStore.getState()
+        if (lp3?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
+          dc3.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
+        }
+      } else if (data.type === 'file-end' && data.fileId) {
+        const pf = pendingFilesRef.current.get(data.fileId as string)
+        if (pf && pf.receivedCount >= pf.totalChunks) {
+          const fileUrl = `data:${pf.mimeType};base64,${pf.chunks.join('')}`
+          addMessage({
+            id: `file-${data.fileId as string}`,
+            from: pf.sender,
+            text: `📎 ${pf.filename}`,
+            timestamp: Date.now(),
+            isLocal: false,
+            fileUrl,
+            fileName: pf.filename,
+            fileMime: pf.mimeType,
+          })
+          pendingFilesRef.current.delete(data.fileId as string)
+        }
+        const { peer: lp4, dataConnections: dc4 } = useChatRoomStore.getState()
+        if (lp4?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
+          dc4.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
         }
       } else if (data.type === 'auth') {
         if (localPwdHash) {

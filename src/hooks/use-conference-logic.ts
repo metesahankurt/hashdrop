@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import {
   useRoomContext,
   useLocalParticipant,
@@ -24,6 +24,16 @@ export function useConferenceLogic() {
   const room = useRoomContext()
   const { localParticipant } = useLocalParticipant()
   const participants = useParticipants()
+
+  type PendingFile = {
+    chunks: string[]
+    totalChunks: number
+    filename: string
+    mimeType: string
+    sender: string
+    receivedCount: number
+  }
+  const pendingFilesRef = useRef<Map<string, PendingFile>>(new Map())
 
   const {
     role, username, identity,
@@ -128,6 +138,48 @@ export function useConferenceLogic() {
             text: data.text,
             timestamp: Date.now(),
           })
+        }
+
+        const fd = data as Record<string, unknown>
+
+        if (fd.type === 'file-start' && fd.fileId) {
+          pendingFilesRef.current.set(fd.fileId as string, {
+            chunks: new Array(fd.totalChunks as number).fill(''),
+            totalChunks: fd.totalChunks as number,
+            filename: fd.filename as string,
+            mimeType: fd.mimeType as string,
+            sender: fd.sender as string,
+            receivedCount: 0,
+          })
+        }
+
+        if (fd.type === 'file-chunk' && fd.fileId) {
+          const pf = pendingFilesRef.current.get(fd.fileId as string)
+          if (pf) {
+            pf.chunks[fd.index as number] = fd.data as string
+            pf.receivedCount++
+          }
+        }
+
+        if (fd.type === 'file-end' && fd.fileId) {
+          const pf = pendingFilesRef.current.get(fd.fileId as string)
+          if (pf && pf.receivedCount >= pf.totalChunks) {
+            const fileUrl = `data:${pf.mimeType};base64,${pf.chunks.join('')}`
+            const senderName = participant
+              ? getUsername(participant.metadata, participant.identity)
+              : pf.sender
+            addChatMessage({
+              id: `file-${fd.fileId as string}`,
+              from: 'remote',
+              fromLabel: senderName,
+              text: `📎 ${pf.filename}`,
+              timestamp: Date.now(),
+              fileUrl,
+              fileName: pf.filename,
+              fileMime: pf.mimeType,
+            })
+            pendingFilesRef.current.delete(fd.fileId as string)
+          }
         }
       } catch { /* ignore parse errors */ }
     }
