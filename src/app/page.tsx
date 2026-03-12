@@ -17,9 +17,7 @@ function HomeRedirect() {
       const from = searchParams.get('from')
       const fromParam = from ? `&from=${encodeURIComponent(from)}` : ''
 
-      if (mode === 'videocall') {
-        router.replace(`/videocall?code=${code}${fromParam}`)
-      } else if (mode === 'chatroom') {
+      if (mode === 'chatroom') {
         router.replace(`/chatroom?code=${code}${fromParam}`)
       } else {
         router.replace(`/transfer?code=${code}${fromParam}`)

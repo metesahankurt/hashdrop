@@ -3,17 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { HamburgerMenu } from './hamburger-menu'
-import { Send, Video, MessageSquare, Users } from 'lucide-react'
+import { Send, MessageSquare, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useWarpStore } from '@/store/use-warp-store'
-import { useVideoStore } from '@/store/use-video-store'
 import { useChatRoomStore } from '@/store/use-chat-room-store'
 import { useConferenceStore } from '@/store/use-conference-store'
 
 export function MinimalHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
   const { fullReset, peer, conn } = useWarpStore()
-  const { resetCall, callStatus } = useVideoStore()
   const conferenceStatus = useConferenceStore((s) => s.status)
   const router = useRouter()
   const pathname = usePathname()
@@ -26,38 +24,29 @@ export function MinimalHeader() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Hide navbar when conference or video call is in fullscreen mode
+  // Hide navbar when conference is in fullscreen mode
   const isConferenceFullscreen =
     conferenceStatus === 'connecting' ||
     conferenceStatus === 'in-room' ||
     conferenceStatus === 'waiting'
 
-  const isVideoCallFullscreen =
-    callStatus === 'connected' || callStatus === 'waiting'
-
-  if (isConferenceFullscreen || isVideoCallFullscreen) return null
+  if (isConferenceFullscreen) return null
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()
     if (conn) conn.close()
     if (peer) peer.destroy()
     fullReset()
-    resetCall()
     useChatRoomStore.getState().resetRoom()
     router.push('/')
   }
 
-  const handleModeSwitch = (mode: 'transfer' | 'videocall' | 'chatroom' | 'conference') => {
+  const handleModeSwitch = (mode: 'transfer' | 'chatroom' | 'conference') => {
     if (mode === 'transfer') {
       if (conn) conn.close()
       if (peer) peer.destroy()
       fullReset()
       router.push('/transfer')
-      return
-    }
-    if (mode === 'videocall') {
-      resetCall()
-      router.push('/videocall')
       return
     }
     if (mode === 'chatroom') {
@@ -73,8 +62,6 @@ export function MinimalHeader() {
 
   const activeMode = pathname?.startsWith('/transfer')
     ? 'transfer'
-    : pathname?.startsWith('/videocall')
-    ? 'videocall'
     : pathname?.startsWith('/chatroom')
     ? 'chatroom'
     : pathname?.startsWith('/conference')
@@ -117,15 +104,15 @@ export function MinimalHeader() {
             <span className="hidden lg:inline">File Transfer</span>
           </button>
           <button
-            onClick={() => handleModeSwitch('videocall')}
+            onClick={() => handleModeSwitch('conference')}
             className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeMode === 'videocall'
+              activeMode === 'conference'
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted hover:text-foreground hover:bg-white/5'
             }`}
           >
-            <Video className="w-4 h-4 shrink-0" />
-            <span className="hidden lg:inline">Video Call</span>
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="hidden lg:inline">Conference</span>
           </button>
           <button
             onClick={() => handleModeSwitch('chatroom')}
@@ -137,17 +124,6 @@ export function MinimalHeader() {
           >
             <MessageSquare className="w-4 h-4 shrink-0" />
             <span className="hidden lg:inline">Chat Room</span>
-          </button>
-          <button
-            onClick={() => handleModeSwitch('conference')}
-            className={`flex items-center gap-2 px-2.5 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeMode === 'conference'
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <Users className="w-4 h-4 shrink-0" />
-            <span className="hidden lg:inline">Conference</span>
           </button>
         </nav>
 
