@@ -184,6 +184,7 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
       const peerId = codeToCallPeerId(displayCode)
       setGeneratedInfo({ displayCode, peerId })
       setCodeExpiry(Date.now() + CODE_EXPIRY_MS)
+      setCallStatus('generating') // Show invite card immediately — don't wait for PeerJS
       const { username: uname } = useUsernameStore.getState()
       const fromParam = uname ? `&from=${encodeURIComponent(uname)}` : ''
       setCallInviteUrl(`https://hashdrop.metesahankurt.cloud?mode=videocall&code=${displayCode}${fromParam}`)
@@ -357,15 +358,25 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
     if (!peerId || peer) return
     const initPeer = async () => {
       try {
-        setCallStatus('generating')
-        const { stream, hasVideo } = await getLocalMediaStreamWithFallback()
-        if (!mountedRef.current) { stopMediaStream(stream); return }
-        setLocalStream(stream)
-        if (!hasVideo) {
-          useVideoStore.getState().toggleCamera() // set isCameraOff = true
-          toast.info('No camera detected. Joining with audio only.')
-        }
+        // Start camera in background — don't block PeerJS connection
+        getLocalMediaStreamWithFallback().then(({ stream, hasVideo }) => {
+          if (!mountedRef.current) { stopMediaStream(stream); return }
+          setLocalStream(stream)
+          if (!hasVideo) {
+            useVideoStore.getState().toggleCamera()
+            toast.info('No camera detected. Joining with audio only.')
+          }
+        }).catch((err) => {
+          if (!mountedRef.current) return
+          const error = err as DOMException
+          if (error.name === 'NO_MEDIA_DEVICES') {
+            toast.info('No camera/mic found. Code is still shareable.')
+          } else if (error.name === 'NotAllowedError') {
+            toast.info('Camera access denied. Code is still shareable.')
+          }
+        })
 
+        // Connect PeerJS immediately (parallel with camera)
         const newPeer = new Peer(peerId, {
           host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
           config: {
@@ -452,15 +463,8 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
         newPeer.on('close', () => console.warn('[VideoCall] Peer CLOSED'))
       } catch (err) {
         if (!mountedRef.current) return
-        console.error('[VideoCall] Media error:', err)
-        const error = err as DOMException
-        if (error.name === 'NO_MEDIA_DEVICES') {
-          toast.error('No camera or microphone found', { description: 'Please connect a media device and try again.' })
-        } else if (error.name === 'NotAllowedError') {
-          toast.error('Camera/microphone access denied', { description: 'Please allow access in your browser settings.' })
-        } else {
-          toast.error('Media device error', { description: 'Could not access camera or microphone.' })
-        }
+        console.error('[VideoCall] PeerJS init error:', err)
+        toast.error('Connection error', { description: 'Could not initialize the call.' })
         setCallStatus('failed')
       }
     }
@@ -610,7 +614,14 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
             <div className="glass-card rounded-2xl p-4 space-y-3 glow-primary">
               {/* Header */}
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted">Your meeting is ready</p>
+                <div className="flex items-center gap-1.5">
+                  {callStatus === 'generating' && (
+                    <Loader2 className="w-3 h-3 text-muted animate-spin" />
+                  )}
+                  <p className="text-xs font-medium text-muted">
+                    {callStatus === 'generating' ? 'Connecting to network...' : 'Your meeting is ready'}
+                  </p>
+                </div>
                 <div className="flex items-center gap-1">
                   {timeLeft !== null && timeLeft > 0 && (
                     <span className="flex items-center gap-1 text-[10px] text-muted">
