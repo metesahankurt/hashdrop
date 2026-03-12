@@ -178,7 +178,7 @@ export function HamburgerMenu() {
                               </div>
                               <div className="flex items-start gap-2 text-xs text-muted">
                                 <Video className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                                <span>Encrypted video calls with optional screen sharing.</span>
+                                <span>Video conferences with waiting room and screen sharing.</span>
                               </div>
                             </div>
                           </div>
@@ -206,9 +206,6 @@ export function HamburgerMenu() {
                             <div className="flex flex-wrap gap-2">
                               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
                                 <Cpu className="w-3 h-3" /> WebRTC
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
-                                <ArrowRight className="w-3 h-3" /> PeerJS
                               </span>
                               <span className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/5 border border-border text-foreground/90">
                                 <Lock className="w-3 h-3" /> E2E Crypto

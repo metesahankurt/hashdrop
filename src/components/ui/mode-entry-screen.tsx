@@ -5,7 +5,7 @@ import { ArrowRight, Plus, LogIn } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface ModeEntryScreenProps {
-  mode: 'transfer' | 'videocall' | 'chatroom' | 'conference'
+  mode: 'transfer' | 'chatroom' | 'conference'
   icon: ReactNode
   onSelect: (action: 'create' | 'join') => void
 }
@@ -15,11 +15,6 @@ const modeConfig = {
     title: 'File Transfer',
     create: { label: 'Send Files', description: 'Generate a code and share files with someone' },
     join: { label: 'Receive Files', description: 'Enter a code to receive files from someone' },
-  },
-  videocall: {
-    title: 'Video Call',
-    create: { label: 'Start a Call', description: 'Create a call room and invite others' },
-    join: { label: 'Join a Call', description: 'Enter a code to join an existing call' },
   },
   chatroom: {
     title: 'Chat Room',

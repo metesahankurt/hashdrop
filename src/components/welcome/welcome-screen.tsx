@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Video, Send, MessageSquare, ArrowRight, Users } from 'lucide-react'
+import { Send, MessageSquare, ArrowRight, Users } from 'lucide-react'
 
 interface CardProps {
   icon: React.ReactNode
@@ -59,21 +59,13 @@ export function WelcomeScreen() {
       </div>
 
       {/* Cards */}
-      <div className="w-full max-w-5xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+      <div className="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
         <FeatureCard
           icon={<Send className="w-6 h-6 text-primary" />}
           title="File Transfer"
           description="Blazing-fast, direct device-to-device file transfer. No cloud, no limits."
           cta="Start transfer"
           onClick={() => router.push('/transfer')}
-        />
-
-        <FeatureCard
-          icon={<Video className="w-6 h-6 text-primary" />}
-          title="Video Call"
-          description="End-to-end encrypted video calls. Supports up to 5 participants."
-          cta="Start a call"
-          onClick={() => router.push('/videocall')}
         />
 
         <FeatureCard

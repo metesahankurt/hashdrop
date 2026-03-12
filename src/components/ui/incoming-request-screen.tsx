@@ -1,10 +1,10 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Send, Video, MessageSquare, Check, X, User, ArrowRight, Lock } from 'lucide-react'
+import { Send, MessageSquare, Check, X, User, ArrowRight, Lock } from 'lucide-react'
 
 interface IncomingRequestScreenProps {
-  mode: 'transfer' | 'videocall' | 'chatroom'
+  mode: 'transfer' | 'chatroom'
   from: string | null
   code: string
   hasPassword?: boolean
@@ -21,15 +21,6 @@ const modeConfig = {
     borderColor: 'border-primary/20',
     actionText: 'Receive File',
     description: 'is inviting you to a file transfer.',
-  },
-  videocall: {
-    icon: Video,
-    label: 'Video Call',
-    color: 'text-primary',
-    bgColor: 'bg-primary/10',
-    borderColor: 'border-primary/20',
-    actionText: 'Join Call',
-    description: 'is inviting you to a video call.',
   },
   chatroom: {
     icon: MessageSquare,
