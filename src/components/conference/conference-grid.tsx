@@ -128,7 +128,7 @@ export function ConferenceGrid() {
   }[cols] || 'grid-cols-6'
 
   return (
-    <div className={clsx('grid gap-2 h-full content-start overflow-y-auto', gridClass)}>
+    <div className={clsx('grid gap-2 h-full auto-rows-fr', gridClass)}>
       {participants.map((p) => (
         <ConferenceTile
           key={p.identity}

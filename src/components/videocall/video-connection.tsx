@@ -667,19 +667,22 @@ export function VideoConnection({ initialAction }: { initialAction?: 'create' | 
                 ) : null}
               </div>
 
-              {/* Start Call — enter room solo, invite others from inside */}
-              {callStatus === 'ready' && (
-                <button
-                  onClick={() => {
-                    setCallStatus('waiting')
-                    setCallStartTime(Date.now())
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl glass-btn-primary text-sm font-semibold transition-all"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  Start Call
-                </button>
-              )}
+              {/* Start Call — passive while generating, active when ready */}
+              <button
+                disabled={callStatus !== 'ready'}
+                onClick={() => {
+                  setCallStatus('waiting')
+                  setCallStartTime(Date.now())
+                }}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all duration-500 ${
+                  callStatus === 'ready'
+                    ? 'glass-btn-primary'
+                    : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed'
+                }`}
+              >
+                <ArrowRight className={`w-4 h-4 transition-all duration-500 ${callStatus === 'ready' ? 'opacity-100' : 'opacity-30'}`} />
+                Start Call
+              </button>
             </div>
 
             {/* Password protection toggle */}

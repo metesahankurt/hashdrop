@@ -13,7 +13,7 @@ import { useConferenceStore } from '@/store/use-conference-store'
 export function MinimalHeader() {
   const [isScrolled, setIsScrolled] = useState(false)
   const { fullReset, peer, conn } = useWarpStore()
-  const resetCall = useVideoStore((s) => s.resetCall)
+  const { resetCall, callStatus } = useVideoStore()
   const conferenceStatus = useConferenceStore((s) => s.status)
   const router = useRouter()
   const pathname = usePathname()
@@ -26,13 +26,16 @@ export function MinimalHeader() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Hide navbar when conference is connecting or active (fullscreen UI)
+  // Hide navbar when conference or video call is in fullscreen mode
   const isConferenceFullscreen =
     conferenceStatus === 'connecting' ||
     conferenceStatus === 'in-room' ||
     conferenceStatus === 'waiting'
 
-  if (isConferenceFullscreen) return null
+  const isVideoCallFullscreen =
+    callStatus === 'connected' || callStatus === 'waiting'
+
+  if (isConferenceFullscreen || isVideoCallFullscreen) return null
 
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault()

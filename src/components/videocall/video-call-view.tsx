@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { VideoConnection } from './video-connection'
 import { VideoDisplay } from './video-display'
@@ -14,7 +13,6 @@ import { useVideoStore } from '@/store/use-video-store'
 import { Video, WifiOff, RefreshCw } from 'lucide-react'
 
 export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'join' }) {
-  const router = useRouter()
   const {
     callStatus, callStartTime, setCallDuration, resetCall,
     isChatOpen, setChatOpen,
@@ -36,8 +34,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   }, [resetCall])
 
   const handleEndCall = () => {
-    resetCall()
-    router.push('/')
+    window.location.href = '/'
   }
 
   const isInCall = callStatus === 'connected' || callStatus === 'waiting'
@@ -164,7 +161,7 @@ export function VideoCallView({ initialAction }: { initialAction?: 'create' | 'j
   return (
     <>
       {isInCall && (
-        <div className="fixed left-0 right-0 bottom-0 top-20 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-4 md:pb-6 bg-background">
+        <div className="fixed inset-0 flex flex-col z-40 overflow-hidden px-4 md:px-8 pt-4 pb-4 md:pt-6 md:pb-6 bg-background">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-7xl mx-auto h-full flex flex-col gap-3">
             <CallStatus />
 

@@ -67,10 +67,10 @@ export function ConferenceTile({ participant, isLocal, size = 'normal', isActive
   return (
     <div
       className={clsx(
-        'relative rounded-xl overflow-hidden bg-white/5 border flex items-center justify-center group cursor-pointer transition-all duration-200',
+        'relative rounded-xl overflow-hidden bg-white/5 border flex items-center justify-center group cursor-pointer transition-all duration-200 min-h-0',
         isActiveSpeaker ? 'border-primary ring-2 ring-primary/40' : 'border-white/10',
         isPinned && 'border-yellow-400/60 ring-2 ring-yellow-400/30',
-        size === 'large' ? 'aspect-video' : size === 'small' ? 'aspect-video' : 'aspect-video'
+        size === 'small' ? 'aspect-video' : 'w-full h-full'
       )}
       onClick={() => setPinnedIdentity(isPinned ? null : participant.identity)}
     >
