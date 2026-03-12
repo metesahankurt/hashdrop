@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Participant, Track } from 'livekit-client'
+import { Participant, Track, RoomEvent } from 'livekit-client'
 import { useTracks } from '@livekit/components-react'
 import { MicOff, Pin, UserRound } from 'lucide-react'
 import { useConferenceStore } from '@/store/use-conference-store'
@@ -30,12 +30,24 @@ export function ConferenceTile({ participant, isLocal, size = 'normal', isActive
   const isPinned = pinnedIdentity === participant.identity
   const { username, role } = getParticipantInfo(participant)
 
+  // Listen to mute/unmute and publish/unpublish events so camera toggles update immediately
   const allTracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
-    { updateOnlyOn: [] }
+    {
+      updateOnlyOn: [
+        RoomEvent.TrackMuted,
+        RoomEvent.TrackUnmuted,
+        RoomEvent.TrackPublished,
+        RoomEvent.TrackUnpublished,
+        RoomEvent.LocalTrackPublished,
+        RoomEvent.LocalTrackUnpublished,
+        RoomEvent.ParticipantConnected,
+        RoomEvent.ParticipantDisconnected,
+      ],
+    }
   )
 
   const participantCamTrack = allTracks.find(
@@ -45,23 +57,44 @@ export function ConferenceTile({ participant, isLocal, size = 'normal', isActive
     (t) => t.participant.identity === participant.identity && t.source === Track.Source.ScreenShare
   )
 
-  const cameraEnabled = !!(participantCamTrack?.publication?.isMuted === false && participantCamTrack?.publication?.track)
+  const cameraEnabled = !!(
+    participantCamTrack?.publication?.isMuted === false &&
+    participantCamTrack?.publication?.track
+  )
   const micMuted = participant.isMicrophoneEnabled === false
 
-  // Attach camera track to video element
+  // Attach/detach camera track — re-runs when track reference, trackSid, or enabled state changes
   useEffect(() => {
     const track = participantCamTrack?.publication?.track
-    if (!track || !videoRef.current) return
-    track.attach(videoRef.current)
-    return () => { track.detach(videoRef.current!) }
-  }, [participantCamTrack?.publication?.track])
+    const el = videoRef.current
+    if (!el) return
+
+    if (!track || !cameraEnabled) {
+      // Clear srcObject to avoid gray/frozen frame
+      el.srcObject = null
+      return
+    }
+
+    track.attach(el)
+    el.play().catch(() => {})
+
+    return () => {
+      try { track.detach(el) } catch { /* ignore */ }
+      el.srcObject = null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    participantCamTrack?.publication?.track,
+    participantCamTrack?.publication?.trackSid,
+    cameraEnabled,
+  ])
 
   // Attach screen track
   useEffect(() => {
     const track = participantScreenTrack?.publication?.track
     if (!track || !screenRef.current) return
     track.attach(screenRef.current)
-    return () => { track.detach(screenRef.current!) }
+    return () => { try { track.detach(screenRef.current!) } catch { /* ignore */ } }
   }, [participantScreenTrack?.publication?.track])
 
   return (
@@ -74,19 +107,21 @@ export function ConferenceTile({ participant, isLocal, size = 'normal', isActive
       )}
       onClick={() => setPinnedIdentity(isPinned ? null : participant.identity)}
     >
-      {/* Video */}
-      {cameraEnabled ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal}
-          className={clsx(
-            'w-full h-full object-cover',
-            isLocal && 'scale-x-[-1]'
-          )}
-        />
-      ) : (
+      {/* Video (always rendered; hidden when camera off to preserve ref) */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocal}
+        className={clsx(
+          'w-full h-full object-cover',
+          isLocal && 'scale-x-[-1]',
+          !cameraEnabled && 'hidden'
+        )}
+      />
+
+      {/* Avatar when camera is off */}
+      {!cameraEnabled && (
         <div className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
             <UserRound className="w-6 h-6 text-muted" />
@@ -110,7 +145,6 @@ export function ConferenceTile({ participant, isLocal, size = 'normal', isActive
               Host
             </span>
           )}
-
           <span className="text-[11px] text-white/90 truncate">{isLocal ? `${username} (You)` : username}</span>
         </div>
         {micMuted && <MicOff className="w-3 h-3 text-red-400 shrink-0" />}

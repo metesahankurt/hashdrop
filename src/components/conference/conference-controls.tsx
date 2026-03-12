@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useRoomContext, useLocalParticipant } from '@livekit/components-react'
 import {
   Mic, MicOff, Video, VideoOff, Monitor, MonitorOff,
-  MessageSquare, Users, PhoneOff, Volume2, VolumeOff, Link2,
+  MessageSquare, Users, PhoneOff, Volume2, VolumeOff, Link2, Settings,
 } from 'lucide-react'
 import { useConferenceStore } from '@/store/use-conference-store'
+import { ConferenceDeviceSettings } from './conference-device-settings'
 import { clsx } from 'clsx'
 import { toast } from 'sonner'
 
@@ -26,6 +27,7 @@ function formatDuration(seconds: number) {
 export function ConferenceControls({ onLeave }: ConferenceControlsProps) {
   const room = useRoomContext()
   const { localParticipant } = useLocalParticipant()
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false)
 
   const {
     isMicMuted, isCameraOff, isScreenSharing, isSpeakerMuted,
@@ -63,6 +65,7 @@ export function ConferenceControls({ onLeave }: ConferenceControlsProps) {
   const participantCount = room.numParticipants
 
   return (
+    <>
     <div className="flex items-center justify-between gap-2 flex-wrap">
       {/* Left: timer + participant count */}
       <div className="flex items-center gap-3 text-xs text-muted min-w-0">
@@ -156,8 +159,20 @@ export function ConferenceControls({ onLeave }: ConferenceControlsProps) {
           icon={<Link2 className="w-5 h-5" />}
           title="Meeting Info"
         />
+        <CtrlBtn
+          onClick={() => setShowDeviceSettings(true)}
+          active={showDeviceSettings}
+          icon={<Settings className="w-5 h-5" />}
+          title="Device Settings"
+        />
       </div>
     </div>
+
+    {/* Device settings modal */}
+    {showDeviceSettings && (
+      <ConferenceDeviceSettings onClose={() => setShowDeviceSettings(false)} />
+    )}
+  </>
   )
 }
 
