@@ -17,7 +17,7 @@ import type { DataConnection } from 'peerjs'
 import { useSearchParams } from 'next/navigation'
 
 const CODE_EXPIRY_MS = 10 * 60 * 1000
-const MAX_PEERS = 4
+const MAX_PEERS = 49
 const BASE_URL = 'https://hashdrop.metesahankurt.cloud'
 
 async function hashPassword(password: string): Promise<string> {

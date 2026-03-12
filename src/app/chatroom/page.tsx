@@ -14,7 +14,7 @@ function ChatRoomPage() {
         icon={<MessageSquare className="w-7 h-7 text-primary" />}
         title="Chat"
         highlight="Room"
-        description="Instant encrypted messaging rooms. Up to 5 people."
+        description="Instant encrypted messaging rooms. Up to 50 people."
         hint="You will appear in the chat room with this name"
         mode="chatroom"
       >

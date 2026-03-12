@@ -80,7 +80,7 @@ export function WelcomeScreen() {
         <FeatureCard
           icon={<MessageSquare className="w-6 h-6 text-primary" />}
           title="Chat Room"
-          description="Encrypted instant messaging rooms. Up to 5 people. No camera, text only."
+          description="Encrypted instant messaging rooms. Up to 50 people. No camera, text only."
           cta="Enter room"
           onClick={() => router.push('/chatroom')}
         />
