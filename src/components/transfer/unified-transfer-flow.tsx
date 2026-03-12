@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload, Send, ArrowRight, QrCode, ScanLine,
   Copy, Check, Clock, RefreshCw, AlertCircle,
-  FileUp, Users, Zap
+  FileUp, Users, Zap, Link
 } from 'lucide-react'
 import { useWarpStore } from '@/store/use-warp-store'
 import { useDropzone } from 'react-dropzone'
@@ -47,6 +47,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
   const [currentStep, setCurrentStep] = useState<FlowStep>(initialStep)
   const [isCopied, setIsCopied] = useState(false)
+  const [isLinkCopied, setIsLinkCopied] = useState(false)
   const [showQR, setShowQR] = useState(false)
 
   const [inputCode, setInputCode] = useState<string>(codeFromUrl)
@@ -254,6 +255,22 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
       setTimeout(() => setIsCopied(false), 2000)
     }).catch(() => {
       toast.error('Failed to copy code')
+    })
+  }
+
+  // Copy share link handler
+  const handleCopyLink = () => {
+    if (!displayCode) return
+    const origin = window.location.origin
+    const username = localStorage.getItem('hd_username') || 'Someone'
+    const link = `${origin}/transfer?code=${displayCode}&from=${encodeURIComponent(username)}`
+    navigator.clipboard.writeText(link).then(() => {
+      setIsLinkCopied(true)
+      toast.success('Link copied! Send it to your recipient.')
+      addLog('Share link copied to clipboard', 'info')
+      setTimeout(() => setIsLinkCopied(false), 2000)
+    }).catch(() => {
+      toast.error('Failed to copy link')
     })
   }
 
@@ -602,33 +619,55 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               </div>
 
               {/* Actions */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
+                {/* Copy Link — primary action */}
                 <button
-                  onClick={() => handleCopyCode(displayCode || '')}
+                  onClick={handleCopyLink}
                   disabled={!displayCode}
-                  className="glass-btn-primary flex items-center justify-center gap-2 disabled:opacity-50 py-3 md:py-4 touch-manipulation active:scale-95 transition-transform"
+                  className="glass-btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 py-3 md:py-4 touch-manipulation active:scale-95 transition-transform"
                 >
-                  {isCopied ? (
+                  {isLinkCopied ? (
                     <>
                       <Check className="w-4 h-4" />
-                      Copied!
+                      Link Copied!
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4" />
-                      Copy Code
+                      <Link className="w-4 h-4" />
+                      Copy Share Link
                     </>
                   )}
                 </button>
 
-                <button
-                  onClick={() => setShowQR(true)}
-                  disabled={!displayCode}
-                  className="glass-btn flex items-center justify-center gap-2 disabled:opacity-50 py-3 md:py-4 touch-manipulation active:scale-95 transition-transform"
-                >
-                  <QrCode className="w-4 h-4" />
-                  Show QR
-                </button>
+                {/* Secondary: Copy Code + Show QR */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleCopyCode(displayCode || '')}
+                    disabled={!displayCode}
+                    className="glass-btn flex items-center justify-center gap-2 disabled:opacity-50 py-3 touch-manipulation active:scale-95 transition-transform"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy Code
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setShowQR(true)}
+                    disabled={!displayCode}
+                    className="glass-btn flex items-center justify-center gap-2 disabled:opacity-50 py-3 touch-manipulation active:scale-95 transition-transform"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Show QR
+                  </button>
+                </div>
               </div>
 
               {/* Refresh code */}
