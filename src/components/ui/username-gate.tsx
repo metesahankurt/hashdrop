@@ -130,6 +130,8 @@ export function WithUsernameGate({ icon, title, highlight, description, hint, mo
     skipToJoin ? 'join' : skipEntry ? 'create' : null
   )
 
+  console.log('[WithUsernameGate] State:', { savedUsername, confirmedUsername, selectedAction, skipEntry, skipToJoin })
+
   const showEntryScreen = mode && confirmedUsername && !selectedAction
 
   return (

@@ -48,14 +48,17 @@ function JoinRoomContent({ code }: { code: string }) {
       skipEntry
       skipToJoin
     >
-      {(username) => (
-        <ChatRoomView
-          initialUsername={username}
-          initialAction="join"
-          incomingCode={code}
-          incomingHasPassword={hasPassword}
-        />
-      )}
+      {(username) => {
+        console.log('[JoinRoomContent] Username from WithUsernameGate:', username)
+        return (
+          <ChatRoomView
+            initialUsername={username}
+            initialAction="join"
+            incomingCode={code}
+            incomingHasPassword={hasPassword}
+          />
+        )
+      }}
     </WithUsernameGate>
   )
 }

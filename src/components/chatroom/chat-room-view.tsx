@@ -155,11 +155,15 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
   // (if password-protected, we need the user to enter the password first)
   // IMPORTANT: Also wait for username to be available before auto-joining
   useEffect(() => {
-    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin && username) {
-      console.log('[JoinScreen] Auto-joining with username:', username)
+    const trimmedUsername = username?.trim()
+    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin && trimmedUsername) {
+      console.log('[JoinScreen] Auto-joining with username:', trimmedUsername, 'code:', initialCode)
       setHasAttemptedAutoJoin(true)
       setIsJoining(true)
-      onJoin(initialCode, null)
+      // Use a small delay to ensure all state is properly synchronized
+      setTimeout(() => {
+        onJoin(initialCode, null)
+      }, 100)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCode, incomingHasPassword, hasAttemptedAutoJoin, username])
@@ -641,14 +645,20 @@ export function ChatRoomView({
     addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
   } = useChatRoomStore()
 
-  // Set username immediately (synchronously) if provided
+  // Set username immediately (synchronously) if provided - MUST happen before any other logic
+  // This is critical for auto-join functionality when accessing via invite link
+  if (initialUsername && !username) {
+    console.log('[ChatRoom] Setting initial username synchronously:', initialUsername)
+    setUsername(initialUsername)
+  }
+
+  // Cleanup on unmount
   useEffect(() => {
-    if (initialUsername && !username) {
-      console.log('[ChatRoom] Setting initial username:', initialUsername)
-      setUsername(initialUsername)
+    return () => {
+      console.log('[ChatRoom] Component unmounting, username was:', username)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialUsername])
+  }, [])
 
   // Determine initial step:
   // - If we have an incoming code → go straight to join
@@ -821,8 +831,17 @@ export function ChatRoomView({
 
   // Create room: called after password setup (hash may be null for no password)
   const createRoom = useCallback(async (code: string, pwdHash: string | null) => {
-    const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
-    if (!currentUsername) return
+    // Ensure username is set in store before creating room
+    let currentUsername = useChatRoomStore.getState().username
+    if (!currentUsername && initialUsername) {
+      console.log('[ChatRoom] Username not in store for room creation, setting from initialUsername:', initialUsername)
+      setUsername(initialUsername)
+      currentUsername = initialUsername
+    }
+    if (!currentUsername) {
+      console.error('[ChatRoom] No username found for room creation, aborting')
+      return
+    }
 
     setIsCreating(true)
     setRoomCode(code)
@@ -869,14 +888,32 @@ export function ChatRoomView({
     })
 
     newPeer.on('connection', (conn) => {
+      console.log('[ChatRoom] Incoming connection from:', conn.peer)
       const { dataConnections } = useChatRoomStore.getState()
-      if (dataConnections.size >= MAX_PEERS) { conn.close(); return }
+      if (dataConnections.size >= MAX_PEERS) {
+        console.warn('[ChatRoom] Max peers reached, rejecting connection')
+        conn.close()
+        return
+      }
+
+      // Monitor ICE for incoming connections
+      if (conn.peerConnection) {
+        conn.peerConnection.oniceconnectionstatechange = () => {
+          console.log('[ChatRoom Host] ICE state for', conn.peer, ':', conn.peerConnection?.iceConnectionState)
+        }
+      }
+
       conn.on('open', () => {
+        console.log('[ChatRoom] Incoming connection opened from:', conn.peer)
         setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef)
         conn.send({ type: 'announce', username: currentUsername })
         const { participants: p } = useChatRoomStore.getState()
         conn.send({ type: 'participants', participants: Array.from(p.entries()) })
         announcedRef.current.add(conn.peer)
+      })
+
+      conn.on('error', (err) => {
+        console.error('[ChatRoom] Incoming connection error:', err)
       })
     })
 
@@ -897,7 +934,14 @@ export function ChatRoomView({
 
   // Join an existing room
   const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
-    const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
+    // Ensure username is set in store before attempting to join
+    let currentUsername = useChatRoomStore.getState().username
+    if (!currentUsername && initialUsername) {
+      console.log('[ChatRoom] Username not in store, setting from initialUsername:', initialUsername)
+      setUsername(initialUsername)
+      currentUsername = initialUsername
+    }
+
     console.log('[ChatRoom] handleJoin called:', { code, hasPassword: !!pwdHash, username: currentUsername })
 
     if (!currentUsername) {
@@ -964,17 +1008,64 @@ export function ChatRoomView({
       setPeer(newPeer)
 
       console.log('[ChatRoom] Attempting to connect to host:', hostPeerId)
-      const conn = newPeer.connect(hostPeerId, { reliable: true })
 
-      // Data connection timeout - if connection not opened in 15 seconds, fail
+      // Check if host peer exists before connecting
+      console.log('[ChatRoom] Checking if host peer is online...')
+
+      const conn = newPeer.connect(hostPeerId, {
+        reliable: true,
+        serialization: 'json',
+        metadata: { username: currentUsername }
+      })
+
+      console.log('[ChatRoom] Connection object created:', {
+        peer: conn.peer,
+        open: conn.open,
+        type: conn.type
+      })
+
+      // Data connection timeout - if connection not opened in 20 seconds, fail
       const dataConnTimeout = setTimeout(() => {
-        console.error('[ChatRoom] Data connection timeout after 15 seconds')
-        toast.error('Could not establish connection to the room host.')
+        console.error('[ChatRoom] Data connection timeout after 20 seconds')
+        console.error('[ChatRoom] Connection state:', {
+          open: conn.open,
+          peerConnection: conn.peerConnection?.connectionState,
+          iceConnectionState: conn.peerConnection?.iceConnectionState,
+          iceGatheringState: conn.peerConnection?.iceGatheringState
+        })
+        toast.error('Could not establish connection to the room host. The room may be closed.')
         setStatus('failed')
         setStep('join')
         clearTimeout(connectionTimeout)
         try { conn.close() } catch { /* ignore */ }
-      }, 15000)
+      }, 20000)
+
+      // Monitor ICE connection state (peerConnection might not be ready immediately)
+      setTimeout(() => {
+        if (conn.peerConnection) {
+          console.log('[ChatRoom] Setting up ICE monitoring')
+          conn.peerConnection.oniceconnectionstatechange = () => {
+            console.log('[ChatRoom] ICE connection state:', conn.peerConnection?.iceConnectionState)
+            // If ICE fails, provide more info
+            if (conn.peerConnection?.iceConnectionState === 'failed') {
+              console.error('[ChatRoom] ICE connection failed - peer-to-peer connection could not be established')
+            }
+          }
+          conn.peerConnection.onicegatheringstatechange = () => {
+            console.log('[ChatRoom] ICE gathering state:', conn.peerConnection?.iceGatheringState)
+          }
+          conn.peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+              console.log('[ChatRoom] ICE candidate:', event.candidate.type, event.candidate.protocol)
+            } else {
+              console.log('[ChatRoom] ICE gathering complete')
+            }
+          }
+          console.log('[ChatRoom] Current connection state:', conn.peerConnection.connectionState)
+        } else {
+          console.warn('[ChatRoom] peerConnection not available yet')
+        }
+      }, 100)
 
       conn.on('open', () => {
         console.log('[ChatRoom] Data connection opened successfully')
