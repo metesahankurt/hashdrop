@@ -25,7 +25,11 @@ import QRCode from "react-native-qrcode-svg";
 import { useWarpStore } from "@/store/use-warp-store";
 import { isValidCode } from "@/lib/code-generator";
 import { formatFileSize, getFileIcon } from "@/lib/file-utils";
-import { useWarpPeer, type ReceivedFile } from "@/mobile/hooks/use-warp-peer";
+import {
+  useWarpPeer,
+  sendViaRelay,
+  type ReceivedFile,
+} from "@/mobile/hooks/use-warp-peer";
 import { AppShell } from "@/mobile/components/AppShell";
 import { PrimaryButton } from "@/mobile/components/PrimaryButton";
 import { TextField } from "@/mobile/components/TextField";
@@ -108,16 +112,39 @@ function TransferHub({ onSelect }: { onSelect: (m: TransferMode) => void }) {
 // Send screen
 // ---------------------------------------------------------------------------
 function TransferSendView({ onBack }: { onBack: () => void }) {
-  const { files, displayCode, status, progress, codeExpiry } = useWarpStore();
+  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setError, setDisplayCode, setCodeExpiry, addLog } = useWarpStore();
   const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } =
     useWarpPeer();
 
   const [timeLeft, setTimeLeft] = useState("");
+  // "p2p" = WebRTC PeerJS, "relay" = HTTP relay (works in Expo Go)
+  const [transport, setTransport] = useState<"p2p" | "relay" | "detecting">("detecting");
 
-  // Auto-init sender when this view mounts
+  // Auto-init sender — if WebRTC fails (status becomes "error"), fall back to relay
   useEffect(() => {
-    initSender();
-    return () => cleanup();
+    let cancelled = false;
+    async function init() {
+      await initSender();
+      if (cancelled) return;
+
+      // initSender catches errors internally; check resulting status
+      const afterStatus = useWarpStore.getState().status;
+      if (afterStatus === "error") {
+        // WebRTC not available → relay mode
+        const { generateSecureCode } = await import("@/lib/code-generator");
+        const code = generateSecureCode();
+        setDisplayCode(code);
+        setCodeExpiry(Date.now() + 5 * 60 * 1000);
+        setStatus("waiting");
+        setError(null);
+        addLog(`Relay mode. Code: ${code}`, "info");
+        setTransport("relay");
+      } else {
+        setTransport("p2p");
+      }
+    }
+    init();
+    return () => { cancelled = true; cleanup(); };
   }, []);
 
   // Expiry countdown
@@ -137,6 +164,26 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     return () => clearInterval(interval);
   }, [codeExpiry]);
 
+  const handleSend = async () => {
+    if (transport === "relay") {
+      setStatus("transferring");
+      try {
+        await sendViaRelay(files, displayCode, (sent, total) => {
+          addLog(`Uploaded ${sent}/${total}`, "info");
+        });
+        setStatus("completed");
+        addLog("Files ready for download on the web app!", "success");
+      } catch (err: any) {
+        setError(err.message);
+        setStatus("error");
+        addLog(`Relay upload failed: ${err.message}`, "error");
+      }
+    } else {
+      sendFiles();
+    }
+  };
+
+  const isRelay = transport === "relay";
   const statusColor = getStatusColor(status);
 
   return (
@@ -209,16 +256,35 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         )}
       </View>
 
-      {/* Send button — only visible when connected and files selected */}
-      {status === "connected" && files.length > 0 && (
-        <PrimaryButton onPress={sendFiles}>Send files</PrimaryButton>
+      {/* Relay badge */}
+      {isRelay && status === "waiting" && (
+        <View style={styles.relayBadge}>
+          <Text style={styles.relayBadgeText}>
+            Cloud Relay — open this code on the web app to download
+          </Text>
+        </View>
+      )}
+
+      {/* Send button */}
+      {((transport === "p2p" && status === "connected") || (isRelay && status === "waiting")) && files.length > 0 && (
+        <PrimaryButton onPress={handleSend}>
+          {isRelay ? "Upload & share" : "Send files"}
+        </PrimaryButton>
       )}
 
       {/* Success */}
       {status === "completed" && (
         <View style={styles.successRow}>
           <CheckIcon size={18} stroke="#3ecf8e" strokeWidth={2.2} />
-          <Text style={styles.successText}>Files delivered successfully!</Text>
+          <Text style={styles.successText}>
+            {isRelay ? "Files ready — open the web app and enter the code!" : "Files delivered!"}
+          </Text>
+        </View>
+      )}
+
+      {status === "error" && error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorBoxText}>{error}</Text>
         </View>
       )}
 
@@ -235,7 +301,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
 // Receive screen
 // ---------------------------------------------------------------------------
 function TransferReceiveView({ onBack }: { onBack: () => void }) {
-  const { status, progress } = useWarpStore();
+  const { status, progress, error } = useWarpStore();
   const { connect, saveFile, copyToClipboard, cleanup, receivedFiles } =
     useWarpPeer();
 
@@ -333,6 +399,12 @@ function TransferReceiveView({ onBack }: { onBack: () => void }) {
               <ReceiveIcon size={16} stroke="#3ecf8e" strokeWidth={2.2} />
             </TouchableOpacity>
           ))}
+        </View>
+      )}
+
+      {status === "error" && error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorBoxText}>{error}</Text>
         </View>
       )}
 
@@ -749,8 +821,35 @@ const styles = StyleSheet.create({
   },
   successText: { fontSize: 14, color: "#3ecf8e", fontWeight: "500" },
 
+  // Relay badge
+  relayBadge: {
+    borderRadius: 12,
+    backgroundColor: "rgba(165,180,252,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(165,180,252,0.2)",
+    padding: 12,
+  },
+  relayBadgeText: {
+    color: "#a5b4fc",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+
   // Error
   errorText: { fontSize: 12, color: "#f87171" },
+  errorBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.2)",
+    backgroundColor: "rgba(248,113,113,0.06)",
+    padding: 14,
+  },
+  errorBoxText: {
+    color: "#f87171",
+    fontSize: 13,
+    lineHeight: 20,
+  },
 
   // Divider
   divider: { flexDirection: "row", alignItems: "center", gap: 10 },

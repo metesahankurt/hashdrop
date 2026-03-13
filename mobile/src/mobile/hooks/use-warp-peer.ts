@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import { File, Paths } from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
 
@@ -16,6 +16,12 @@ import {
 const PEERJS_HOST = "hashdrop.onrender.com";
 const CODE_EXPIRY_MS = 5 * 60 * 1000;
 
+// Relay base URL — set EXPO_PUBLIC_WEB_URL in .env (e.g. http://192.168.1.x:3000)
+// Falls back to the production Vercel deployment.
+const RELAY_BASE =
+  process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, "") ??
+  "https://hashdrop.vercel.app";
+
 export interface ReceivedFile {
   name: string;
   size: number;
@@ -24,9 +30,17 @@ export interface ReceivedFile {
 }
 
 async function createPeer(peerId: string) {
-  // react-native-webrtc must inject WebRTC globals before PeerJS is imported
-  const { registerGlobals } = await import("react-native-webrtc");
-  registerGlobals();
+  // react-native-webrtc must inject WebRTC globals before PeerJS is imported.
+  // It requires a native module that is NOT available in Expo Go —
+  // a custom dev build is needed: `npx expo run:ios` or `npx expo run:android`.
+  try {
+    const { registerGlobals } = await import("react-native-webrtc");
+    registerGlobals();
+  } catch {
+    throw new Error(
+      "WebRTC is not available in Expo Go.\n\nRun a development build to use file transfer:\n  npx expo run:ios\n  npx expo run:android",
+    );
+  }
   const { default: Peer } = await import("peerjs");
   return new (Peer as any)(peerId, {
     host: PEERJS_HOST,
@@ -43,6 +57,7 @@ export function useWarpPeer() {
     setStatus,
     setProgress,
     setFiles,
+    setError,
     addLog,
     reset,
   } = useWarpStore();
@@ -103,9 +118,10 @@ export function useWarpPeer() {
       });
     } catch (err: any) {
       addLog(`Init failed: ${err.message}`, "error");
+      setError(err.message);
       setStatus("error");
     }
-  }, [cleanup, setDisplayCode, setCodeExpiry, setStatus, addLog]);
+  }, [cleanup, setDisplayCode, setCodeExpiry, setStatus, setError, addLog]);
 
   /** Send the currently selected files over the open connection */
   const sendFiles = useCallback(async () => {
@@ -201,10 +217,11 @@ export function useWarpPeer() {
         });
       } catch (err: any) {
         addLog(`Error: ${err.message}`, "error");
+        setError(err.message);
         setStatus("error");
       }
     },
-    [cleanup, setStatus, setProgress, addLog],
+    [cleanup, setStatus, setProgress, setError, addLog],
   );
 
   /** Text share — sender side */
@@ -308,15 +325,12 @@ export function useWarpPeer() {
 
   const saveFile = useCallback(async (file: ReceivedFile) => {
     const uint8 = new Uint8Array(file.data);
-    let binary = "";
-    for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-    const b64 = btoa(binary);
-    const uri = (FileSystem.documentDirectory ?? "") + file.name;
-    await FileSystem.writeAsStringAsync(uri, b64, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    // File class inherits write/uri from the native FileSystemFile module;
+    // TypeScript doesn't resolve the native class chain so we cast.
+    const fsFile = new File(Paths.cache, file.name) as any;
+    fsFile.write(uint8);
     if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, { mimeType: file.mimeType });
+      await Sharing.shareAsync(fsFile.uri, { mimeType: file.mimeType });
     }
   }, []);
 
@@ -336,5 +350,53 @@ export function useWarpPeer() {
     copyToClipboard,
     cleanup,
     receivedFiles,
+
+    // HTTP relay — works in Expo Go without WebRTC
+    sendViaRelay,
+    checkRelay,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Relay helpers (standalone, no hook context needed)
+// ---------------------------------------------------------------------------
+
+/** Upload selected files to the relay API. Returns the transfer code. */
+export async function sendViaRelay(
+  files: Array<{ name: string; size: number; type: string; uri: string }>,
+  code: string,
+  onProgress?: (sent: number, total: number) => void,
+): Promise<void> {
+  const url = `${RELAY_BASE}/api/relay/${code}`;
+  const formData = new FormData();
+
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    formData.append("file", {
+      uri: f.uri,
+      name: f.name,
+      type: f.type || "application/octet-stream",
+    } as unknown as Blob);
+    onProgress?.(i + 1, files.length);
+  }
+
+  const res = await fetch(url, { method: "POST", body: formData });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Relay upload failed (${res.status}): ${body}`);
+  }
+}
+
+/** Check if files are available on the relay for a given code. */
+export async function checkRelay(
+  code: string,
+): Promise<Array<{ index: number; name: string; mimeType: string; size: number }> | null> {
+  try {
+    const res = await fetch(`${RELAY_BASE}/api/relay/${code.toUpperCase()}`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.files ?? null;
+  } catch {
+    return null;
+  }
 }

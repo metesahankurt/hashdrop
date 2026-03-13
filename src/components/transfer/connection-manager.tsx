@@ -68,6 +68,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   const [autoConnected, setAutoConnected] = useState(false)
   const [canShare, setCanShare] = useState(false)
   const [hasActiveConnection, setHasActiveConnection] = useState(false)
+  // Relay (mobile → web via HTTP)
+  const [relayFiles, setRelayFiles] = useState<Array<{ index: number; name: string; mimeType: string; size: number }> | null>(null)
+  const [relayCode, setRelayCode] = useState<string | null>(null)
 
   // Detect if we're in QR auto-connect mode (opened from QR code URL)
   // Use both searchParams hook AND window.location as fallback for reliability
@@ -556,7 +559,27 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   }, [peerId, peer, handleConnection, setMyId, setPeer, addLog, hasActiveConnection, refreshCode])
 
 
-  const connect = useCallback((targetCode: string) => {
+  const connect = useCallback(async (targetCode: string) => {
+    const normalized = targetCode.trim().toUpperCase()
+
+    // 1. Check relay first (handles mobile → web transfers via HTTP relay)
+    try {
+      const res = await fetch(`/api/relay/${normalized}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (Array.isArray(json.files) && json.files.length > 0) {
+          setRelayFiles(json.files)
+          setRelayCode(normalized)
+          addLog(`Relay transfer found: ${json.files.length} file(s)`, 'success')
+          toast.success('Files ready to download!', { description: `${json.files.length} file(s) from mobile` })
+          return
+        }
+      }
+    } catch {
+      // relay check failed silently — fall through to PeerJS
+    }
+
+    // 2. Fall back to PeerJS P2P
     if (!peer) {
       toast.error('Initializing connection... Please wait a moment.')
       addLog('Network not ready, please wait', 'warning')
@@ -665,6 +688,47 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   const [showQRScanner, setShowQRScanner] = useState(false)
 
   if (headless) return null
+
+  // Relay download panel — shown when mobile uploaded files via HTTP relay
+  if (relayFiles && relayCode) {
+    return (
+      <div className="w-full flex flex-col items-center gap-4">
+        <div className="glass-card w-full max-w-md p-5 flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-emerald-400 text-sm font-bold uppercase tracking-wider">Mobile Transfer</span>
+          </div>
+          <p className="text-sm text-muted">
+            {relayFiles.length} file{relayFiles.length > 1 ? 's' : ''} ready from the mobile app.
+          </p>
+          <div className="flex flex-col gap-2">
+            {relayFiles.map((f) => (
+              <a
+                key={f.index}
+                href={`/api/relay/${relayCode}?index=${f.index}`}
+                download={f.name}
+                className="glass-btn-primary flex items-center justify-between gap-3 px-4 py-3 text-sm no-underline"
+              >
+                <span className="truncate font-medium">{f.name}</span>
+                <span className="text-xs text-muted whitespace-nowrap">
+                  {(f.size / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </a>
+            ))}
+          </div>
+          <button
+            onClick={async () => {
+              await fetch(`/api/relay/${relayCode}`, { method: 'DELETE' })
+              setRelayFiles(null)
+              setRelayCode(null)
+            }}
+            className="text-xs text-muted hover:text-foreground transition-colors text-center mt-1"
+          >
+            Clear transfer
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full flex flex-col items-center gap-6 md:gap-8">
