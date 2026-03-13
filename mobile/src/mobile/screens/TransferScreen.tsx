@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -112,7 +112,7 @@ function TransferHub({ onSelect }: { onSelect: (m: TransferMode) => void }) {
 // Send screen
 // ---------------------------------------------------------------------------
 function TransferSendView({ onBack }: { onBack: () => void }) {
-  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setError, setDisplayCode, setCodeExpiry, addLog } = useWarpStore();
+  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setError, setDisplayCode, setCodeExpiry, setFiles, addLog } = useWarpStore();
   const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } =
     useWarpPeer();
 
@@ -121,31 +121,33 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   const [transport, setTransport] = useState<"p2p" | "relay" | "detecting">("detecting");
   const [relayCode, setRelayCodeLocal] = useState<string | null>(null);
 
-  // Auto-init sender — if WebRTC fails (status becomes "error"), fall back to relay
+  // Shared init logic — used on mount and on "New transfer"
+  const initWithFallback = useCallback(async () => {
+    setTransport("detecting");
+    setRelayCodeLocal(null);
+    setFiles([]);
+    await initSender();
+
+    const afterStatus = useWarpStore.getState().status;
+    if (afterStatus === "error") {
+      const { generateSecureCode } = await import("@/lib/code-generator");
+      const code = generateSecureCode();
+      setDisplayCode(code);
+      setRelayCodeLocal(code);
+      setCodeExpiry(Date.now() + 5 * 60 * 1000);
+      setStatus("waiting");
+      setError(null);
+      addLog(`Relay mode. Code: ${code}`, "info");
+      setTransport("relay");
+    } else {
+      setTransport("p2p");
+    }
+  }, [initSender, setDisplayCode, setCodeExpiry, setStatus, setError, setFiles, addLog]);
+
+  // Auto-init on mount
   useEffect(() => {
     let cancelled = false;
-    async function init() {
-      await initSender();
-      if (cancelled) return;
-
-      // initSender catches errors internally; check resulting status
-      const afterStatus = useWarpStore.getState().status;
-      if (afterStatus === "error") {
-        // WebRTC not available → relay mode
-        const { generateSecureCode } = await import("@/lib/code-generator");
-        const code = generateSecureCode();
-        setDisplayCode(code);
-        setRelayCodeLocal(code);
-        setCodeExpiry(Date.now() + 5 * 60 * 1000);
-        setStatus("waiting");
-        setError(null);
-        addLog(`Relay mode. Code: ${code}`, "info");
-        setTransport("relay");
-      } else {
-        setTransport("p2p");
-      }
-    }
-    init();
+    initWithFallback().then(() => { if (cancelled) {} });
     return () => { cancelled = true; cleanup(); };
   }, []);
 
@@ -329,7 +331,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
       )}
 
       {(status === "completed" || status === "error") && (
-        <PrimaryButton tone="secondary" onPress={initSender}>
+        <PrimaryButton tone="secondary" onPress={initWithFallback}>
           New transfer
         </PrimaryButton>
       )}
