@@ -17,10 +17,10 @@ const PEERJS_HOST = "hashdrop.onrender.com";
 const CODE_EXPIRY_MS = 5 * 60 * 1000;
 
 // Relay base URL — set EXPO_PUBLIC_WEB_URL in .env (e.g. http://192.168.1.x:3000)
-// Falls back to the production Vercel deployment.
+// Falls back to the production deployment.
 const RELAY_BASE =
   process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, "") ??
-  "https://hashdrop.vercel.app";
+  "https://hashdrop.metesahankurt.cloud";
 
 export interface ReceivedFile {
   name: string;

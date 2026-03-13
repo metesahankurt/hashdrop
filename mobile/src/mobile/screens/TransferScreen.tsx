@@ -305,13 +305,16 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         <PrimaryButton onPress={handleSend}>Send files</PrimaryButton>
       )}
 
-      {/* Relay: waiting for receiver hint */}
+      {/* Relay: manual upload button + hint */}
       {isRelay && status === "waiting" && files.length > 0 && (
-        <View style={styles.relayBadge}>
-          <Text style={styles.relayBadgeText}>
-            Waiting for the recipient to enter the code on the web app…
-          </Text>
-        </View>
+        <>
+          <PrimaryButton onPress={handleSend}>Upload &amp; share</PrimaryButton>
+          <View style={styles.relayBadge}>
+            <Text style={styles.relayBadgeText}>
+              Tap above, then enter the code on the web app to download — or wait for the recipient to enter the code first.
+            </Text>
+          </View>
+        </>
       )}
 
       {/* Success */}
