@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowUpFromLine,
@@ -57,7 +58,7 @@ export function FloatingDock() {
         { bottom: dockBottom, pointerEvents: "box-none" as any },
       ]}
     >
-      <View style={styles.dock}>
+      <BlurView intensity={16} tint="dark" style={styles.dock}>
         <Animated.View style={[styles.indicator, indicatorStyle]} />
         {ITEMS.map((item, index) => (
           <DockItem
@@ -70,7 +71,7 @@ export function FloatingDock() {
             progress={progress}
           />
         ))}
-      </View>
+      </BlurView>
     </View>
   );
 }
@@ -166,15 +167,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    overflow: "hidden",
     paddingHorizontal: DOCK_HORIZONTAL_PADDING,
     paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: "rgba(10,10,10,0.94)",
+    backgroundColor: "rgba(10,10,10,0.62)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.10)",
     shadowColor: "#000000",
     shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.32,
+    shadowOpacity: 0.24,
     shadowRadius: 28,
     elevation: 20,
   },
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
     width: INDICATOR_WIDTH,
     height: 46,
     borderRadius: 999,
-    backgroundColor: "rgba(62,207,142,0.14)",
+    backgroundColor: "rgba(62,207,142,0.16)",
   },
   item: {
     height: 46,

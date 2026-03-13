@@ -1,4 +1,4 @@
-{
+b{
   "name": "hashdrop-mobile",
   "version": "1.1.0",
   "main": "expo-router/entry",
@@ -14,6 +14,7 @@
     "expo": "^54.0.0",
     "expo-constants": "~18.0.13",
     "expo-linking": "~8.0.11",
+    "expo-blur": "~15.0.7",
     "expo-router": "~6.0.23",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
