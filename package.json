@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "mobile:start": "npm --prefix mobile run start",
+    "mobile:android": "npm --prefix mobile run android",
+    "mobile:ios": "npm --prefix mobile run ios",
+    "mobile:typecheck": "npm --prefix mobile run typecheck",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

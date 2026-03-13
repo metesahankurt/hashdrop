@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "HashDrop",
+    "slug": "hashdrop",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "icon": "../public/icon-192.png",
+    "scheme": "hashdrop",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d0d0d",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "../public/hashdrop-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0d0d0d"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hashdrop.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "HashDrop uses camera for QR code scanning and video calls.",
+        "NSMicrophoneUsageDescription": "HashDrop uses microphone for voice and video calls.",
+        "NSLocalNetworkUsageDescription": "HashDrop uses local network for P2P file transfers.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoadsInWebContent": true,
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "../public/icon-192.png",
+        "backgroundColor": "#0d0d0d"
+      },
+      "package": "com.hashdrop.app",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "../public/icon-192.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
