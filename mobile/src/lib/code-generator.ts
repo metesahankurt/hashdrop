@@ -1,5 +1,3 @@
-import * as Crypto from "expo-crypto";
-
 const ADJECTIVES = [
   "Cosmic", "Stellar", "Quantum", "Nebula", "Pulsar",
   "Galaxy", "Meteor", "Comet", "Aurora", "Zenith",
