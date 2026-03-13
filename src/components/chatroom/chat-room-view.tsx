@@ -834,8 +834,27 @@ export function ChatRoomView({
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 1,
-      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          // Public TURN servers for better connectivity
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
+        ],
+        iceTransportPolicy: 'all',
+        iceCandidatePoolSize: 10
+      }
     }
 
     const newPeer = new Peer(peerId, peerConfig)
@@ -900,15 +919,46 @@ export function ChatRoomView({
 
     const peerConfig = {
       host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
-      config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          // Public TURN servers for better connectivity
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
+        ],
+        iceTransportPolicy: 'all',
+        iceCandidatePoolSize: 10
+      }
     }
 
     const newPeer = new Peer(joinerPeerId, peerConfig)
+
+    // Connection timeout - if not connected in 30 seconds, show error
+    const connectionTimeout = setTimeout(() => {
+      if (useChatRoomStore.getState().status !== 'connected') {
+        console.error('[ChatRoom] Connection timeout after 30 seconds')
+        toast.error('Connection timeout. The room may be closed or unreachable.')
+        setStatus('failed')
+        setStep('join')
+        try { newPeer.destroy() } catch { /* ignore */ }
+      }
+    }, 30000)
 
     newPeer.on('open', (id) => {
       console.log('[ChatRoom] Peer opened:', id)
       if (!mountedRef.current) {
         console.warn('[ChatRoom] Component unmounted, aborting')
+        clearTimeout(connectionTimeout)
         return
       }
       setPeer(newPeer)
@@ -916,8 +966,20 @@ export function ChatRoomView({
       console.log('[ChatRoom] Attempting to connect to host:', hostPeerId)
       const conn = newPeer.connect(hostPeerId, { reliable: true })
 
+      // Data connection timeout - if connection not opened in 15 seconds, fail
+      const dataConnTimeout = setTimeout(() => {
+        console.error('[ChatRoom] Data connection timeout after 15 seconds')
+        toast.error('Could not establish connection to the room host.')
+        setStatus('failed')
+        setStep('join')
+        clearTimeout(connectionTimeout)
+        try { conn.close() } catch { /* ignore */ }
+      }, 15000)
+
       conn.on('open', () => {
         console.log('[ChatRoom] Data connection opened successfully')
+        clearTimeout(connectionTimeout)
+        clearTimeout(dataConnTimeout)
         setupConn(conn, hostPeerId, currentUsername, null, announcedRef)
         conn.send({ type: 'auth', hash: pwdHash || '' })
         conn.send({ type: 'announce', username: currentUsername })
@@ -929,18 +991,22 @@ export function ChatRoomView({
 
       conn.on('error', (err) => {
         console.error('[ChatRoom] Data connection error:', err)
-        toast.error('Could not join room. Is the code correct?')
+        clearTimeout(connectionTimeout)
+        clearTimeout(dataConnTimeout)
+        toast.error('Could not join room. The room may be closed.')
         setStatus('failed')
         setStep('join')
       })
 
       conn.on('close', () => {
         console.warn('[ChatRoom] Data connection closed before opening')
+        clearTimeout(dataConnTimeout)
       })
     })
 
     newPeer.on('error', (err) => {
       console.error('[ChatRoom] Peer error:', err)
+      clearTimeout(connectionTimeout)
       toast.error(`Connection error: ${err.type || 'Unknown'}`)
       setStatus('failed')
       setStep('join')
@@ -952,6 +1018,7 @@ export function ChatRoomView({
 
     newPeer.on('close', () => {
       console.warn('[ChatRoom] Peer connection closed')
+      clearTimeout(connectionTimeout)
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
