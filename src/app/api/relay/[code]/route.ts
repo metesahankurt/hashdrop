@@ -1,26 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-// ---------------------------------------------------------------------------
-// In-memory relay store
-// Works on single-instance deployments (Vercel free tier, render.com).
-// For multi-instance production: swap with Vercel KV / Upstash Redis.
-// ---------------------------------------------------------------------------
-
-interface RelayFile {
-  name: string;
-  mimeType: string;
-  size: number;
-  data: Buffer;
-}
-
-interface RelayEntry {
-  files: RelayFile[];
-  expiresAt: number;
-}
-
-// Module-level Map persists across requests within the same server instance.
-const store = new Map<string, RelayEntry>();
-const TTL_MS = 15 * 60 * 1000; // 15 minutes
+import { relayStore as store, RelayEntry, RelayFile, TTL_MS } from "../store";
 
 function sweep() {
   const now = Date.now();
@@ -66,14 +45,14 @@ export async function POST(
   if (existing && existing.expiresAt > Date.now()) {
     existing.files.push(...files);
   } else {
-    store.set(key, { files, expiresAt: Date.now() + TTL_MS });
+    store.set(key, { files, expiresAt: Date.now() + TTL_MS, claimed: existing?.claimed ?? false });
   }
 
   return NextResponse.json({ success: true, count: files.length });
 }
 
 // GET /api/relay/[code]
-// Without ?index: returns JSON list of available files.
+// Without ?index: returns JSON with file list + claimed flag.
 // With ?index=N: downloads file at position N.
 export async function GET(
   request: NextRequest,
@@ -84,7 +63,7 @@ export async function GET(
   const entry = store.get(key);
 
   if (!entry || entry.expiresAt < Date.now()) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ error: "Not found", files: [], claimed: false }, { status: 404 });
   }
 
   const indexParam = request.nextUrl.searchParams.get("index");
@@ -98,6 +77,7 @@ export async function GET(
         mimeType: f.mimeType,
         size: f.size,
       })),
+      claimed: entry.claimed,
       expiresAt: entry.expiresAt,
     });
   }

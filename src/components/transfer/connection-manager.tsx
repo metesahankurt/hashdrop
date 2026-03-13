@@ -56,7 +56,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     setError, setProgress, setIsPeerReady, setReadyToDownload,
     codeExpiry, setCodeExpiry, setFileHash,
     setTransferStartTime, setTransferredBytes, addLog, resetPeerKeepFiles,
-    displayCode, setDisplayCode, clientInputCode
+    displayCode, setDisplayCode, clientInputCode,
+    relayFiles, setRelayFiles, relayCode, setRelayCode
   } = useWarpStore()
 
   const searchParams = useSearchParams()
@@ -68,9 +69,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   const [autoConnected, setAutoConnected] = useState(false)
   const [canShare, setCanShare] = useState(false)
   const [hasActiveConnection, setHasActiveConnection] = useState(false)
-  // Relay (mobile → web via HTTP)
-  const [relayFiles, setRelayFiles] = useState<Array<{ index: number; name: string; mimeType: string; size: number }> | null>(null)
-  const [relayCode, setRelayCode] = useState<string | null>(null)
 
   // Detect if we're in QR auto-connect mode (opened from QR code URL)
   // Use both searchParams hook AND window.location as fallback for reliability

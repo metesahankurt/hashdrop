@@ -30,7 +30,7 @@ interface UnifiedTransferFlowProps {
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
 export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
-  const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode } = useWarpStore()
+  const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode, relayFiles, setRelayFiles, relayCode, setRelayCode } = useWarpStore()
 
   const searchParams = useSearchParams()
   const codeFromUrl = searchParams.get('code') || ''
@@ -301,6 +301,9 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
     setCurrentStep('connecting')
     setClientInputCode(trimmedCode)
     setStatus('connecting')
+    // Signal the relay that a web receiver has claimed this code —
+    // mobile polls this to know when to auto-upload.
+    fetch(`/api/relay/${trimmedCode.trim().toUpperCase()}/claim`, { method: 'POST' }).catch(() => {})
   }
 
   // Update step based on status
@@ -308,6 +311,13 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
     if (status === 'connecting') setTimeout(() => setCurrentStep('connecting'), 0)
     if (status === 'transferring') setTimeout(() => setCurrentStep('transferring'), 0)
   }, [status])
+
+  // When relay files arrive (mobile uploaded), switch out of connecting spinner
+  useEffect(() => {
+    if (relayFiles && relayFiles.length > 0) {
+      setCurrentStep('connecting') // keep step but relay panel will render instead
+    }
+  }, [relayFiles])
 
   // Format time left
   const formatTimeLeft = (seconds: number | null): string => {
@@ -828,7 +838,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
           </motion.div>
         )}
 
-        {/* Step 5: Connecting */}
+        {/* Step 5: Connecting / Relay Download */}
         {currentStep === 'connecting' && (
           <motion.div
             key="connecting"
@@ -837,24 +847,60 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
             animate="animate"
             exit="exit"
             transition={{ duration: 0.3 }}
-            className="glass-card rounded-2xl p-8 md:p-12 text-center space-y-6"
           >
-            <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-2xl font-semibold text-foreground">
-                Connecting...
-              </h3>
-              <p className="text-sm text-muted max-w-md mx-auto">
-                Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
-              </p>
-            </div>
-
-            <div className="text-xs text-muted">
-              Checking relay and peer-to-peer connection
-            </div>
+            {relayFiles && relayFiles.length > 0 && relayCode ? (
+              /* Relay download panel — mobile uploaded successfully */
+              <div className="glass-card rounded-2xl p-6 md:p-8 flex flex-col gap-4 max-w-md mx-auto">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="text-sm font-bold text-primary uppercase tracking-wider">Files Ready</span>
+                </div>
+                <p className="text-sm text-muted">
+                  {relayFiles.length} file{relayFiles.length > 1 ? 's' : ''} from the mobile app — click to download.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {relayFiles.map((f) => (
+                    <a
+                      key={f.index}
+                      href={`/api/relay/${relayCode}?index=${f.index}`}
+                      download={f.name}
+                      className="glass-btn-primary flex items-center justify-between gap-3 px-4 py-3 text-sm no-underline"
+                    >
+                      <span className="truncate font-medium">{f.name}</span>
+                      <span className="text-xs text-muted whitespace-nowrap">
+                        {(f.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                    </a>
+                  ))}
+                </div>
+                <button
+                  onClick={async () => {
+                    await fetch(`/api/relay/${relayCode}`, { method: 'DELETE' })
+                    setRelayFiles(null)
+                    setRelayCode(null)
+                    setStatus('idle')
+                    setCurrentStep('select-mode')
+                  }}
+                  className="text-xs text-muted hover:text-foreground transition-colors text-center mt-1"
+                >
+                  Clear transfer
+                </button>
+              </div>
+            ) : (
+              /* Spinner while waiting */
+              <div className="glass-card rounded-2xl p-8 md:p-12 text-center space-y-6">
+                <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-semibold text-foreground">Connecting...</h3>
+                  <p className="text-sm text-muted max-w-md mx-auto">
+                    Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
+                  </p>
+                </div>
+                <div className="text-xs text-muted">Checking relay and peer-to-peer connection</div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

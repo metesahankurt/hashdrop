@@ -119,6 +119,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   const [timeLeft, setTimeLeft] = useState("");
   // "p2p" = WebRTC PeerJS, "relay" = HTTP relay (works in Expo Go)
   const [transport, setTransport] = useState<"p2p" | "relay" | "detecting">("detecting");
+  const [relayCode, setRelayCodeLocal] = useState<string | null>(null);
 
   // Auto-init sender — if WebRTC fails (status becomes "error"), fall back to relay
   useEffect(() => {
@@ -134,6 +135,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         const { generateSecureCode } = await import("@/lib/code-generator");
         const code = generateSecureCode();
         setDisplayCode(code);
+        setRelayCodeLocal(code);
         setCodeExpiry(Date.now() + 5 * 60 * 1000);
         setStatus("waiting");
         setError(null);
@@ -168,7 +170,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     if (transport === "relay") {
       setStatus("transferring");
       try {
-        await sendViaRelay(files, displayCode, (sent, total) => {
+        await sendViaRelay(files, displayCode ?? "", (sent, total) => {
           addLog(`Uploaded ${sent}/${total}`, "info");
         });
         setStatus("completed");
@@ -182,6 +184,37 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
       sendFiles();
     }
   };
+
+  // Poll /claim endpoint — auto-upload when web receiver enters the code
+  useEffect(() => {
+    if (transport !== "relay" || !relayCode || files.length === 0) return;
+    if (status !== "waiting") return;
+
+    const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? "https://hashdrop.metesahankurt.cloud").replace(/\/$/, "");
+    let stopped = false;
+
+    const interval = setInterval(async () => {
+      if (stopped || useWarpStore.getState().status !== "waiting") {
+        clearInterval(interval);
+        return;
+      }
+      try {
+        const res = await fetch(`${WEB_URL}/api/relay/${relayCode}/claim`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.claimed) {
+            stopped = true;
+            clearInterval(interval);
+            handleSend();
+          }
+        }
+      } catch {
+        // ignore network errors, keep polling
+      }
+    }, 2000);
+
+    return () => { stopped = true; clearInterval(interval); };
+  }, [transport, relayCode, files.length, status]);
 
   const isRelay = transport === "relay";
   const statusColor = getStatusColor(status);
@@ -265,11 +298,18 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         </View>
       )}
 
-      {/* Send button */}
-      {((transport === "p2p" && status === "connected") || (isRelay && status === "waiting")) && files.length > 0 && (
-        <PrimaryButton onPress={handleSend}>
-          {isRelay ? "Upload & share" : "Send files"}
-        </PrimaryButton>
+      {/* Send button — P2P only; relay auto-uploads when receiver enters the code */}
+      {transport === "p2p" && status === "connected" && files.length > 0 && (
+        <PrimaryButton onPress={handleSend}>Send files</PrimaryButton>
+      )}
+
+      {/* Relay: waiting for receiver hint */}
+      {isRelay && status === "waiting" && files.length > 0 && (
+        <View style={styles.relayBadge}>
+          <Text style={styles.relayBadgeText}>
+            Waiting for the recipient to enter the code on the web app…
+          </Text>
+        </View>
       )}
 
       {/* Success */}
@@ -277,7 +317,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         <View style={styles.successRow}>
           <CheckIcon size={18} stroke="#3ecf8e" strokeWidth={2.2} />
           <Text style={styles.successText}>
-            {isRelay ? "Files ready — open the web app and enter the code!" : "Files delivered!"}
+            {isRelay ? "Files uploaded — recipient can now download!" : "Files delivered!"}
           </Text>
         </View>
       )}

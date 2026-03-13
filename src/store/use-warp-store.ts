@@ -34,6 +34,8 @@ interface WarpState {
 
   displayCode: string | null
   clientInputCode: string | null
+  relayFiles: Array<{ index: number; name: string; mimeType: string; size: number }> | null
+  relayCode: string | null
 
   setMyId: (id: string) => void
   setPeer: (peer: Peer | null) => void
@@ -54,6 +56,8 @@ interface WarpState {
   setTransferredBytes: (bytes: number) => void
   setDisplayCode: (code: string | null) => void
   setClientInputCode: (code: string | null) => void
+  setRelayFiles: (files: Array<{ index: number; name: string; mimeType: string; size: number }> | null) => void
+  setRelayCode: (code: string | null) => void
   addLog: (message: string, type: LogType) => void
   clearLogs: () => void
   reset: () => void
@@ -82,6 +86,8 @@ export const useWarpStore = create<WarpState>((set) => ({
   consoleLogs: [],
   displayCode: null,
   clientInputCode: null,
+  relayFiles: null,
+  relayCode: null,
 
   setMyId: (id) => set({ myId: id }),
   setPeer: (peer) => set({ peer }),
@@ -103,6 +109,8 @@ export const useWarpStore = create<WarpState>((set) => ({
   setTransferredBytes: (bytes) => set({ transferredBytes: bytes }),
   setDisplayCode: (code) => set({ displayCode: code }),
   setClientInputCode: (code) => set({ clientInputCode: code }),
+  setRelayFiles: (relayFiles) => set({ relayFiles }),
+  setRelayCode: (relayCode) => set({ relayCode }),
   setError: (error) => set({ error }),
   addLog: (message, type) => set((state) => ({
     consoleLogs: [
@@ -133,7 +141,9 @@ export const useWarpStore = create<WarpState>((set) => ({
     transferredBytes: 0,
     consoleLogs: [],
     displayCode: null,
-    clientInputCode: null
+    clientInputCode: null,
+    relayFiles: null,
+    relayCode: null
     // We keep 'peer', 'myId', and 'codeExpiry' to avoid reconnecting
   }),
   resetPeerKeepFiles: () => set((state) => {
@@ -158,7 +168,9 @@ export const useWarpStore = create<WarpState>((set) => ({
       transferSpeed: 0,
       transferredBytes: 0,
       displayCode: state.displayCode,
-      clientInputCode: state.clientInputCode
+      clientInputCode: state.clientInputCode,
+      relayFiles: null,
+      relayCode: null
       // KEEP code expiry
     }
   }),
@@ -182,6 +194,8 @@ export const useWarpStore = create<WarpState>((set) => ({
     transferredBytes: 0,
     consoleLogs: [],
     displayCode: null,
-    clientInputCode: null
+    clientInputCode: null,
+    relayFiles: null,
+    relayCode: null
   })
 }))
