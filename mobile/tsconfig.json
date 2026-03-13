@@ -15,6 +15,7 @@
     "src/app/**/*.tsx",
     "src/mobile/**/*.ts",
     "src/mobile/**/*.tsx",
+    "src/types/**/*.d.ts",
     ".expo/types/**/*.d.ts",
     "expo-env.d.ts",
     ".expo/types/**/*.ts"

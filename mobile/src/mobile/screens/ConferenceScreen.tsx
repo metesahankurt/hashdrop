@@ -1,318 +1,346 @@
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowRight,
-  Link2,
-  ShieldCheck,
-  Users,
-  Video,
-} from "lucide-react-native";
+  ActivityIndicator,
+  NativeSyntheticEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Constants from "expo-constants";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { RefreshCw } from "lucide-react-native";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 
-import { generateSecureCode, isValidCode } from "@/mobile/lib/code-generator";
+import { ConferenceView } from "@/components/conference/ConferenceView";
+import { useProfileStore } from "@/mobile/state/use-profile-store";
+import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 
-import { AppShell } from "../components/AppShell";
-import { PrimaryButton } from "../components/PrimaryButton";
-import { TextField } from "../components/TextField";
+const WEB_APP_URL =
+  process.env.EXPO_PUBLIC_WEB_URL || "https://hashdrop.metesahankurt.cloud";
+const PROD_WEB_APP_URL = "https://hashdrop.metesahankurt.cloud";
+const FLOATING_DOCK_HEIGHT = 74;
 
-const VideoIcon = Video as any;
-const UsersIcon = Users as any;
-const LinkIcon = Link2 as any;
-const ArrowRightIcon = ArrowRight as any;
-const ShieldCheckIcon = ShieldCheck as any;
+function escapeJsString(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
+type BridgeRoute = {
+  code: string;
+  mode: "create" | "join";
+  autoEnter: boolean;
+};
 
 export function ConferenceScreen() {
-  const [roomCode, setRoomCode] = useState("");
-  const [joinCode, setJoinCode] = useState("");
+  const insets = useSafeAreaInsets();
+  const { username } = useProfileStore();
+  const routeRefreshNonce = useMainNavigationStore(
+    (state) => state.routeRefreshNonce,
+  );
+  const isExpoGo = Constants.executionEnvironment === "storeClient";
+  const webViewRef = useRef<WebView>(null);
+  const previousRefreshNonceRef = useRef(routeRefreshNonce);
 
-  const normalizedJoinCode = joinCode.toUpperCase();
+  const [bridgeRoute, setBridgeRoute] = useState<BridgeRoute | null>(null);
+  const [bridgeBaseUrl, setBridgeBaseUrl] = useState(
+    WEB_APP_URL.replace(/\/$/, ""),
+  );
+  const [webError, setWebError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
+  const canFallbackToProd =
+    bridgeBaseUrl !== PROD_WEB_APP_URL && WEB_APP_URL !== PROD_WEB_APP_URL;
+
+  const injectedJavaScriptBeforeContentLoaded = useMemo(() => {
+    const persistedUsername = JSON.stringify({
+      state: { username },
+      version: 0,
+    });
+    const escapedPersistedUsername = escapeJsString(persistedUsername);
+
+    return `
+      try {
+        window.localStorage.setItem('hashdrop-username', '${escapedPersistedUsername}');
+      } catch (error) {}
+      true;
+    `;
+  }, [username]);
+
+  const injectedJavaScript = useMemo(
+    () => `
+      try {
+        var settleView = function () {
+          var y = 300;
+          var root = document.scrollingElement || document.documentElement || document.body;
+          if (root) root.scrollTop = y;
+          document.documentElement.scrollTop = y;
+          document.body.scrollTop = y;
+          window.scrollTo(0, y);
+        };
+
+        settleView();
+        setTimeout(settleView, 120);
+        setTimeout(settleView, 320);
+        setTimeout(settleView, 700);
+      } catch (error) {}
+      true;
+    `,
+    [],
+  );
+
+  const bridgeUrl = useMemo(() => {
+    if (!bridgeRoute) return null;
+    const params = new URLSearchParams({
+      mobile: "1",
+      mode: bridgeRoute.mode,
+      code: bridgeRoute.code,
+    });
+    if (bridgeRoute.autoEnter) {
+      params.set("autoEnter", "1");
+    }
+    return `${bridgeBaseUrl}/conference?${params.toString()}`;
+  }, [bridgeBaseUrl, bridgeRoute]);
+
+  const launchBridge = (
+    mode: "create" | "join",
+    code: string,
+    options?: { autoEnter?: boolean },
+  ) => {
+    setWebError(false);
+    setBridgeBaseUrl(WEB_APP_URL.replace(/\/$/, ""));
+    setBridgeRoute({ mode, code, autoEnter: options?.autoEnter ?? false });
+    setReloadKey((value) => value + 1);
+  };
+
+  const closeBridgeToAppHome = () => {
+    setWebError(false);
+    setBridgeRoute(null);
+    setReloadKey((value) => value + 1);
+  };
+
+  const handleWebMessage = (
+    event: NativeSyntheticEvent<WebViewMessageEvent["nativeEvent"]>,
+  ) => {
+    try {
+      const payload = JSON.parse(event.nativeEvent.data);
+      if (payload?.type === "conference-exit") {
+        closeBridgeToAppHome();
+      }
+    } catch {
+      // Ignore non-JSON messages from the page.
+    }
+  };
+
+  useEffect(() => {
+    if (previousRefreshNonceRef.current === routeRefreshNonce) {
+      return;
+    }
+    previousRefreshNonceRef.current = routeRefreshNonce;
+    if (!bridgeRoute) {
+      return;
+    }
+    closeBridgeToAppHome();
+  }, [bridgeRoute, routeRefreshNonce]);
+
+  if (!isExpoGo) {
+    return <ConferenceView />;
+  }
+
+  if (!bridgeRoute) {
+    return (
+      <ConferenceView
+        expoGoBridgeHandlers={{
+          onCreate: (code, options) => launchBridge("create", code, options),
+          onJoin: (code, options) => launchBridge("join", code, options),
+        }}
+      />
+    );
+  }
 
   return (
-    <AppShell
-      title="Conference"
-      subtitle="Host or join a meeting from a tighter native entry point built for quick room access and clearer control."
-    >
-      <View style={styles.heroCard}>
-        <View style={styles.heroOrb} />
-        <Text style={styles.heroKicker}>MEETING SPACE</Text>
-        <Text style={styles.heroTitle}>Open a room in seconds.</Text>
-        <Text style={styles.heroText}>
-          Create a code for your meeting or join an existing room with a direct native flow.
-        </Text>
+    <View style={styles.screen}>
+      <View
+        style={[
+          styles.webviewFrame,
+          {
+            paddingTop: insets.top,
+            paddingBottom: dockClearance,
+          },
+        ]}
+      >
+        {webError ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorTitle}>Could not load conference</Text>
+            <Text style={styles.errorText}>
+              The embedded conference page could not be reached.
+            </Text>
 
-        <View style={styles.heroInline}>
-          <View style={styles.heroPill}>
-            <ShieldCheckIcon size={14} stroke="#ededed" strokeWidth={2.3} />
-            <Text style={styles.heroPillText}>Controlled access</Text>
+            {canFallbackToProd ? (
+              <Pressable
+                style={styles.primaryButton}
+                onPress={() => {
+                  setBridgeBaseUrl(PROD_WEB_APP_URL);
+                  setWebError(false);
+                  setReloadKey((value) => value + 1);
+                }}
+              >
+                <Text style={styles.primaryButtonText}>
+                  Try production conference
+                </Text>
+              </Pressable>
+            ) : null}
+
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => {
+                setWebError(false);
+                setReloadKey((value) => value + 1);
+              }}
+            >
+              <RefreshCw size={16} color="#ededed" />
+              <Text style={styles.secondaryButtonText}>Retry</Text>
+            </Pressable>
           </View>
-          <View style={styles.heroPill}>
-            <UsersIcon size={14} stroke="#ededed" strokeWidth={2.3} />
-            <Text style={styles.heroPillText}>Room-based entry</Text>
-          </View>
-        </View>
+        ) : (
+          <WebView
+            ref={webViewRef}
+            key={`${reloadKey}:${bridgeBaseUrl}:${bridgeUrl}:${username}`}
+            source={{ uri: bridgeUrl ?? `${bridgeBaseUrl}/conference?mobile=1` }}
+            style={styles.webview}
+            containerStyle={styles.webviewContainer}
+            originWhitelist={["*"]}
+            javaScriptEnabled
+            domStorageEnabled
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            injectedJavaScriptBeforeContentLoaded={
+              injectedJavaScriptBeforeContentLoaded
+            }
+            injectedJavaScript={injectedJavaScript}
+            bounces={false}
+            scrollEnabled
+            automaticallyAdjustContentInsets={false}
+            contentInsetAdjustmentBehavior="never"
+            onMessage={handleWebMessage}
+            onNavigationStateChange={(navState) => {
+              // If web navigates away from /conference (e.g. router.push('/') after leave)
+              // treat it as a leave event so we return to the native conference screen.
+              if (navState.url && !navState.url.includes("/conference")) {
+                closeBridgeToAppHome();
+              }
+            }}
+            onLoadEnd={() => {
+              webViewRef.current?.injectJavaScript(injectedJavaScript);
+            }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loader}>
+                <ActivityIndicator color="#3ecf8e" />
+                <Text style={styles.loaderText}>Loading conference...</Text>
+              </View>
+            )}
+            onError={() => {
+              if (canFallbackToProd) {
+                setBridgeBaseUrl(PROD_WEB_APP_URL);
+                setReloadKey((value) => value + 1);
+                return;
+              }
+              setWebError(true);
+            }}
+          />
+        )}
       </View>
-
-      <View style={styles.featureCard}>
-        <View style={styles.featureTop}>
-          <View style={[styles.iconWrap, styles.iconWrapBlue]}>
-            <VideoIcon size={20} stroke="#a5b4fc" strokeWidth={2.2} />
-          </View>
-          <View style={[styles.badge, styles.badgeBlue]}>
-            <Text style={[styles.badgeText, styles.badgeTextBlue]}>HOST</Text>
-          </View>
-        </View>
-
-        <Text style={styles.featureTitle}>Create a meeting code</Text>
-        <Text style={styles.featureDescription}>
-          Generate a one-time code, share it with participants, and start the room from mobile.
-        </Text>
-
-        <PrimaryButton onPress={() => setRoomCode(generateSecureCode())}>
-          Generate meeting code
-        </PrimaryButton>
-
-        {roomCode ? (
-          <View style={styles.roomBox}>
-            <View>
-              <Text style={styles.roomLabel}>Active meeting code</Text>
-              <Text style={styles.roomValue}>{roomCode}</Text>
-            </View>
-            <View style={styles.roomIcon}>
-              <LinkIcon size={16} stroke="#0d0d0d" strokeWidth={2.2} />
-            </View>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={styles.featureCard}>
-        <View style={styles.featureTop}>
-          <View style={[styles.iconWrap, styles.iconWrapPurple]}>
-            <UsersIcon size={20} stroke="#c4b5fd" strokeWidth={2.2} />
-          </View>
-          <View style={[styles.badge, styles.badgePurple]}>
-            <Text style={[styles.badgeText, styles.badgeTextPurple]}>JOIN</Text>
-          </View>
-        </View>
-
-        <Text style={styles.featureTitle}>Join with a room code</Text>
-        <Text style={styles.featureDescription}>
-          Enter the meeting code from the host and prepare the room connection flow.
-        </Text>
-
-        <TextField
-          autoCapitalize="characters"
-          label="Meeting code"
-          onChangeText={(value) => setJoinCode(value.toUpperCase())}
-          placeholder="COSMIC-FALCON"
-          value={normalizedJoinCode}
-        />
-
-        <PrimaryButton
-          disabled={!isValidCode(normalizedJoinCode)}
-          onPress={() => {}}
-          tone="secondary"
-        >
-          Prepare room join
-        </PrimaryButton>
-      </View>
-
-      <View style={styles.miniPanel}>
-        <Text style={styles.miniPanelTitle}>Next connection layer</Text>
-        <Text style={styles.miniPanelText}>
-          Live media, participant tiles, and host controls will plug into this screen next.
-        </Text>
-        <View style={styles.miniPanelFooter}>
-          <Text style={styles.miniPanelLink}>Continue setup</Text>
-          <ArrowRightIcon size={15} stroke="#a5b4fc" strokeWidth={2.2} />
-        </View>
-      </View>
-    </AppShell>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  heroCard: {
+  screen: {
+    flex: 1,
+    backgroundColor: "#0d0d0d",
+  },
+  webviewFrame: {
+    flex: 1,
+    backgroundColor: "#0d0d0d",
+    marginHorizontal: 10,
+    marginTop: 8,
+    borderRadius: 26,
     overflow: "hidden",
-    position: "relative",
-    borderRadius: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "#131313",
-    padding: 20,
+  },
+  webviewContainer: {
+    flex: 1,
+    backgroundColor: "#0d0d0d",
+    borderRadius: 26,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: "#0d0d0d",
+  },
+  loader: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111111",
     gap: 10,
   },
-  heroOrb: {
-    position: "absolute",
-    width: 190,
-    height: 190,
-    borderRadius: 95,
-    backgroundColor: "rgba(129,140,248,0.14)",
-    right: -40,
-    top: -62,
-  },
-  heroKicker: {
-    color: "#a5b4fc",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-  },
-  heroTitle: {
-    color: "#ededed",
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 34,
-    maxWidth: "90%",
-  },
-  heroText: {
+  loaderText: {
     color: "#8b8b8b",
+    fontSize: 13,
+  },
+  errorState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 12,
+    backgroundColor: "#111111",
+  },
+  errorTitle: {
+    color: "#ededed",
+    fontSize: 20,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  errorText: {
+    color: "#8b8b8b",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  primaryButton: {
+    backgroundColor: "#3ecf8e",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
+  primaryButtonText: {
+    color: "#0d0d0d",
     fontSize: 14,
-    lineHeight: 21,
-    maxWidth: "92%",
+    fontWeight: "700",
   },
-  heroInline: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 6,
-  },
-  heroPill: {
+  secondaryButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 11,
-    paddingVertical: 8,
   },
-  heroPillText: {
-    color: "#d4d4d4",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  featureCard: {
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 18,
-    gap: 12,
-  },
-  featureTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  iconWrapBlue: {
-    backgroundColor: "rgba(129,140,248,0.12)",
-    borderColor: "rgba(129,140,248,0.24)",
-  },
-  iconWrapPurple: {
-    backgroundColor: "rgba(196,181,253,0.12)",
-    borderColor: "rgba(196,181,253,0.24)",
-  },
-  badge: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  badgeBlue: {
-    backgroundColor: "rgba(129,140,248,0.12)",
-    borderColor: "rgba(129,140,248,0.2)",
-  },
-  badgePurple: {
-    backgroundColor: "rgba(196,181,253,0.12)",
-    borderColor: "rgba(196,181,253,0.2)",
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.8,
-  },
-  badgeTextBlue: {
-    color: "#a5b4fc",
-  },
-  badgeTextPurple: {
-    color: "#c4b5fd",
-  },
-  featureTitle: {
+  secondaryButtonText: {
     color: "#ededed",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  featureDescription: {
-    color: "#8b8b8b",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  roomBox: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(129,140,248,0.18)",
-    backgroundColor: "rgba(129,140,248,0.08)",
-    padding: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  roomLabel: {
-    color: "#a5b4fc",
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  roomValue: {
-    color: "#ededed",
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-    marginTop: 4,
-  },
-  roomIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#a5b4fc",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  miniPanel: {
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 18,
-    gap: 8,
-  },
-  miniPanelTitle: {
-    color: "#ededed",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  miniPanelText: {
-    color: "#8b8b8b",
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  miniPanelFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 2,
-  },
-  miniPanelLink: {
-    color: "#a5b4fc",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
   },
 });

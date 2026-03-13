@@ -13,7 +13,6 @@ import {
   useLocalParticipant,
   useParticipants,
   VideoTrack,
-  AudioTrack,
   useRoomContext,
   useTracks,
 } from "@livekit/react-native";
@@ -45,17 +44,18 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
   }
 
   return (
-    <LiveKitRoom
-      serverUrl={livekitUrl}
-      token={token}
-      connect={true}
-      audio={true}
-      video={true}
-      onDisconnected={onLeave}
-      style={styles.room}
-    >
-      <RoomContent onLeave={onLeave} />
-    </LiveKitRoom>
+    <View style={styles.room}>
+      <LiveKitRoom
+        serverUrl={livekitUrl}
+        token={token}
+        connect={true}
+        audio={true}
+        video={true}
+        onDisconnected={onLeave}
+      >
+        <RoomContent onLeave={onLeave} />
+      </LiveKitRoom>
+    </View>
   );
 }
 
@@ -76,6 +76,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
   } = useConferenceStore();
 
   const { localParticipant } = useLocalParticipant();
+  const room = useRoomContext();
   const participants = useParticipants();
   const cameraTracks = useTracks([Track.Source.Camera]);
   const screenTracks = useTracks([Track.Source.ScreenShare]);
@@ -98,7 +99,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
         text: "Leave",
         style: "destructive",
         onPress: () => {
-          localParticipant.room?.disconnect();
+          room?.disconnect();
           onLeave();
         },
       },
@@ -154,12 +155,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
           </View>
         )}
       </ScrollView>
-
-      {/* Audio tracks (invisible, just for playback) */}
-      {audioTracks.map((track) => (
-        <AudioTrack key={track.participant.identity} trackRef={track} />
-      ))}
-
       {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity

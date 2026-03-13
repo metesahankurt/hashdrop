@@ -36,6 +36,8 @@ export function FloatingDock() {
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, 10);
   const setRoute = useMainNavigationStore((state) => state.setRoute);
+  const refreshRoute = useMainNavigationStore((state) => state.refreshRoute);
+  const activeRoute = useMainNavigationStore((state) => state.route);
   const { progress } = useMainNavigationAnimation();
 
   const indicatorStyle = useAnimatedStyle(() => ({
@@ -67,7 +69,14 @@ export function FloatingDock() {
             icon={item.icon as any}
             index={index}
             label={item.label}
-            onPress={() => setRoute(item.href as MainRoute)}
+            onPress={() => {
+              const nextRoute = item.href as MainRoute;
+              if (activeRoute === nextRoute) {
+                refreshRoute(nextRoute);
+                return;
+              }
+              setRoute(nextRoute);
+            }}
             progress={progress}
           />
         ))}

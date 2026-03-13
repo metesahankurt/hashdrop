@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LiveKitRoom } from '@livekit/components-react'
 import { DisconnectReason } from 'livekit-client'
@@ -14,26 +14,54 @@ const LK_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL || ''
 
 interface ConferenceViewProps {
   initialCode?: string | null
+  initialMode?: 'create' | 'join'
+  isMobileEmbed?: boolean
+  autoEnter?: boolean
 }
 
-export function ConferenceView({ initialCode }: ConferenceViewProps) {
+export function ConferenceView({ initialCode, initialMode, isMobileEmbed, autoEnter }: ConferenceViewProps) {
   const router = useRouter()
   const { status, token, setStatus, reset } = useConferenceStore()
+  const [isViewportMobile, setIsViewportMobile] = useState(false)
 
   const isPreJoin = status === 'idle' || status === 'pre-join'
   const isConnecting = status === 'connecting'
   const isInRoom = status === 'in-room' || status === 'waiting'
   const isEnded = status === 'ended' || status === 'denied'
+  const isCompactLayout = isMobileEmbed || isViewportMobile
 
   // Cleanup on unmount
   useEffect(() => {
     return () => reset()
   }, [reset])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const updateMatch = () => setIsViewportMobile(mediaQuery.matches)
+
+    updateMatch()
+    mediaQuery.addEventListener('change', updateMatch)
+    return () => mediaQuery.removeEventListener('change', updateMatch)
+  }, [])
+
+  const exitToNativeApp = useCallback(() => {
+    if (typeof window === 'undefined') return false
+    if (!window.ReactNativeWebView?.postMessage) return false
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type: 'conference-exit' })
+    )
+    return true
+  }, [])
+
   const handleLeave = useCallback(() => {
     reset()
+    if (exitToNativeApp()) {
+      return
+    }
     router.push('/')
-  }, [reset, router])
+  }, [exitToNativeApp, reset, router])
 
   const handleDisconnect = useCallback((reason?: DisconnectReason) => {
     if (
@@ -53,6 +81,9 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
           <motion.div key="prejoin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <ConferencePreJoin
               initialCode={initialCode}
+              initialMode={initialMode}
+              isMobileEmbed={isCompactLayout}
+              autoEnter={autoEnter}
               onEnterRoom={() => setStatus('connecting')}
             />
           </motion.div>
@@ -79,7 +110,10 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
               </p>
             </div>
             <button
-              onClick={() => { reset(); }}
+              onClick={() => {
+                reset()
+                if (exitToNativeApp()) return
+              }}
               className="glass-btn-primary px-6 py-3 rounded-xl text-sm"
             >
               Start New Meeting
@@ -100,7 +134,7 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
             setStatus('ended')
           }}
         >
-          <ConferenceRoomInner onLeave={handleLeave} />
+          <ConferenceRoomInner onLeave={handleLeave} isMobileEmbed={isCompactLayout} />
         </LiveKitRoom>
       )}
 
@@ -108,7 +142,10 @@ export function ConferenceView({ initialCode }: ConferenceViewProps) {
       {(isConnecting || isInRoom) && token && !LK_URL && (
         <div className="min-h-screen flex flex-col items-center justify-center px-4 gap-4 text-center">
           <p className="text-sm text-muted">Conference server not configured.<br />Please set up the LiveKit environment variables.</p>
-          <button onClick={() => reset()} className="glass-btn px-4 py-2 rounded-xl text-sm">Back</button>
+          <button onClick={() => {
+            reset()
+            if (exitToNativeApp()) return
+          }} className="glass-btn px-4 py-2 rounded-xl text-sm">Back</button>
         </div>
       )}
     </>

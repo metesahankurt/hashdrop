@@ -10,10 +10,13 @@ import { Video } from 'lucide-react'
 function ConferenceContent() {
   const searchParams = useSearchParams()
   const code = searchParams.get('code')
+  const mode = searchParams.get('mode')
+  const isMobileEmbed = searchParams.get('mobile') === '1'
+  const autoEnter = searchParams.get('autoEnter') === '1'
 
   return (
     <>
-      <MinimalHeader />
+      {!isMobileEmbed && <MinimalHeader />}
       <WithUsernameGate
         icon={<Video className="w-7 h-7 text-primary" />}
         title="Video"
@@ -21,10 +24,17 @@ function ConferenceContent() {
         description="Secure video conferencing for up to 50 participants. Waiting room and presentation mode supported."
         hint="Your username will be shown to other participants"
         mode="conference"
-        skipEntry={!!code}
-        skipToJoin={!!code}
+        skipEntry={!!code || mode === 'create'}
+        skipToJoin={mode === 'join' && !!code}
       >
-        {() => <ConferenceView initialCode={code} />}
+        {() => (
+          <ConferenceView
+            initialCode={code}
+            initialMode={mode === 'create' ? 'create' : mode === 'join' ? 'join' : undefined}
+            isMobileEmbed={isMobileEmbed}
+            autoEnter={autoEnter}
+          />
+        )}
       </WithUsernameGate>
     </>
   )

@@ -15,10 +15,11 @@ import { AudioRenderer } from './conference-audio'
 
 interface ConferenceRoomProps {
   onLeave: () => void
+  isMobileEmbed?: boolean
 }
 
 // Inner component — runs inside <LiveKitRoom> provider
-export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
+export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomProps) {
   useConferenceLogic()
 
   const {
@@ -70,12 +71,13 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
   }
 
   const hasSidePanel = isChatOpen || isParticipantsOpen || isInviteOpen
+  const showMobilePanelOverlay = isMobileEmbed && hasSidePanel
 
   return (
     <>
       <AudioRenderer />
       <div className="fixed inset-0 top-0 flex flex-col bg-background z-40">
-        <div className="flex-1 min-h-0 flex flex-col gap-3 p-3 md:p-4">
+        <div className={`flex-1 min-h-0 flex flex-col ${isMobileEmbed ? 'gap-1.5 p-1.5' : 'gap-3 p-3 md:p-4'}`}>
           {/* Admit panel — host only */}
           {role === 'host' && waitingParticipants.length > 0 && (
             <div className="shrink-0">
@@ -84,23 +86,29 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
           )}
 
           {/* Main area */}
-          <div className="flex-1 min-h-0 flex gap-3">
+          <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? 'gap-1.5 flex-col' : 'gap-3'}`}>
             {/* Video grid */}
-            <div className="flex-1 min-w-0 min-h-0">
-              <ConferenceGrid />
+            <div className={isMobileEmbed ? 'w-full shrink-0' : 'flex-1 min-w-0 min-h-0'}>
+              <div className={isMobileEmbed ? 'aspect-[4/5] max-h-[46vh] min-h-[250px] w-full' : 'h-full'}>
+                <ConferenceGrid isMobileEmbed={isMobileEmbed} />
+              </div>
             </div>
 
             {/* Side panels */}
             <AnimatePresence>
               {hasSidePanel && (
                 <motion.div
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 320 }}
-                  exit={{ opacity: 0, width: 0 }}
+                  initial={showMobilePanelOverlay ? { opacity: 0, y: 24 } : { opacity: 0, width: 0 }}
+                  animate={showMobilePanelOverlay ? { opacity: 1, y: 0 } : { opacity: 1, width: 320 }}
+                  exit={showMobilePanelOverlay ? { opacity: 0, y: 24 } : { opacity: 0, width: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="shrink-0 overflow-hidden h-full"
+                  className={
+                    showMobilePanelOverlay
+                      ? 'absolute inset-x-2 bottom-24 top-2 z-50 overflow-hidden rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl'
+                      : 'shrink-0 overflow-hidden h-full'
+                  }
                 >
-                  <div className="w-80 h-full">
+                  <div className={showMobilePanelOverlay ? 'h-full w-full' : 'w-80 h-full'}>
                     {isChatOpen && (
                       <ConferenceChat onClose={() => setChatOpen(false)} />
                     )}
@@ -117,8 +125,8 @@ export function ConferenceRoomInner({ onLeave }: ConferenceRoomProps) {
           </div>
 
           {/* Controls */}
-          <div className="glass-card rounded-2xl px-4 py-3 shrink-0">
-            <ConferenceControls onLeave={onLeave} />
+          <div className={`glass-card shrink-0 ${isMobileEmbed ? 'rounded-[20px] px-2.5 py-2' : 'rounded-2xl px-4 py-3'}`}>
+            <ConferenceControls onLeave={onLeave} isMobileEmbed={isMobileEmbed} />
           </div>
         </div>
       </div>

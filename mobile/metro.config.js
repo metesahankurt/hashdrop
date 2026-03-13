@@ -11,17 +11,28 @@ const config = getDefaultConfig(__dirname);
 //   WEBRTC_STUB=false npx expo run:ios
 //   WEBRTC_STUB=false npx expo run:android
 if (process.env.WEBRTC_STUB !== "false") {
-  const stubPath = path.resolve(
+  const webrtcStubPath = path.resolve(
     __dirname,
     "src/mobile/mocks/react-native-webrtc.ts",
   );
+  const livekitStubPath = path.resolve(
+    __dirname,
+    "src/mobile/mocks/livekit-react-native.ts",
+  );
+  const LIVEKIT_PACKAGES = [
+    "@livekit/react-native",
+    "@livekit/react-native-webrtc",
+  ];
 
   const originalResolveRequest = config.resolver?.resolveRequest;
 
   config.resolver = config.resolver ?? {};
   config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (moduleName === "react-native-webrtc") {
-      return { filePath: stubPath, type: "sourceFile" };
+      return { filePath: webrtcStubPath, type: "sourceFile" };
+    }
+    if (LIVEKIT_PACKAGES.includes(moduleName)) {
+      return { filePath: livekitStubPath, type: "sourceFile" };
     }
     if (originalResolveRequest) {
       return originalResolveRequest(context, moduleName, platform);

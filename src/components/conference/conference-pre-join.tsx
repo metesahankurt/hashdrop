@@ -11,13 +11,17 @@ import { generateSecureCode } from '@/lib/code-generator'
 
 interface ConferencePreJoinProps {
   initialCode?: string | null
+  initialMode?: 'create' | 'join'
+  autoEnter?: boolean
+  isMobileEmbed?: boolean
   onEnterRoom: () => void
 }
 
-export function ConferencePreJoin({ initialCode, onEnterRoom }: ConferencePreJoinProps) {
+export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobileEmbed: _isMobileEmbed, onEnterRoom }: ConferencePreJoinProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const autoEnteredRef = useRef(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
-  const [mode, setMode] = useState<'create' | 'join'>(initialCode ? 'join' : 'create')
+  const [mode, setMode] = useState<'create' | 'join'>(initialMode ?? (initialCode ? 'join' : 'create'))
   const [joinCode, setJoinCode] = useState(initialCode || '')
   const [createdCode, setCreatedCode] = useState('')
   const [showQr, setShowQr] = useState(false)
@@ -98,6 +102,17 @@ export function ConferencePreJoin({ initialCode, onEnterRoom }: ConferencePreJoi
       setLoading(false)
     }
   }
+
+  // Auto-enter on mount when requested (e.g. "Start Without Sharing" from mobile)
+  useEffect(() => {
+    if (!autoEnter || autoEnteredRef.current || !username) return
+    autoEnteredRef.current = true
+    if (mode === 'join' && joinCode.trim()) {
+      handleJoin()
+    } else if (mode === 'create') {
+      handleCreate()
+    }
+  }, [username]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const copyLink = () => {
     const url = `${window.location.origin}/conference?code=${createdCode}`
