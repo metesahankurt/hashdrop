@@ -593,12 +593,41 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
     const conn = peer.connect(targetId)
 
-    // Add 15-second timeout for connection attempt
     let connectionTimeout: NodeJS.Timeout | null = null
     let hasConnected = false
+    let relayPollInterval: NodeJS.Timeout | null = null
+    let relayFound = false
+
+    // Poll relay every 2s while P2P is connecting.
+    // Handles the case where mobile uploads AFTER web started connecting.
+    relayPollInterval = setInterval(async () => {
+      if (hasConnected || relayFound) {
+        clearInterval(relayPollInterval!)
+        return
+      }
+      try {
+        const res = await fetch(`/api/relay/${normalized}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (Array.isArray(json.files) && json.files.length > 0) {
+            relayFound = true
+            clearInterval(relayPollInterval!)
+            if (connectionTimeout) clearTimeout(connectionTimeout)
+            conn.close()
+            setRelayFiles(json.files)
+            setRelayCode(normalized)
+            addLog(`Relay transfer found: ${json.files.length} file(s)`, 'success')
+            toast.success('Files ready to download!', { description: `${json.files.length} file(s) from mobile` })
+          }
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 2000)
 
     connectionTimeout = setTimeout(() => {
-      if (!hasConnected && conn.open === false) {
+      clearInterval(relayPollInterval!)
+      if (!hasConnected && !relayFound && conn.open === false) {
         conn.close()
         setStatus('failed')
         toast.error('Connection Timeout', {
@@ -607,16 +636,19 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         })
         addLog('Connection timeout - peer unreachable. Check that the sender has the app open.', 'error')
       }
-    }, 20000) // 20 seconds timeout for better reliability
+    }, 60000) // 60 seconds — gives mobile time to tap "Upload & share"
 
     conn.on('open', () => {
         hasConnected = true
+        clearInterval(relayPollInterval!)
         if (connectionTimeout) clearTimeout(connectionTimeout)
         handleConnection(conn)
     })
 
     conn.on('error', (err) => {
+      clearInterval(relayPollInterval!)
       if (connectionTimeout) clearTimeout(connectionTimeout)
+      if (relayFound) return // relay took over, suppress P2P error
       setStatus('failed')
       const errorInfo = formatErrorForToast(err, 'peer-unavailable')
       toast.error(errorInfo.title, {
@@ -625,7 +657,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       })
       addLog(`Connection failed: ${errorInfo.title}`, 'error')
     })
-  }, [peer, addLog, setStatus, handleConnection])
+  }, [peer, addLog, setStatus, handleConnection, setRelayFiles, setRelayCode])
 
   // Auto-connect from URL parameter (QR code scan)
   useEffect(() => {
@@ -835,11 +867,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           <div className="inline-flex items-center gap-3 glass-card rounded-lg px-5 py-4 glow-primary">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <div className="text-left">
-              <p className="text-sm font-semibold text-foreground">Establishing connection...</p>
+              <p className="text-sm font-semibold text-foreground">Connecting...</p>
               <p className="text-xs text-muted font-mono">{inputCode}</p>
             </div>
           </div>
-          <p className="text-xs text-muted">Waiting for peer to respond</p>
+          <p className="text-xs text-muted">If using the mobile app, tap <strong>Upload &amp; share</strong> to send</p>
         </motion.div>
       )}
 

@@ -845,15 +845,15 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
 
             <div className="space-y-2">
               <h3 className="text-2xl font-semibold text-foreground">
-                Establishing connection...
+                Connecting...
               </h3>
               <p className="text-sm text-muted max-w-md mx-auto">
-                Setting up secure peer-to-peer link. This may take a few seconds.
+                Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
               </p>
             </div>
 
             <div className="text-xs text-muted">
-              Using WebRTC with end-to-end encryption
+              Checking relay and peer-to-peer connection
             </div>
           </motion.div>
         )}
