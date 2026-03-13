@@ -1,7 +1,9 @@
 import PagerView from "react-native-pager-view";
 import { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
+import Animated from "react-native-reanimated";
 
+import { useMainNavigationAnimation } from "@/mobile/navigation/MainNavigationAnimationProvider";
 import type { MainRoute } from "@/mobile/navigation/use-main-navigation-store";
 import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 import { ChatRoomScreen } from "@/mobile/screens/ChatRoomScreen";
@@ -14,11 +16,13 @@ interface MainPagerScreenProps {
 }
 
 const ROUTES: MainRoute[] = ["/", "/transfer", "/conference", "/chatroom"];
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);
 
 export function MainPagerScreen({ route }: MainPagerScreenProps) {
   const pagerRef = useRef<PagerView>(null);
   const activeRoute = useMainNavigationStore((state) => state.route);
   const setRoute = useMainNavigationStore((state) => state.setRoute);
+  const { progress } = useMainNavigationAnimation();
 
   const initialPage = useMemo(() => {
     const index = ROUTES.indexOf(route);
@@ -27,6 +31,7 @@ export function MainPagerScreen({ route }: MainPagerScreenProps) {
 
   useEffect(() => {
     setRoute(route);
+    progress.value = initialPage;
   }, [route, setRoute]);
 
   useEffect(() => {
@@ -37,9 +42,13 @@ export function MainPagerScreen({ route }: MainPagerScreenProps) {
   }, [activeRoute]);
 
   return (
-    <PagerView
+    <AnimatedPagerView
       ref={pagerRef}
       initialPage={initialPage}
+      onPageScroll={(event) => {
+        progress.value =
+          event.nativeEvent.position + event.nativeEvent.offset;
+      }}
       onPageSelected={(event) => {
         const nextRoute = ROUTES[event.nativeEvent.position] ?? "/";
         setRoute(nextRoute);
@@ -59,7 +68,7 @@ export function MainPagerScreen({ route }: MainPagerScreenProps) {
       <View key="chatroom" style={styles.page}>
         <ChatRoomScreen />
       </View>
-    </PagerView>
+    </AnimatedPagerView>
   );
 }
 

@@ -6,21 +6,24 @@ import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { FloatingDock } from "@/mobile/components/FloatingDock";
+import { MainNavigationAnimationProvider } from "@/mobile/navigation/MainNavigationAnimationProvider";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: "#0d0d0d" }}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: "#0d0d0d" },
-            animation: "fade",
-          }}
-        />
-        <FloatingDock />
-      </View>
+      <MainNavigationAnimationProvider>
+        <StatusBar style="light" />
+        <View style={{ flex: 1, backgroundColor: "#0d0d0d" }}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#0d0d0d" },
+              animation: "fade",
+            }}
+          />
+          <FloatingDock />
+        </View>
+      </MainNavigationAnimationProvider>
     </SafeAreaProvider>
   );
 }
