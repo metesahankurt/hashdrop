@@ -1,14 +1,14 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { ChatRoomScreen } from "@/mobile/screens/ChatRoomScreen";
 import { UsernameGate } from "@/mobile/components/UsernameGate";
+import { MainPagerScreen } from "@/mobile/navigation/MainPagerScreen";
 
 export default function ChatRoomRoute() {
   useLocalSearchParams<Record<string, string | string[]>>();
 
   return (
     <UsernameGate>
-      <ChatRoomScreen />
+      <MainPagerScreen route="/chatroom" />
     </UsernameGate>
   );
 }

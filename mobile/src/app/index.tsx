@@ -1,14 +1,14 @@
 import { useLocalSearchParams } from "expo-router";
 
 import { UsernameGate } from "@/mobile/components/UsernameGate";
-import { HomeScreen } from "@/mobile/screens/HomeScreen";
+import { MainPagerScreen } from "@/mobile/navigation/MainPagerScreen";
 
 export default function HomeRoute() {
   useLocalSearchParams<Record<string, string | string[]>>();
 
   return (
     <UsernameGate>
-      <HomeScreen />
+      <MainPagerScreen route="/" />
     </UsernameGate>
   );
 }

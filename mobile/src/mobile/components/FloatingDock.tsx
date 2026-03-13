@@ -1,4 +1,3 @@
-import { usePathname, useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -7,6 +6,8 @@ import {
   MessageSquare,
   Video,
 } from "lucide-react-native";
+import type { MainRoute } from "@/mobile/navigation/use-main-navigation-store";
+import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: House },
@@ -16,25 +17,24 @@ const ITEMS = [
 ];
 
 export function FloatingDock() {
-  const router = useRouter();
-  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, 10);
+  const activeRoute = useMainNavigationStore((state) => state.route);
+  const setRoute = useMainNavigationStore((state) => state.setRoute);
 
   return (
     <View
-      pointerEvents="box-none"
-      style={[styles.wrapper, { bottom: dockBottom }]}
+      style={[styles.wrapper, { bottom: dockBottom, pointerEvents: "box-none" as any }]}
     >
       <View style={styles.dock}>
         {ITEMS.map((item) => {
-          const active = pathname === item.href;
+          const active = activeRoute === item.href;
           const Icon = item.icon as any;
 
           return (
             <Pressable
               key={item.href}
-              onPress={() => router.push(item.href as never)}
+              onPress={() => setRoute(item.href as MainRoute)}
               style={[styles.item, active ? styles.itemActive : null]}
             >
               <View style={[styles.icon, active ? styles.iconActive : null]}>

@@ -1,14 +1,14 @@
 import { useLocalSearchParams } from "expo-router";
 
-import { ConferenceScreen } from "@/mobile/screens/ConferenceScreen";
 import { UsernameGate } from "@/mobile/components/UsernameGate";
+import { MainPagerScreen } from "@/mobile/navigation/MainPagerScreen";
 
 export default function ConferenceRoute() {
   useLocalSearchParams<Record<string, string | string[]>>();
 
   return (
     <UsernameGate>
-      <ConferenceScreen />
+      <MainPagerScreen route="/conference" />
     </UsernameGate>
   );
 }
