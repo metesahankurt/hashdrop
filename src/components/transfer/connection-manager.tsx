@@ -57,7 +57,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     codeExpiry, setCodeExpiry, setFileHash,
     setTransferStartTime, setTransferredBytes, addLog, resetPeerKeepFiles,
     displayCode, setDisplayCode, clientInputCode,
-    relayFiles, setRelayFiles, relayCode, setRelayCode
+    relayFiles, setRelayFiles, relayCode, setRelayCode,
+    files,
   } = useWarpStore()
 
   const searchParams = useSearchParams()
@@ -105,6 +106,49 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     toast.success('New code generated! Peer connection reset.')
     addLog(`New code generated: ${newDisplayCode}`, 'success')
   }, [addLog, resetPeerKeepFiles, setCodeExpiry, setDisplayCode])
+
+  // PC → Mobile relay: when sender has files and a code, poll for a mobile claim,
+  // then upload files to relay so the mobile receiver can download them.
+  useEffect(() => {
+    if (!displayCode || files.length === 0 || mode !== 'send') return
+    if (status === 'transferring' || status === 'completed') return
+
+    let stopped = false
+
+    const poll = setInterval(async () => {
+      if (stopped) { clearInterval(poll); return }
+      try {
+        const res = await fetch(`/api/relay/${displayCode}/claim`)
+        if (!res.ok) return
+        const json = await res.json()
+        if (!json.claimed) return
+
+        // Mobile claimed the code — upload files to relay
+        stopped = true
+        clearInterval(poll)
+        addLog('Mobile receiver detected — uploading to relay...', 'info')
+        toast.info('Mobile receiver connected — uploading files...')
+
+        const formData = new FormData()
+        for (const f of files) {
+          formData.append('file', f, f.name)
+        }
+        const uploadRes = await fetch(`/api/relay/${displayCode}`, { method: 'POST', body: formData })
+        if (uploadRes.ok) {
+          addLog('Files uploaded to relay for mobile receiver', 'success')
+          toast.success('Files ready for mobile download!')
+        } else {
+          addLog('Relay upload failed', 'error')
+          toast.error('Failed to upload files to relay')
+        }
+      } catch {
+        // ignore transient errors
+      }
+    }, 2000)
+
+    return () => { stopped = true; clearInterval(poll) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayCode, files.length, mode, status])
 
   // Generate code and set expiry on mount
   useEffect(() => {
@@ -568,6 +612,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         if (Array.isArray(json.files) && json.files.length > 0) {
           setRelayFiles(json.files)
           setRelayCode(normalized)
+          setStatus('idle')
           addLog(`Relay transfer found: ${json.files.length} file(s)`, 'success')
           toast.success('Files ready to download!', { description: `${json.files.length} file(s) from mobile` })
           return
@@ -614,6 +659,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             conn.close()
             setRelayFiles(json.files)
             setRelayCode(normalized)
+            setStatus('idle')
             addLog(`Relay transfer found: ${json.files.length} file(s)`, 'success')
             toast.success('Files ready to download!', { description: `${json.files.length} file(s) from mobile` })
           }

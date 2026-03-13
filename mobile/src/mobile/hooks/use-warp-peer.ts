@@ -64,6 +64,7 @@ export function useWarpPeer() {
 
   const peerRef = useRef<any>(null);
   const connRef = useRef<any>(null);
+  const relayPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [receivedFiles, setReceivedFiles] = useState<ReceivedFile[]>([]);
 
   const cleanup = useCallback(() => {
@@ -71,6 +72,10 @@ export function useWarpPeer() {
     peerRef.current?.destroy();
     peerRef.current = null;
     connRef.current = null;
+    if (relayPollRef.current) {
+      clearInterval(relayPollRef.current);
+      relayPollRef.current = null;
+    }
     setReceivedFiles([]);
     reset();
   }, [reset]);
@@ -176,27 +181,113 @@ export function useWarpPeer() {
       setStatus("connecting");
       addLog(`Connecting with code: ${trimmed}`, "info");
 
+      // 1. Check relay first — PC may have already uploaded files
+      try {
+        const res = await fetch(`${RELAY_BASE}/api/relay/${trimmed}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.files) && json.files.length > 0) {
+            addLog(`Relay files found: ${json.files.length} file(s)`, "success");
+            setStatus("transferring");
+            const downloaded: ReceivedFile[] = [];
+            for (const f of json.files) {
+              const fileRes = await fetch(`${RELAY_BASE}/api/relay/${trimmed}?index=${f.index}`);
+              const data = await fileRes.arrayBuffer();
+              downloaded.push({ name: f.name, size: f.size, mimeType: f.mimeType, data });
+              addLog(`Downloaded: ${f.name}`, "success");
+            }
+            setReceivedFiles(downloaded);
+            setProgress(100);
+            setStatus("completed");
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            addLog("All files received!", "success");
+            return;
+          }
+        }
+      } catch {
+        // relay check failed — fall through
+      }
+
+      // 2. Claim the code so the PC sender knows to upload to relay
+      try {
+        await fetch(`${RELAY_BASE}/api/relay/${trimmed}/claim`, { method: "POST" });
+        addLog("Notified sender — waiting for upload...", "info");
+      } catch {
+        // ignore
+      }
+
+      // 3. Poll relay for files uploaded by PC sender
+      let relayFound = false;
+      const pollInterval = setInterval(async () => {
+        if (relayFound) { clearInterval(pollInterval); relayPollRef.current = null; return; }
+        try {
+          const res = await fetch(`${RELAY_BASE}/api/relay/${trimmed}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json.files) && json.files.length > 0) {
+              relayFound = true;
+              clearInterval(pollInterval);
+              addLog(`Relay files found: ${json.files.length} file(s)`, "success");
+              setStatus("transferring");
+              const downloaded: ReceivedFile[] = [];
+              for (const f of json.files) {
+                const fileRes = await fetch(`${RELAY_BASE}/api/relay/${trimmed}?index=${f.index}`);
+                const data = await fileRes.arrayBuffer();
+                downloaded.push({ name: f.name, size: f.size, mimeType: f.mimeType, data });
+                addLog(`Downloaded: ${f.name}`, "success");
+              }
+              setReceivedFiles(downloaded);
+              setProgress(100);
+              setStatus("completed");
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              addLog("All files received!", "success");
+            }
+          }
+        } catch {
+          // ignore poll errors
+        }
+      }, 2000);
+      relayPollRef.current = pollInterval;
+
+      // Timeout — stop polling after 90s if nothing arrived
+      setTimeout(() => {
+        if (!relayFound) {
+          clearInterval(pollInterval);
+          relayPollRef.current = null;
+          if (useWarpStore.getState().status === "connecting" || useWarpStore.getState().status === "transferring") {
+            setStatus("error");
+            setError("Connection timeout — no files received. Make sure the sender has the app open.");
+            addLog("Relay timeout — no files received", "error");
+          }
+        }
+      }, 90000);
+
+      // 4. Also attempt PeerJS P2P (works in dev builds, not Expo Go)
       try {
         const myId = `rcv-${Date.now()}`;
         const peer = await createPeer(myId);
         peerRef.current = peer;
 
         peer.on("open", () => {
+          if (relayFound) { peer.destroy(); return; }
           const peerId = codeToPeerId(trimmed);
           const conn = peer.connect(peerId, { reliable: true });
 
           conn.on("open", () => {
+            if (relayFound) { conn.close(); return; }
             addLog("Connected! Requesting files...", "success");
             setStatus("connected");
             conn.send({ type: "request" });
           });
 
           conn.on("data", (data: any) => {
+            if (relayFound) return;
             if (data.type === "file") {
               addLog(`Receiving: ${data.name}`, "info");
               setStatus("transferring");
               setReceivedFiles((prev) => [...prev, data as ReceivedFile]);
             } else if (data.type === "done") {
+              clearInterval(pollInterval);
               setStatus("completed");
               setProgress(100);
               addLog("All files received!", "success");
@@ -206,19 +297,16 @@ export function useWarpPeer() {
           });
 
           conn.on("error", (err: any) => {
-            addLog(`Connection error: ${err.message}`, "error");
-            setStatus("error");
+            if (!relayFound) addLog(`P2P error: ${err.message}`, "info");
           });
         });
 
         peer.on("error", (err: any) => {
-          addLog(`Peer error: ${err.message}`, "error");
-          setStatus("error");
+          if (!relayFound) addLog(`P2P unavailable: ${err.message}`, "info");
         });
       } catch (err: any) {
-        addLog(`Error: ${err.message}`, "error");
-        setError(err.message);
-        setStatus("error");
+        // WebRTC not available (Expo Go) — relay will handle it
+        addLog(`P2P unavailable: ${err.message}`, "info");
       }
     },
     [cleanup, setStatus, setProgress, setError, addLog],
