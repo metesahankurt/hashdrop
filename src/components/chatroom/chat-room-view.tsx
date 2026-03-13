@@ -153,14 +153,16 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
 
   // Auto-join only if there is an initial code AND the room is NOT password-protected
   // (if password-protected, we need the user to enter the password first)
+  // IMPORTANT: Also wait for username to be available before auto-joining
   useEffect(() => {
-    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin) {
+    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin && username) {
+      console.log('[JoinScreen] Auto-joining with username:', username)
       setHasAttemptedAutoJoin(true)
       setIsJoining(true)
       onJoin(initialCode, null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialCode, incomingHasPassword, hasAttemptedAutoJoin, username])
 
   // Reset isJoining when status becomes 'failed' or 'connected'
   useEffect(() => {
@@ -639,10 +641,14 @@ export function ChatRoomView({
     addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
   } = useChatRoomStore()
 
+  // Set username immediately (synchronously) if provided
   useEffect(() => {
-    if (initialUsername) setUsername(initialUsername)
+    if (initialUsername && !username) {
+      console.log('[ChatRoom] Setting initial username:', initialUsername)
+      setUsername(initialUsername)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialUsername])
 
   // Determine initial step:
   // - If we have an incoming code → go straight to join
@@ -873,7 +879,14 @@ export function ChatRoomView({
   // Join an existing room
   const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
     const currentUsername = useChatRoomStore.getState().username || initialUsername || ''
-    if (!currentUsername) return
+    console.log('[ChatRoom] handleJoin called:', { code, hasPassword: !!pwdHash, username: currentUsername })
+
+    if (!currentUsername) {
+      console.error('[ChatRoom] No username found, aborting join')
+      toast.error('Please set a username first')
+      setStatus('failed')
+      return
+    }
 
     setRoomCode(code)
     setRoomPasswordHash(pwdHash)
@@ -881,21 +894,30 @@ export function ChatRoomView({
 
     const joinerPeerId = codeToCallPeerId(generateSecureCode())
     const hostPeerId = codeToCallPeerId(code)
+    console.log('[ChatRoom] Peer IDs:', { joiner: joinerPeerId, host: hostPeerId })
+
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 1,
+      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
       config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
     }
 
     const newPeer = new Peer(joinerPeerId, peerConfig)
 
-    newPeer.on('open', () => {
-      if (!mountedRef.current) return
+    newPeer.on('open', (id) => {
+      console.log('[ChatRoom] Peer opened:', id)
+      if (!mountedRef.current) {
+        console.warn('[ChatRoom] Component unmounted, aborting')
+        return
+      }
       setPeer(newPeer)
 
+      console.log('[ChatRoom] Attempting to connect to host:', hostPeerId)
       const conn = newPeer.connect(hostPeerId, { reliable: true })
+
       conn.on('open', () => {
+        console.log('[ChatRoom] Data connection opened successfully')
         setupConn(conn, hostPeerId, currentUsername, null, announcedRef)
         conn.send({ type: 'auth', hash: pwdHash || '' })
         conn.send({ type: 'announce', username: currentUsername })
@@ -905,17 +927,31 @@ export function ChatRoomView({
         addSystemMsg('Connected to room!')
       })
 
-      conn.on('error', () => {
+      conn.on('error', (err) => {
+        console.error('[ChatRoom] Data connection error:', err)
         toast.error('Could not join room. Is the code correct?')
         setStatus('failed')
         setStep('join')
       })
+
+      conn.on('close', () => {
+        console.warn('[ChatRoom] Data connection closed before opening')
+      })
     })
 
-    newPeer.on('error', () => {
-      toast.error('Connection error. Please try again.')
+    newPeer.on('error', (err) => {
+      console.error('[ChatRoom] Peer error:', err)
+      toast.error(`Connection error: ${err.type || 'Unknown'}`)
       setStatus('failed')
       setStep('join')
+    })
+
+    newPeer.on('disconnected', () => {
+      console.warn('[ChatRoom] Peer disconnected from signaling server')
+    })
+
+    newPeer.on('close', () => {
+      console.warn('[ChatRoom] Peer connection closed')
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
 
