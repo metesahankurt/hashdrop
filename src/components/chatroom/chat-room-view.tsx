@@ -160,10 +160,12 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
       console.log('[JoinScreen] Auto-joining with username:', trimmedUsername, 'code:', initialCode)
       setHasAttemptedAutoJoin(true)
       setIsJoining(true)
-      // Use a small delay to ensure all state is properly synchronized
+      // Use a delay to ensure all state is properly synchronized
+      // Longer delay helps with PC browsers that may need more time
       setTimeout(() => {
+        console.log('[JoinScreen] Executing auto-join after delay')
         onJoin(initialCode, null)
-      }, 100)
+      }, 300)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCode, incomingHasPassword, hasAttemptedAutoJoin, username])
@@ -1009,24 +1011,44 @@ export function ChatRoomView({
 
       console.log('[ChatRoom] Attempting to connect to host:', hostPeerId)
 
-      // Check if host peer exists before connecting
-      console.log('[ChatRoom] Checking if host peer is online...')
+      // Add a delay before attempting connection to ensure signaling server is ready
+      // This is especially important on desktop browsers
+      setTimeout(() => {
+        console.log('[ChatRoom] Initiating connection to host after delay...')
 
-      const conn = newPeer.connect(hostPeerId, {
-        reliable: true,
-        serialization: 'json',
-        metadata: { username: currentUsername }
-      })
+        // Try to check if peer exists first (best effort - listAllPeers might not be available)
+        if (typeof (newPeer as any).listAllPeers === 'function') {
+          (newPeer as any).listAllPeers((peers: string[]) => {
+            console.log('[ChatRoom] Available peers:', peers)
+            const hostExists = peers.includes(hostPeerId)
+            console.log('[ChatRoom] Host peer exists:', hostExists)
 
+            if (!hostExists) {
+              console.warn('[ChatRoom] Host peer not found in peer list, attempting connection anyway...')
+            }
+          })
+        }
+
+        const conn = newPeer.connect(hostPeerId, {
+          reliable: true,
+          serialization: 'json',
+          metadata: { username: currentUsername }
+        })
+
+        connectToPeer(conn)
+      }, 800)
+    })
+
+    function connectToPeer(conn: DataConnection) {
       console.log('[ChatRoom] Connection object created:', {
         peer: conn.peer,
         open: conn.open,
         type: conn.type
       })
 
-      // Data connection timeout - if connection not opened in 20 seconds, fail
+      // Data connection timeout - if connection not opened in 25 seconds, fail
       const dataConnTimeout = setTimeout(() => {
-        console.error('[ChatRoom] Data connection timeout after 20 seconds')
+        console.error('[ChatRoom] Data connection timeout after 25 seconds')
         console.error('[ChatRoom] Connection state:', {
           open: conn.open,
           peerConnection: conn.peerConnection?.connectionState,
@@ -1038,7 +1060,7 @@ export function ChatRoomView({
         setStep('join')
         clearTimeout(connectionTimeout)
         try { conn.close() } catch { /* ignore */ }
-      }, 20000)
+      }, 25000)
 
       // Monitor ICE connection state (peerConnection might not be ready immediately)
       setTimeout(() => {
@@ -1082,9 +1104,20 @@ export function ChatRoomView({
 
       conn.on('error', (err) => {
         console.error('[ChatRoom] Data connection error:', err)
+        console.error('[ChatRoom] Error type:', (err as any).type)
         clearTimeout(connectionTimeout)
         clearTimeout(dataConnTimeout)
-        toast.error('Could not join room. The room may be closed.')
+
+        // Provide more specific error messages
+        const errorType = (err as any).type
+        if (errorType === 'peer-unavailable') {
+          toast.error('Room host is not available. They may have closed the room.')
+        } else if (errorType === 'network') {
+          toast.error('Network error. Please check your connection.')
+        } else {
+          toast.error('Could not join room. The room may be closed.')
+        }
+
         setStatus('failed')
         setStep('join')
       })
@@ -1093,7 +1126,7 @@ export function ChatRoomView({
         console.warn('[ChatRoom] Data connection closed before opening')
         clearTimeout(dataConnTimeout)
       })
-    })
+    }
 
     newPeer.on('error', (err) => {
       console.error('[ChatRoom] Peer error:', err)
