@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
-import { File, Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
 
@@ -412,13 +412,26 @@ export function useWarpPeer() {
   }, [setFiles, addLog]);
 
   const saveFile = useCallback(async (file: ReceivedFile) => {
-    const uint8 = new Uint8Array(file.data);
-    // File class inherits write/uri from the native FileSystemFile module;
-    // TypeScript doesn't resolve the native class chain so we cast.
-    const fsFile = new File(Paths.cache, file.name) as any;
-    fsFile.write(uint8);
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fsFile.uri, { mimeType: file.mimeType });
+    try {
+      const uint8 = new Uint8Array(file.data);
+      // Convert to base64 for writing via classic FileSystem API
+      let binary = "";
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8.byteLength; i += chunkSize) {
+        binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+
+      const fileUri = (FileSystem.cacheDirectory ?? "") + file.name;
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: file.mimeType });
+      }
+    } catch (err: any) {
+      console.error("saveFile error:", err);
     }
   }, []);
 
