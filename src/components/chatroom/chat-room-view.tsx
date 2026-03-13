@@ -855,7 +855,7 @@ export function ChatRoomView({
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
+      host: 'hashdrop.onrender.com', port: 443, path: '/peerjs', secure: true, debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -964,7 +964,7 @@ export function ChatRoomView({
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
+      host: 'hashdrop.onrender.com', port: 443, path: '/peerjs', secure: true, debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },

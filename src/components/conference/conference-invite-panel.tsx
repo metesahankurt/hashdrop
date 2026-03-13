@@ -40,7 +40,7 @@ export function ConferenceInvitePanel({ onClose }: ConferenceInvitePanelProps) {
   }
 
   return (
-    <div className="w-80 h-full flex flex-col glass-card rounded-2xl overflow-hidden">
+    <div className="glass-card rounded-2xl flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-2">
@@ -56,7 +56,7 @@ export function ConferenceInvitePanel({ onClose }: ConferenceInvitePanelProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {/* Room Code */}
         <div className="space-y-1.5">
           <p className="text-xs text-muted font-medium">Meeting Code</p>

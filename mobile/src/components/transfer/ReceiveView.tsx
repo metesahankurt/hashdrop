@@ -66,7 +66,7 @@ export function ReceiveView({ onBack }: ReceiveViewProps) {
       const peer = new (Peer as any)(myId, {
         host: PEERJS_SERVER,
         port: 443,
-        path: "/",
+        path: "/peerjs",
         secure: true,
       });
       peerRef.current = peer;

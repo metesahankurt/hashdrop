@@ -50,7 +50,7 @@ export function TextShareView({ onBack }: TextShareViewProps) {
       const peer = new (Peer as any)(peerId, {
         host: PEERJS_SERVER,
         port: 443,
-        path: "/",
+        path: "/peerjs",
         secure: true,
       });
       peerRef.current = peer;
