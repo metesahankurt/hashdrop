@@ -148,27 +148,36 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
   const [showPwd, setShowPwd] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
+  const [hasAttemptedAutoJoin, setHasAttemptedAutoJoin] = useState(false)
+  const status = useChatRoomStore(state => state.status)
 
   // Auto-join only if there is an initial code AND the room is NOT password-protected
   // (if password-protected, we need the user to enter the password first)
   useEffect(() => {
-    if (initialCode && !incomingHasPassword && !isJoining) {
+    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin) {
+      setHasAttemptedAutoJoin(true)
       setIsJoining(true)
       onJoin(initialCode, null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Reset isJoining when status becomes 'failed' or 'connected'
+  useEffect(() => {
+    if (status === 'failed' || status === 'connected') {
+      setIsJoining(false)
+    }
+  }, [status])
+
   const handleJoin = async () => {
     if (!inputCode.trim()) return
     setIsJoining(true)
     const hash = joinPassword ? await hashPassword(joinPassword) : null
     await onJoin(inputCode.trim(), hash)
-    setIsJoining(false)
   }
 
-  // If auto-joining (non-password link), show spinner
-  if (initialCode && !incomingHasPassword) {
+  // If auto-joining (non-password link) and still attempting, show spinner
+  if (initialCode && !incomingHasPassword && isJoining) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto flex flex-col items-center gap-4 py-12">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
