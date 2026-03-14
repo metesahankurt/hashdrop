@@ -47,6 +47,8 @@ const XIcon = X as any;
 const CheckIcon = CheckCircle as any;
 
 type TransferMode = "hub" | "send" | "receive" | "text";
+const RELAY_PREFERRED_FILE_BYTES = 4 * 1024 * 1024;
+const RELAY_PREFERRED_TOTAL_BYTES = 10 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Hub screen
@@ -112,7 +114,7 @@ function TransferHub({ onSelect }: { onSelect: (m: TransferMode) => void }) {
 // Send screen
 // ---------------------------------------------------------------------------
 function TransferSendView({ onBack }: { onBack: () => void }) {
-  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setError, setDisplayCode, setCodeExpiry, setFiles, addLog } = useWarpStore();
+  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setProgress, setError, setDisplayCode, setCodeExpiry, setFiles, addLog } = useWarpStore();
   const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } =
     useWarpPeer();
 
@@ -171,10 +173,13 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   const handleSend = async () => {
     if (transport === "relay") {
       setStatus("transferring");
+      setProgress(0);
       try {
         await sendViaRelay(files, displayCode ?? "", (sent, total) => {
+          setProgress((sent / total) * 100);
           addLog(`Uploaded ${sent}/${total}`, "info");
         });
+        setProgress(100);
         setStatus("completed");
         addLog("Files ready for download on the web app!", "success");
       } catch (err: any) {
@@ -220,6 +225,19 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
 
   const isRelay = transport === "relay";
   const statusColor = getStatusColor(status);
+  const relayRecommended = shouldPreferRelay(files);
+
+  const handlePickFiles = useCallback(async () => {
+    await pickFiles();
+    const selectedFiles = useWarpStore.getState().files;
+    if (!selectedFiles.length) return;
+
+    if (shouldPreferRelay(selectedFiles)) {
+      setTransport("relay");
+      setRelayCodeLocal(useWarpStore.getState().displayCode || null);
+      addLog("Optimized upload enabled for photos and large files.", "info");
+    }
+  }, [pickFiles, addLog]);
 
   return (
     <SubShell title="Send Files" onBack={onBack}>
@@ -268,7 +286,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
       {/* File picker */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Files to send</Text>
-        <TouchableOpacity style={styles.dropzone} onPress={pickFiles}>
+        <TouchableOpacity style={styles.dropzone} onPress={handlePickFiles}>
           <FileUpIcon size={28} stroke="#8b8b8b" strokeWidth={2} />
           <Text style={styles.dropzoneTitle}>Tap to select files</Text>
           <Text style={styles.dropzoneHint}>Any format, up to 10 GB</Text>
@@ -290,6 +308,14 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
           </View>
         )}
       </View>
+
+      {relayRecommended && (
+        <View style={styles.relayBadge}>
+          <Text style={styles.relayBadgeText}>
+            Photo optimization active: this transfer will use faster relay upload.
+          </Text>
+        </View>
+      )}
 
       {/* Relay badge */}
       {isRelay && status === "waiting" && (
@@ -662,6 +688,22 @@ function statusLabel(status: string, progress: number) {
     case "error": return "Failed";
     default: return "";
   }
+}
+
+function shouldPreferRelay(files: Array<{ size: number; type: string }>) {
+  if (!files.length) return false;
+
+  let totalBytes = 0;
+  for (const file of files) {
+    totalBytes += file.size || 0;
+    const mime = (file.type || "").toLowerCase();
+    const isMedia = mime.startsWith("image/") || mime.startsWith("video/");
+    if (isMedia && (file.size || 0) >= RELAY_PREFERRED_FILE_BYTES) {
+      return true;
+    }
+  }
+
+  return totalBytes >= RELAY_PREFERRED_TOTAL_BYTES;
 }
 
 // ---------------------------------------------------------------------------
