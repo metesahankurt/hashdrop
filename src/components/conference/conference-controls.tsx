@@ -77,7 +77,10 @@ export function ConferenceControls({ onLeave, isMobileEmbed }: ConferenceControl
     }
   }, [localParticipant, setScreenSharing])
 
-  const participantCount = participants.length + (localParticipant ? 1 : 0)
+  const participantCount = [
+    ...(localParticipant ? [localParticipant] : []),
+    ...participants.filter((participant) => participant.identity !== localParticipant?.identity),
+  ].length
   const toggleChat = () => {
     setChatOpen(!isChatOpen)
     if (isParticipantsOpen) setParticipantsOpen(false)
