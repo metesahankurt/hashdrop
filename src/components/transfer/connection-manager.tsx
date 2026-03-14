@@ -433,8 +433,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     notifyConnectionEstablished()
     addLog('Connection established with peer', 'success')
 
-    // Handshake: Announce we are ready to receive data
-    // Both sides do this, ensuring the pipe is open
+    // Handshake: connection is already open when this runs
     conn.send({ type: 'ready' })
 
     conn.on('data', (data) => {
@@ -541,8 +540,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             return
           }
 
-          // Use ref to avoid stale closure - always calls the latest handler
-          handleConnectionRef.current(conn)
+          // Wait for the connection to be open before handling (avoids "not open" send errors)
+          conn.on('open', () => {
+            handleConnectionRef.current(conn)
+          })
         })
 
         newPeer.on('error', (err) => {
