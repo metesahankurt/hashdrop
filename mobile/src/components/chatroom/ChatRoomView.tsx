@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { WebView } from "react-native-webview";
 import { Lock, MessageSquare, Plus, LogIn } from "lucide-react-native";
 import Toast from "react-native-toast-message";
@@ -40,7 +39,8 @@ async function hashPassword(password: string): Promise<string> {
 
 export function ChatRoomView() {
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  // Dock sits at Math.max(insets.bottom, 10) from screen bottom and is 64px tall (46 item + 9+9 padding).
+  const dockClearance = Math.max(insets.bottom, 10) + 64;
   const { username: profileUsername } = useProfileStore();
   const { status, roomName, username: storeUsername, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
   const username = storeUsername || profileUsername;
@@ -136,14 +136,32 @@ export function ChatRoomView() {
 
   if (status === "connected") {
     const displayName = username || `User-${roomName.slice(-4)}`;
-    const chatUrl = `${API_BASE}/chatroom/${encodeURIComponent(roomName)}?autoAccept=1&from=${encodeURIComponent(displayName)}`;
+    const chatUrl = `${API_BASE}/chatroom/${encodeURIComponent(roomName)}?autoAccept=1&from=${encodeURIComponent(displayName)}&topInset=${Math.round(insets.top)}`;
+    const topPx = Math.round(insets.top);
+    // Inject padding directly into the web page's fixed container so it clears the status bar/Dynamic Island.
+    // Retries handle cases where React hydration finishes after DOMContentLoaded.
+    const injectedJavaScript = `
+      (function() {
+        function apply() {
+          var el = document.querySelector('div.fixed.top-0');
+          if (el) { el.style.paddingTop = '${topPx}px'; return true; }
+          return false;
+        }
+        if (!apply()) {
+          var n = 0;
+          var t = setInterval(function() { if (apply() || ++n > 30) clearInterval(t); }, 100);
+        }
+      })();
+      true;
+    `;
     return (
-      <View style={{ flex: 1, backgroundColor: "#0d0d0d", paddingTop: insets.top, paddingBottom: tabBarHeight }}>
+      <View style={{ flex: 1, paddingBottom: dockClearance }}>
         <WebView
           source={{ uri: chatUrl }}
           style={{ flex: 1 }}
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
+          injectedJavaScript={injectedJavaScript}
           onNavigationStateChange={(state) => {
             if (state.url && !state.url.includes("/chatroom/")) {
               handleLeave();
