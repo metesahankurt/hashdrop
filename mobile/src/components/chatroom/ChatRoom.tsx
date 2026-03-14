@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import {
   LiveKitRoom,
+  useDataChannel,
   useRoomContext,
   useParticipants,
   useLocalParticipant,
@@ -37,6 +38,22 @@ interface ChatRoomProps {
 export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
   const { token, status } = useChatRoomStore();
 
+  // Stable callbacks — inline arrow functions re-create on every render, which
+  // causes useLiveKitRoom's connect useEffect to re-fire (onError is in its deps).
+  const handleConnected = useCallback(() => {
+    console.log('[ChatRoom][MOBILE] LiveKitRoom onConnected — serverUrl:', livekitUrl);
+  }, [livekitUrl]);
+
+  const handleDisconnected = useCallback(() => {
+    console.log('[ChatRoom][MOBILE] LiveKitRoom onDisconnected');
+    onLeave();
+  }, [onLeave]);
+
+  const handleError = useCallback((error: Error) => {
+    console.error('[ChatRoom][MOBILE] LiveKitRoom onError:', error?.message, error);
+    Toast.show({ type: "error", text1: "Connection failed", text2: error?.message ?? "Could not connect to room" });
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: "#0d0d0d" }}>
       <LiveKitRoom
@@ -45,17 +62,9 @@ export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
         connect={status !== "idle"}
         audio={false}
         video={false}
-        onConnected={() => {
-          console.log('[ChatRoom][MOBILE] LiveKitRoom onConnected — serverUrl:', livekitUrl);
-        }}
-        onDisconnected={() => {
-          console.log('[ChatRoom][MOBILE] LiveKitRoom onDisconnected');
-          onLeave();
-        }}
-        onError={(error) => {
-          console.error('[ChatRoom][MOBILE] LiveKitRoom onError:', error?.message, error);
-          Toast.show({ type: "error", text1: "Connection failed", text2: error?.message ?? "Could not connect to room" });
-        }}
+        onConnected={handleConnected}
+        onDisconnected={handleDisconnected}
+        onError={handleError}
       >
         <ChatRoomContent onLeave={onLeave} />
       </LiveKitRoom>
@@ -93,38 +102,35 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
     console.log('[ChatRoom][MOBILE] useParticipants() count:', participants.length, participants.map((p: any) => ({ id: p.identity, meta: p.metadata })));
   }, [participants]);
 
-  // Listen for incoming messages
-  useEffect(() => {
-    if (!room) {
-      console.log('[ChatRoom][MOBILE] DataReceived useEffect — room is null, skipping');
-      return;
-    }
-    console.log('[ChatRoom][MOBILE] Attaching DataReceived listener');
-    const handler = (payload: Uint8Array, participant: any) => {
-      try {
-        const text = new TextDecoder().decode(payload);
-        console.log('[ChatRoom][MOBILE] DataReceived raw:', text.slice(0, 200), 'from:', participant?.identity);
-        const data = JSON.parse(text);
-        if (data?.type !== "chat") {
-          console.log('[ChatRoom][MOBILE] DataReceived — ignored, type:', data?.type);
-          return;
-        }
-        console.log('[ChatRoom][MOBILE] DataReceived chat — sender:', data.sender, 'content:', data.content, 'senderIdentity:', data.senderIdentity);
-        addMessage({
-          id: `msg-${data.timestamp}-${data.senderIdentity}`,
-          type: "text",
-          sender: data.sender,
-          senderIdentity: data.senderIdentity,
-          content: data.content,
-          timestamp: data.timestamp,
-        });
-      } catch (e) {
-        console.error('[ChatRoom][MOBILE] DataReceived parse error:', e);
+  // Use useDataChannel hook — more reliable than room.on(DataReceived) in @livekit/react-native
+  // Use a ref so the stable callback always calls the latest addMessage without re-subscribing
+  const addMessageRef = useRef(addMessage);
+  addMessageRef.current = addMessage;
+
+  const onDataReceived = useCallback((msg: any) => {
+    try {
+      const text = new TextDecoder().decode(msg.payload);
+      console.log('[ChatRoom][MOBILE] useDataChannel received:', text.slice(0, 200), 'from:', msg.from?.identity);
+      const data = JSON.parse(text);
+      if (data?.type !== "chat") {
+        console.log('[ChatRoom][MOBILE] useDataChannel — ignored, type:', data?.type);
+        return;
       }
-    };
-    room.on(RoomEvent.DataReceived, handler);
-    return () => { room.off(RoomEvent.DataReceived, handler); };
-  }, [room, addMessage]);
+      console.log('[ChatRoom][MOBILE] useDataChannel chat — sender:', data.sender, 'content:', data.content);
+      addMessageRef.current({
+        id: `msg-${data.timestamp}-${data.senderIdentity}`,
+        type: "text",
+        sender: data.sender,
+        senderIdentity: data.senderIdentity,
+        content: data.content,
+        timestamp: data.timestamp,
+      });
+    } catch (e) {
+      console.error('[ChatRoom][MOBILE] useDataChannel parse error:', e);
+    }
+  }, []); // stable — uses ref for addMessage
+
+  useDataChannel(onDataReceived);
 
   // Participant join/leave system messages
   useEffect(() => {
