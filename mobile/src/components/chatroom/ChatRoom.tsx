@@ -15,7 +15,6 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import {
   LiveKitRoom,
-  useDataChannel,
   useRoomContext,
   useParticipants,
   useLocalParticipant,
@@ -102,35 +101,38 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
     console.log('[ChatRoom][MOBILE] useParticipants() count:', participants.length, participants.map((p: any) => ({ id: p.identity, meta: p.metadata })));
   }, [participants]);
 
-  // Use useDataChannel hook — more reliable than room.on(DataReceived) in @livekit/react-native
-  // Use a ref so the stable callback always calls the latest addMessage without re-subscribing
-  const addMessageRef = useRef(addMessage);
-  addMessageRef.current = addMessage;
-
-  const onDataReceived = useCallback((msg: any) => {
-    try {
-      const text = new TextDecoder().decode(msg.payload);
-      console.log('[ChatRoom][MOBILE] useDataChannel received:', text.slice(0, 200), 'from:', msg.from?.identity);
-      const data = JSON.parse(text);
-      if (data?.type !== "chat") {
-        console.log('[ChatRoom][MOBILE] useDataChannel — ignored, type:', data?.type);
-        return;
-      }
-      console.log('[ChatRoom][MOBILE] useDataChannel chat — sender:', data.sender, 'content:', data.content);
-      addMessageRef.current({
-        id: `msg-${data.timestamp}-${data.senderIdentity}`,
-        type: "text",
-        sender: data.sender,
-        senderIdentity: data.senderIdentity,
-        content: data.content,
-        timestamp: data.timestamp,
-      });
-    } catch (e) {
-      console.error('[ChatRoom][MOBILE] useDataChannel parse error:', e);
+  // Listen for incoming messages via room event
+  useEffect(() => {
+    if (!room) {
+      console.log('[ChatRoom][MOBILE] DataReceived useEffect — room is null, skipping');
+      return;
     }
-  }, []); // stable — uses ref for addMessage
-
-  useDataChannel(onDataReceived);
+    console.log('[ChatRoom][MOBILE] Attaching DataReceived listener, room state:', (room as any).state);
+    const handler = (payload: Uint8Array, participant: any) => {
+      try {
+        const text = new TextDecoder().decode(payload);
+        console.log('[ChatRoom][MOBILE] DataReceived raw:', text.slice(0, 200), 'from:', participant?.identity);
+        const data = JSON.parse(text);
+        if (data?.type !== "chat") {
+          console.log('[ChatRoom][MOBILE] DataReceived — ignored, type:', data?.type);
+          return;
+        }
+        console.log('[ChatRoom][MOBILE] DataReceived chat — sender:', data.sender, 'content:', data.content);
+        addMessage({
+          id: `msg-${data.timestamp}-${data.senderIdentity}`,
+          type: "text",
+          sender: data.sender,
+          senderIdentity: data.senderIdentity,
+          content: data.content,
+          timestamp: data.timestamp,
+        });
+      } catch (e) {
+        console.error('[ChatRoom][MOBILE] DataReceived parse error:', e);
+      }
+    };
+    room.on(RoomEvent.DataReceived, handler);
+    return () => { room.off(RoomEvent.DataReceived, handler); };
+  }, [room, addMessage]);
 
   // Participant join/leave system messages
   useEffect(() => {
