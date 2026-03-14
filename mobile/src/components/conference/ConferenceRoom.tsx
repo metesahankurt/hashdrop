@@ -139,6 +139,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     setStatus,
     setCallStartTime,
     addWaitingParticipant,
+    setWaitingParticipants,
     removeWaitingParticipant,
     addChatMessage,
     clearUnread,
@@ -160,20 +161,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
   useEffect(() => {
     if (!room || !localParticipant) return;
 
-    const publishTracks = async () => {
-      try {
-        await localParticipant.setCameraEnabled(!isCameraOff);
-        await localParticipant.setMicrophoneEnabled(!isMicMuted);
-      } catch (error) {
-        console.error("[Conference][MOBILE] publishTracks error:", error);
-        Toast.show({
-          type: "error",
-          text1: "Media setup failed",
-          text2: "Could not start camera or microphone.",
-        });
-      }
-    };
-
     const sendJoinRequest = async () => {
       try {
         const payload = new TextEncoder().encode(
@@ -189,7 +176,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
       if (role === "host") {
         setStatus("in-room");
         setCallStartTime(Date.now());
-        await publishTracks();
       } else {
         setStatus("waiting");
         setTimeout(() => {
@@ -276,7 +262,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
       if (participant.permissions?.canPublish && role !== "host") {
         setStatus("in-room");
         setCallStartTime(Date.now());
-        await publishTracks();
         Toast.show({ type: "success", text1: "You were admitted" });
       }
     };
@@ -309,23 +294,58 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     role,
     identity,
     username,
-    isCameraOff,
-    isMicMuted,
     setStatus,
     setCallStartTime,
     addWaitingParticipant,
+    setWaitingParticipants,
     removeWaitingParticipant,
     addChatMessage,
   ]);
 
+  useEffect(() => {
+    if (role !== "host" || !roomName) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/conference/waiting?roomName=${encodeURIComponent(roomName)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          participants?: Array<{ identity: string; username: string }>;
+        };
+        if (!cancelled) {
+          setWaitingParticipants(
+            (data.participants || []).map((participant) => ({
+              ...participant,
+              joinedAt: Date.now(),
+            })),
+          );
+        }
+      } catch {
+        // Ignore transient polling errors.
+      }
+    };
+
+    void poll();
+    const interval = setInterval(poll, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [role, roomName, setWaitingParticipants]);
+
   const toggleMic = async () => {
-    await localParticipant.setMicrophoneEnabled(isMicMuted);
-    setIsMicMuted(!isMicMuted);
+    const nextMuted = !isMicMuted;
+    await localParticipant.setMicrophoneEnabled(!nextMuted);
+    setIsMicMuted(nextMuted);
   };
 
   const toggleCamera = async () => {
-    await localParticipant.setCameraEnabled(isCameraOff);
-    setIsCameraOff(!isCameraOff);
+    const nextCameraOff = !isCameraOff;
+    await localParticipant.setCameraEnabled(!nextCameraOff);
+    setIsCameraOff(nextCameraOff);
   };
 
   const leaveRoom = () => {

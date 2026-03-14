@@ -82,6 +82,7 @@ interface ConferenceStore {
   setPinnedIdentity: (id: string | null) => void;
   setCallStartTime: (time: number | null) => void;
   addWaitingParticipant: (p: WaitingParticipant) => void;
+  setWaitingParticipants: (participants: WaitingParticipant[]) => void;
   removeWaitingParticipant: (identity: string) => void;
   addChatMessage: (msg: ChatMessage) => void;
   incrementUnread: () => void;
@@ -96,8 +97,8 @@ const initialState = {
   role: "participant" as ConferenceRole,
   username: "",
   status: "idle" as ConferenceStatus,
-  isMicMuted: false,
-  isCameraOff: false,
+  isMicMuted: true,
+  isCameraOff: true,
   isScreenSharing: false,
   isSpeakerMuted: false,
   isChatOpen: false,
@@ -129,6 +130,7 @@ export const useConferenceStore = create<ConferenceStore>((set) => ({
     set((state) => ({
       waitingParticipants: [...state.waitingParticipants, p],
     })),
+  setWaitingParticipants: (participants) => set({ waitingParticipants: participants }),
   removeWaitingParticipant: (identity) =>
     set((state) => ({
       waitingParticipants: state.waitingParticipants.filter(
