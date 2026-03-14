@@ -6,9 +6,12 @@ import {
   TouchableOpacity,
   FlatList,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RemoteParticipant, LocalParticipant } from "livekit-client";
 import { X, Mic, MicOff, Video, VideoOff, Crown } from "lucide-react-native";
 import { useConferenceStore } from "@/store/use-conference-store";
+
+const FLOATING_DOCK_HEIGHT = 74;
 
 interface ConferenceParticipantsProps {
   participants: (RemoteParticipant | LocalParticipant)[];
@@ -19,7 +22,9 @@ export function ConferenceParticipants({
   participants,
   onClose,
 }: ConferenceParticipantsProps) {
-  const { identity, role } = useConferenceStore();
+  const { identity } = useConferenceStore();
+  const insets = useSafeAreaInsets();
+  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
 
   const getInitials = (name: string) => {
     return name
@@ -43,7 +48,7 @@ export function ConferenceParticipants({
       <FlatList
         data={participants}
         keyExtractor={(p) => p.identity}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: dockClearance }]}
         renderItem={({ item: participant }) => {
           const isMe = participant.identity === identity;
           const isMuted = !participant.isMicrophoneEnabled;

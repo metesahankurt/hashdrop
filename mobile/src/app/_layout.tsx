@@ -1,7 +1,21 @@
 import "react-native-gesture-handler";
 import { registerGlobals } from "@livekit/react-native-webrtc";
+import { Platform } from "react-native";
 
 registerGlobals();
+
+const navigatorTarget = globalThis.navigator as
+  | (Navigator & { product?: string; userAgent?: string })
+  | undefined;
+
+if (navigatorTarget) {
+  if (!navigatorTarget.product) {
+    navigatorTarget.product = "ReactNative";
+  }
+  if (!navigatorTarget.userAgent) {
+    navigatorTarget.userAgent = `HashDropMobile/${Platform.OS}`;
+  }
+}
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";

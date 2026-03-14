@@ -9,9 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoomContext } from "@livekit/react-native";
 import { X, Send } from "lucide-react-native";
 import { useConferenceStore } from "@/store/use-conference-store";
+
+const FLOATING_DOCK_HEIGHT = 74;
 
 interface ConferenceChatProps {
   onClose: () => void;
@@ -20,8 +23,10 @@ interface ConferenceChatProps {
 export function ConferenceChat({ onClose }: ConferenceChatProps) {
   const { chatMessages, addChatMessage, identity, username } = useConferenceStore();
   const room = useRoomContext();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
 
   const sendMessage = () => {
     if (!message.trim() || !room) return;
@@ -122,6 +127,7 @@ export function ConferenceChat({ onClose }: ConferenceChatProps) {
           <Send size={18} color={message.trim() ? "#0d0d0d" : "#8b8b8b"} />
         </TouchableOpacity>
       </View>
+      <View style={{ height: dockClearance }} />
     </KeyboardAvoidingView>
   );
 }

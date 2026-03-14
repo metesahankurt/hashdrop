@@ -1,14 +1,14 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   Alert,
 } from "react-native";
 import {
+  AudioSession,
   LiveKitRoom,
   useLocalParticipant,
   useParticipants,
@@ -16,7 +16,14 @@ import {
   useRoomContext,
   useTracks,
 } from "@livekit/react-native";
-import { Track } from "livekit-client";
+import {
+  DisconnectReason,
+  ParticipantEvent,
+  RoomEvent,
+  Track,
+  type Participant,
+  type RemoteParticipant,
+} from "livekit-client";
 import {
   Mic,
   MicOff,
@@ -26,21 +33,71 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react-native";
+import Toast from "react-native-toast-message";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useConferenceStore } from "@/store/use-conference-store";
 import { ConferenceChat } from "./ConferenceChat";
 import { ConferenceParticipants } from "./ConferenceParticipants";
 import { ConferenceWaiting } from "./ConferenceWaiting";
+
+const FLOATING_DOCK_HEIGHT = 74;
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL || "https://hashdrop.metesahankurt.cloud";
 
 interface ConferenceRoomProps {
   livekitUrl: string;
   onLeave: () => void;
 }
 
+function getParticipantName(participant?: {
+  identity?: string;
+  metadata?: string;
+  name?: string;
+}) {
+  if (participant?.name) return participant.name;
+  try {
+    const metadata = JSON.parse(participant?.metadata || "{}") as {
+      username?: string;
+      role?: string;
+    };
+    return metadata.username || participant?.identity || "Participant";
+  } catch {
+    return participant?.identity || "Participant";
+  }
+}
+
 export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
   const { token, status } = useConferenceStore();
 
+  useEffect(() => {
+    AudioSession.startAudioSession();
+    return () => {
+      AudioSession.stopAudioSession();
+    };
+  }, []);
+
   if (status === "waiting") {
     return <ConferenceWaiting onLeave={onLeave} />;
+  }
+
+  if (status === "ended" || status === "denied") {
+    return (
+      <SafeAreaView style={styles.endedScreen}>
+        <View style={styles.endedCard}>
+          <Text style={styles.endedTitle}>
+            {status === "denied" ? "Entry denied" : "Meeting ended"}
+          </Text>
+          <Text style={styles.endedText}>
+            {status === "denied"
+              ? "The host did not admit you or removed you from the meeting."
+              : "The conference connection has ended."}
+          </Text>
+          <TouchableOpacity style={styles.endedButton} onPress={onLeave}>
+            <Text style={styles.endedButtonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -49,9 +106,12 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
         serverUrl={livekitUrl}
         token={token}
         connect={true}
-        audio={true}
-        video={true}
-        onDisconnected={onLeave}
+        audio={false}
+        video={false}
+        connectOptions={{
+          autoSubscribe: true,
+          rtcConfig: { iceTransportPolicy: "all" },
+        }}
       >
         <RoomContent onLeave={onLeave} />
       </LiveKitRoom>
@@ -63,24 +123,199 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
   const {
     roomName,
     role,
+    identity,
+    username,
     isMicMuted,
     isCameraOff,
     isChatOpen,
     isParticipantsOpen,
     unreadCount,
+    waitingParticipants,
     setIsMicMuted,
     setIsCameraOff,
     setIsChatOpen,
     setIsParticipantsOpen,
+    setStatus,
+    setCallStartTime,
+    addWaitingParticipant,
+    removeWaitingParticipant,
+    addChatMessage,
     clearUnread,
   } = useConferenceStore();
 
+  const insets = useSafeAreaInsets();
   const { localParticipant } = useLocalParticipant();
   const room = useRoomContext();
   const participants = useParticipants();
   const cameraTracks = useTracks([Track.Source.Camera]);
-  const screenTracks = useTracks([Track.Source.ScreenShare]);
-  const audioTracks = useTracks([Track.Source.Microphone]);
+  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
+  const hostWaitingCount = waitingParticipants.length;
+
+  const participantList = useMemo(
+    () => participants.filter((participant) => participant.identity !== identity),
+    [participants, identity],
+  );
+
+  useEffect(() => {
+    if (!room || !localParticipant) return;
+
+    const publishTracks = async () => {
+      try {
+        await localParticipant.setCameraEnabled(!isCameraOff);
+        await localParticipant.setMicrophoneEnabled(!isMicMuted);
+      } catch (error) {
+        console.error("[Conference][MOBILE] publishTracks error:", error);
+        Toast.show({
+          type: "error",
+          text1: "Media setup failed",
+          text2: "Could not start camera or microphone.",
+        });
+      }
+    };
+
+    const sendJoinRequest = async () => {
+      try {
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: "join-request", identity, username }),
+        );
+        await localParticipant.publishData(payload, { reliable: true });
+      } catch (error) {
+        console.error("[Conference][MOBILE] join-request error:", error);
+      }
+    };
+
+    const handleConnected = async () => {
+      if (role === "host") {
+        setStatus("in-room");
+        setCallStartTime(Date.now());
+        await publishTracks();
+      } else {
+        setStatus("waiting");
+        setTimeout(() => {
+          void sendJoinRequest();
+        }, 500);
+      }
+    };
+
+    const handleDisconnected = (reason?: DisconnectReason) => {
+      if (
+        reason === DisconnectReason.PARTICIPANT_REMOVED ||
+        reason === DisconnectReason.ROOM_DELETED
+      ) {
+        setStatus("denied");
+      } else if (reason !== DisconnectReason.CLIENT_INITIATED) {
+        setStatus("ended");
+      }
+    };
+
+    const handleParticipantConnected = (participant: RemoteParticipant) => {
+      const participantName = getParticipantName(participant);
+      let isWaiting = false;
+      try {
+        const metadata = JSON.parse(participant.metadata || "{}") as { role?: string };
+        isWaiting = metadata.role === "waiting";
+      } catch {
+        isWaiting = false;
+      }
+      if (!isWaiting) {
+        Toast.show({ type: "success", text1: `${participantName} joined` });
+      }
+    };
+
+    const handleParticipantDisconnected = (participant: RemoteParticipant) => {
+      removeWaitingParticipant(participant.identity);
+      Toast.show({ type: "info", text1: `${getParticipantName(participant)} left` });
+    };
+
+    const handleDataReceived = (
+      payload: Uint8Array,
+      participant?: RemoteParticipant,
+    ) => {
+      try {
+        const data = JSON.parse(new TextDecoder().decode(payload)) as {
+          type?: string;
+          identity?: string;
+          username?: string;
+          content?: string;
+          sender?: string;
+          senderIdentity?: string;
+          timestamp?: number;
+        };
+
+        if (data.type === "join-request" && role === "host" && data.identity) {
+          addWaitingParticipant({
+            identity: data.identity,
+            username: data.username || "Anonymous",
+            joinedAt: Date.now(),
+          });
+          return;
+        }
+
+        if (data.type === "chat" && data.content) {
+          addChatMessage({
+            id: `${data.timestamp || Date.now()}-${data.senderIdentity || "remote"}`,
+            sender:
+              data.sender ||
+              getParticipantName(participant) ||
+              data.username ||
+              "Participant",
+            senderIdentity: data.senderIdentity || participant?.identity || "remote",
+            content: data.content,
+            timestamp: data.timestamp || Date.now(),
+            type: "text",
+          });
+        }
+      } catch (error) {
+        console.error("[Conference][MOBILE] DataReceived parse error:", error);
+      }
+    };
+
+    const handlePermissionsChanged = async () => {
+      const participant = localParticipant as Participant;
+      if (participant.permissions?.canPublish && role !== "host") {
+        setStatus("in-room");
+        setCallStartTime(Date.now());
+        await publishTracks();
+        Toast.show({ type: "success", text1: "You were admitted" });
+      }
+    };
+
+    room.on(RoomEvent.Connected, handleConnected);
+    room.on(RoomEvent.Disconnected, handleDisconnected);
+    room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
+    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+    room.on(RoomEvent.DataReceived, handleDataReceived);
+    localParticipant.on(ParticipantEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
+
+    if ((room as { state?: string }).state === "connected") {
+      void handleConnected();
+    }
+
+    return () => {
+      room.off(RoomEvent.Connected, handleConnected);
+      room.off(RoomEvent.Disconnected, handleDisconnected);
+      room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
+      room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+      room.off(RoomEvent.DataReceived, handleDataReceived);
+      localParticipant.off(
+        ParticipantEvent.ParticipantPermissionsChanged,
+        handlePermissionsChanged,
+      );
+    };
+  }, [
+    room,
+    localParticipant,
+    role,
+    identity,
+    username,
+    isCameraOff,
+    isMicMuted,
+    setStatus,
+    setCallStartTime,
+    addWaitingParticipant,
+    removeWaitingParticipant,
+    addChatMessage,
+  ]);
 
   const toggleMic = async () => {
     await localParticipant.setMicrophoneEnabled(isMicMuted);
@@ -118,7 +353,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     return (
       <SafeAreaView style={styles.container}>
         <ConferenceParticipants
-          participants={participants}
+          participants={participantList}
           onClose={() => setIsParticipantsOpen(false)}
         />
       </SafeAreaView>
@@ -155,8 +390,48 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
           </View>
         )}
       </ScrollView>
+
+      {role === "host" && hostWaitingCount > 0 && (
+        <View style={styles.waitingBanner}>
+          <Text style={styles.waitingBannerText}>
+            {hostWaitingCount} participant{hostWaitingCount > 1 ? "s" : ""} waiting
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.waitingList}>
+            {waitingParticipants.map((participant) => (
+              <View key={participant.identity} style={styles.waitingChip}>
+                <Text style={styles.waitingChipName} numberOfLines={1}>
+                  {participant.username}
+                </Text>
+                <TouchableOpacity
+                  style={styles.waitingApprove}
+                  onPress={async () => {
+                    try {
+                      const res = await fetch(`${API_BASE}/api/conference/admit`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ roomName, identity: participant.identity }),
+                      });
+                      if (!res.ok) throw new Error("Failed to admit participant");
+                      removeWaitingParticipant(participant.identity);
+                      Toast.show({ type: "success", text1: `${participant.username} admitted` });
+                    } catch (error: unknown) {
+                      Toast.show({
+                        type: "error",
+                        text1: error instanceof Error ? error.message : "Admit failed",
+                      });
+                    }
+                  }}
+                >
+                  <Text style={styles.waitingApproveText}>Admit</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Controls */}
-      <View style={styles.controls}>
+      <View style={[styles.controls, { paddingBottom: dockClearance }]}>
         <TouchableOpacity
           style={[styles.controlBtn, isMicMuted && styles.controlBtnActive]}
           onPress={toggleMic}
@@ -214,6 +489,34 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
 const styles = StyleSheet.create({
   room: { flex: 1, backgroundColor: "#0d0d0d" },
   container: { flex: 1, backgroundColor: "#0d0d0d" },
+  endedScreen: {
+    flex: 1,
+    backgroundColor: "#0d0d0d",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  endedCard: {
+    width: "100%",
+    maxWidth: 320,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 20,
+    padding: 24,
+    gap: 12,
+  },
+  endedTitle: { color: "#ededed", fontSize: 20, fontWeight: "700" },
+  endedText: { color: "#8b8b8b", fontSize: 14, lineHeight: 20 },
+  endedButton: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(62,207,142,0.16)",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  endedButtonText: { color: "#3ecf8e", fontSize: 14, fontWeight: "700" },
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -268,6 +571,47 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   noVideoText: { color: "#8b8b8b", fontSize: 14 },
+  waitingBanner: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    gap: 10,
+  },
+  waitingBannerText: {
+    color: "#f59e0b",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  waitingList: {
+    gap: 8,
+  },
+  waitingChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(245,158,11,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.18)",
+  },
+  waitingChipName: {
+    color: "#ededed",
+    fontSize: 12,
+    fontWeight: "600",
+    maxWidth: 120,
+  },
+  waitingApprove: {
+    borderRadius: 999,
+    backgroundColor: "#3ecf8e",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  waitingApproveText: {
+    color: "#0d0d0d",
+    fontSize: 11,
+    fontWeight: "800",
+  },
   controls: {
     flexDirection: "row",
     justifyContent: "center",
