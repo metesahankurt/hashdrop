@@ -20,7 +20,8 @@ const BASE_URL = 'https://hashdrop.metesahankurt.cloud'
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
 type ChatPayload =
-  | { type: 'chat'; payload: RoomMessage }
+  | { type: 'chat'; payload: RoomMessage }  // legacy web format
+  | { type: 'chat'; id: string; content: string; sender: string; senderIdentity: string; timestamp: number }  // unified format
   | { type: 'file-start'; fileId: string; filename: string; mimeType: string; totalChunks: number; totalSize: number; sender: string }
   | { type: 'file-chunk'; fileId: string; index: number; data: string }
   | { type: 'file-end'; fileId: string }
@@ -667,11 +668,23 @@ export function ChatRoomView({
         const sender = participant ? getParticipantUsername(participant) : 'Participant'
 
         if (data.type === 'chat') {
-          addMessage({
-            ...data.payload,
-            from: sender,
-            isLocal: false,
-          })
+          if ('content' in data) {
+            // Unified flat format (mobile / new web)
+            addMessage({
+              id: data.id || crypto.randomUUID(),
+              from: data.sender || sender,
+              text: data.content,
+              timestamp: data.timestamp,
+              isLocal: false,
+            })
+          } else {
+            // Legacy nested payload format (old web-to-web)
+            addMessage({
+              ...data.payload,
+              from: sender,
+              isLocal: false,
+            })
+          }
           return
         }
 
@@ -854,7 +867,14 @@ export function ChatRoomView({
     }
     addMessage(msg)
     void room.localParticipant.publishData(
-      new TextEncoder().encode(JSON.stringify({ type: 'chat', payload: { ...msg, isLocal: false } satisfies RoomMessage })),
+      new TextEncoder().encode(JSON.stringify({
+        type: 'chat',
+        id: msg.id,
+        content: text,
+        sender: localUsername,
+        senderIdentity: room.localParticipant.identity,
+        timestamp: msg.timestamp,
+      })),
       { reliable: true },
     )
   }, [addMessage, initialUsername, username])
