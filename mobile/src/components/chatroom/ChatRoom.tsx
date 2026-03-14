@@ -46,6 +46,9 @@ export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
         audio={false}
         video={false}
         onDisconnected={onLeave}
+        onError={(error) => {
+          Toast.show({ type: "error", text1: "Connection failed", text2: error?.message ?? "Could not connect to room" });
+        }}
       >
         <ChatRoomContent onLeave={onLeave} />
       </LiveKitRoom>

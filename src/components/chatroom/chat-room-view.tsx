@@ -644,7 +644,8 @@ export function ChatRoomView({
     addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
   }, [addMessage])
 
-  const handleRoomEventWireup = useCallback((room: Room, localUsername: string) => {
+  // Sets up event listeners only — call this BEFORE room.connect() so no events are missed
+  const setupRoomListeners = useCallback((room: Room) => {
     room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       const remoteName = getParticipantUsername(participant)
       addParticipant(participant.identity, remoteName)
@@ -728,12 +729,6 @@ export function ChatRoomView({
         console.error('[ChatRoom] Failed to parse data payload', error)
       }
     })
-
-    room.remoteParticipants.forEach((participant) => {
-      addParticipant(participant.identity, getParticipantUsername(participant))
-    })
-
-    addSystemMsg(`Connected as ${localUsername}`)
   }, [addParticipant, addMessage, addSystemMsg, removeParticipant, setStatus])
 
   const connectToChatRoom = useCallback(async ({
@@ -776,18 +771,26 @@ export function ChatRoomView({
     roomRef.current?.disconnect()
     roomRef.current = room
 
+    // Attach listeners BEFORE connecting so no ParticipantConnected events are missed
+    setupRoomListeners(room)
+
     await room.connect(LIVEKIT_URL, data.token, {
       autoSubscribe: true,
     })
 
-    handleRoomEventWireup(room, localUsername)
+    // Sync any participants already in the room when we connected
+    room.remoteParticipants.forEach((participant) => {
+      addParticipant(participant.identity, getParticipantUsername(participant))
+    })
+
+    addSystemMsg(`Connected as ${localUsername}`)
     setRoomCode(roomName)
     setRoomPasswordHash(passwordHash)
     setRoomHasPassword(Boolean(passwordHash))
     setStatus('connected')
     setStep('chatting')
     setIsCreating(false)
-  }, [handleRoomEventWireup, setRoomCode, setRoomPasswordHash, setStatus])
+  }, [setupRoomListeners, addParticipant, addSystemMsg, setRoomCode, setRoomPasswordHash, setStatus])
 
   const createRoom = useCallback(async (code: string, passwordHash: string | null) => {
     let currentUsername = useChatRoomStore.getState().username
