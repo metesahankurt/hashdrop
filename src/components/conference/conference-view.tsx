@@ -87,7 +87,15 @@ export function ConferenceView({ initialCode, initialMode, isMobileEmbed, autoEn
         {isPreJoin && (
           <motion.div key="prejoin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {isMobileEmbed && autoEnter ? (
-              <div className="min-h-screen bg-background" />
+              <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-0">
+                <ConferencePreJoin
+                  initialCode={initialCode}
+                  initialMode={initialMode}
+                  isMobileEmbed={isCompactLayout}
+                  autoEnter={autoEnter}
+                  onEnterRoom={() => setStatus('connecting')}
+                />
+              </div>
             ) : (
               <ConferencePreJoin
                 initialCode={initialCode}
