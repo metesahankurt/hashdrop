@@ -46,6 +46,13 @@ export function ConferenceView({ initialCode, initialMode, isMobileEmbed, autoEn
     return () => mediaQuery.removeEventListener('change', updateMatch)
   }, [])
 
+  useEffect(() => {
+    if (!window.ReactNativeWebView?.postMessage) return
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({ type: 'conference-status', status })
+    )
+  }, [status])
+
   const exitToNativeApp = useCallback(() => {
     if (typeof window === 'undefined') return false
     if (!window.ReactNativeWebView?.postMessage) return false
@@ -79,13 +86,17 @@ export function ConferenceView({ initialCode, initialMode, isMobileEmbed, autoEn
       <AnimatePresence mode="wait">
         {isPreJoin && (
           <motion.div key="prejoin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <ConferencePreJoin
-              initialCode={initialCode}
-              initialMode={initialMode}
-              isMobileEmbed={isCompactLayout}
-              autoEnter={autoEnter}
-              onEnterRoom={() => setStatus('connecting')}
-            />
+            {isMobileEmbed && autoEnter ? (
+              <div className="min-h-screen bg-background" />
+            ) : (
+              <ConferencePreJoin
+                initialCode={initialCode}
+                initialMode={initialMode}
+                isMobileEmbed={isCompactLayout}
+                autoEnter={autoEnter}
+                onEnterRoom={() => setStatus('connecting')}
+              />
+            )}
           </motion.div>
         )}
 

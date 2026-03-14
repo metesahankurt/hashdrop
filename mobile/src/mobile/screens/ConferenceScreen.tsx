@@ -49,6 +49,7 @@ export function ConferenceScreen() {
   );
   const [webError, setWebError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [conferenceReady, setConferenceReady] = useState(false);
 
   const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
   const canFallbackToProd =
@@ -110,6 +111,7 @@ export function ConferenceScreen() {
     options?: { autoEnter?: boolean },
   ) => {
     setWebError(false);
+    setConferenceReady(false);
     setBridgeBaseUrl(WEB_APP_URL.replace(/\/$/, ""));
     setBridgeRoute({ mode, code, autoEnter: options?.autoEnter ?? false });
     setReloadKey((value) => value + 1);
@@ -117,6 +119,7 @@ export function ConferenceScreen() {
 
   const closeBridgeToAppHome = () => {
     setWebError(false);
+    setConferenceReady(false);
     setBridgeRoute(null);
     setReloadKey((value) => value + 1);
   };
@@ -128,6 +131,13 @@ export function ConferenceScreen() {
       const payload = JSON.parse(event.nativeEvent.data);
       if (payload?.type === "conference-exit") {
         closeBridgeToAppHome();
+        return;
+      }
+      if (payload?.type === "conference-status") {
+        const nextStatus = String(payload.status || "");
+        setConferenceReady(
+          nextStatus === "in-room" || nextStatus === "waiting",
+        );
       }
     } catch {
       // Ignore non-JSON messages from the page.
@@ -233,13 +243,6 @@ export function ConferenceScreen() {
             onLoadEnd={() => {
               webViewRef.current?.injectJavaScript(injectedJavaScript);
             }}
-            startInLoadingState
-            renderLoading={() => (
-              <View style={styles.loader}>
-                <ActivityIndicator color="#3ecf8e" />
-                <Text style={styles.loaderText}>Loading conference...</Text>
-              </View>
-            )}
             onError={() => {
               if (canFallbackToProd) {
                 setBridgeBaseUrl(PROD_WEB_APP_URL);
@@ -250,6 +253,14 @@ export function ConferenceScreen() {
             }}
           />
         )}
+        {!webError && !conferenceReady ? (
+          <View style={styles.loaderOverlay} pointerEvents="auto">
+            <View style={styles.loader}>
+              <ActivityIndicator color="#3ecf8e" />
+              <Text style={styles.loaderText}>Loading conference...</Text>
+            </View>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -267,8 +278,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 26,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
   },
   webviewContainer: {
     flex: 1,
@@ -280,11 +289,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#0d0d0d",
   },
   loader: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#111111",
     gap: 10,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    minWidth: 180,
+  },
+  loaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#0d0d0d",
   },
   loaderText: {
     color: "#8b8b8b",
