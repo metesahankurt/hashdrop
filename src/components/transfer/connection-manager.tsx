@@ -225,7 +225,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       (data as Record<string, unknown>).type === 'text-message'
     ) {
       const textData = data as { type: 'text-message'; content: string; timestamp: number; hasFile?: boolean }
-      console.log('[Receive] Got text message:', textData.content.substring(0, 50))
 
       // Store the text content
       useWarpStore.getState().setTextContent(textData.content)
@@ -242,7 +241,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
       // If file is coming (hasFile=true), just store text and wait for file
       if (textData.hasFile === true) {
-        console.log('[Receive] Text stored, waiting for file...')
+
         toast.info('Text received, waiting for file...')
         useWarpStore.getState().addLog('Text message received, waiting for file...', 'info')
         // Don't return - continue to process file-meta
@@ -251,7 +250,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
     // 1. Handle Meta (now includes hash)
     if (isFileMetaData(data)) {
-      console.log('[Receive] Got metadata:', data.name, data.size, 'bytes')
 
       // SECURITY: Validate file size to prevent DoS
       if (data.size > MAX_FILE_SIZE) {
@@ -306,13 +304,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       // SECURITY: Check for duplicate chunks
       const isDuplicate = receivedChunks.some(chunk => chunk.index === chunkIndex)
       if (isDuplicate) {
-        console.warn(`[HashDrop] Duplicate chunk detected: ${chunkIndex}`)
+
         return // Ignore duplicate chunks
       }
 
       // SECURITY: Check total chunks count to prevent memory exhaustion
       if (receivedChunks.length >= MAX_CHUNKS) {
-        console.error('[HashDrop] Maximum chunk count exceeded')
+
         toast.error('Transfer aborted: Too many chunks', {
           description: 'Potential DoS attack detected.'
         })
@@ -338,10 +336,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             return newSize
           })
         } catch (error) {
-          console.error('[HashDrop] Chunk decode failed:', error)
+
         }
       } else {
-        console.error('[HashDrop] Invalid chunk data type')
+
       }
     }
     // 3. Handle Completion Signal
@@ -351,7 +349,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         'type' in data && 
         (data as Record<string, unknown>).type === 'transfer-complete'
     ) {
-        console.log('[Receive] Transfer complete signal received')
+
         setStatus('completed')
     }
     // 4. Handle Handshake
@@ -361,7 +359,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         'type' in data &&
         (data as Record<string, unknown>).type === 'ready'
     ) {
-        console.log('[Receive] Peer is ready')
+
         setIsPeerReady(true)
         useWarpStore.getState().addLog('Peer is ready to transfer', 'success')
     }
@@ -392,7 +390,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           const calculatedHash = await calculateFileHash(file)
 
           if (calculatedHash !== meta.hash) {
-            console.error('[HashDrop] Hash mismatch detected')
+
             toast.error('File integrity check failed')
             toast.warning('File may be corrupted. Download with caution.')
             useWarpStore.getState().addLog('File integrity check failed - Hash mismatch', 'error')
@@ -400,7 +398,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             setReadyToDownload(file)
             setError('Hash verification failed')
           } else {
-            console.log('[HashDrop] File verified')
+
             toast.success('File verified!')
             useWarpStore.getState().addLog('File integrity verified successfully', 'success')
             setReadyToDownload(file)
@@ -413,7 +411,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             setReceivedSize(0)
           }, 1000)
         } catch (error) {
-          console.error('[HashDrop] Verification error:', error)
+
           toast.error('Verification failed')
           setStatus('failed')
         }
@@ -422,7 +420,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       verifyAndPrepare()
     }
   }, [receivedSize, meta, status, receivedChunks, setProgress, setReadyToDownload, setStatus, setError])
-
 
   // Centralized Connection Handler
   const handleConnection = useCallback((conn: DataConnection) => {
@@ -472,13 +469,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   useEffect(() => {
     if (!peerId || peer) return
 
-    console.log('[Peer] Attempting to create peer with ID:', peerId)
     let retryCount = 0
     const MAX_RETRIES = 3 // Retry up to 3 times for reliability
     
     const createPeer = async () => {
       try {
-        console.log('[FileTransfer] Creating peer with ID:', peerId)
 
         const peerHost = 'hashdrop.onrender.com'
         const peerPort = 443
@@ -500,13 +495,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         // Longer timeout - 30 seconds
         const connectionTimeout = setTimeout(() => {
           if (!newPeer.id) {
-            console.error('[Peer] Connection timeout after 30s')
+
             newPeer.destroy()
             
             if (retryCount < MAX_RETRIES) {
               retryCount++
               const delay = 2000 * retryCount // Exponential: 2s, 4s, 6s
-              console.log(`[Peer] Retry attempt ${retryCount}/${MAX_RETRIES} in ${delay}ms`)
+
               addLog(`Retrying connection (${retryCount}/${MAX_RETRIES})...`, 'warning')
               setTimeout(() => {
                 void createPeer()
@@ -520,7 +515,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         }, 30000) // 30 second timeout
 
         newPeer.on('open', (id) => {
-          console.log('[Peer] Connected! ID:', id)
+
           clearTimeout(connectionTimeout)
           setMyId(id)
           setPeer(newPeer)
@@ -528,11 +523,10 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         })
 
         newPeer.on('connection', (conn) => {
-          console.log('[Peer] Incoming connection...')
 
           // SECURITY: Only accept the first connection to prevent multiple recipients
           if (hasActiveConnection) {
-            console.warn('[Peer] Rejecting connection - already have an active connection')
+
             toast.warning('Connection rejected: Already connected to a peer', {
               description: 'Only one recipient is allowed per transfer for security.'
             })
@@ -542,7 +536,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
           // Attach error handler immediately so ICE failures aren't silently swallowed
           conn.on('error', (err) => {
-            console.error('[Peer] Incoming connection error:', err)
+
             clearTimeout(incomingTimeout)
             setStatus('failed')
             const errorInfo = formatErrorForToast(err, 'transfer-interrupted')
@@ -553,7 +547,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           // Timeout: if ICE never completes, auto-upload files to relay as fallback
           const incomingTimeout = setTimeout(() => {
             if (!conn.open) {
-              console.error('[Peer] Incoming connection ICE timeout — attempting relay fallback')
+
               conn.close()
               addLog('P2P connection failed — uploading files to server relay...', 'warning')
 
@@ -598,7 +592,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         })
 
         newPeer.on('error', (err) => {
-          console.error('[Peer] Error:', err)
+
           clearTimeout(connectionTimeout)
 
           if (err.type === 'unavailable-id') {
@@ -608,7 +602,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             refreshCode()
           } else if (err.type === 'network') {
             // Don't show error toast immediately - let timeout handle it
-            console.error('[Peer] Network error, will retry if needed')
+
             addLog('Network error detected, attempting retry', 'warning')
           } else {
             // Only show error for non-network issues
@@ -627,14 +621,13 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           if (retryCount < MAX_RETRIES && err.type === 'network') {
             retryCount++
             const delay = 2000 * retryCount
-            console.log(`[Peer] Network error retry ${retryCount}/${MAX_RETRIES} in ${delay}ms`)
+
             addLog(`Network retry (${retryCount}/${MAX_RETRIES})...`, 'warning')
             setTimeout(createPeer, delay)
           }
         })
 
       } catch (error) {
-        console.error('[Peer] Creation failed:', error)
 
         if (retryCount < MAX_RETRIES) {
           retryCount++
@@ -652,7 +645,6 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
     void createPeer()
   }, [peerId, peer, handleConnection, setMyId, setPeer, addLog, hasActiveConnection, refreshCode])
-
 
   const connect = useCallback(async (targetCode: string) => {
     const normalized = targetCode.trim().toUpperCase()
@@ -788,7 +780,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     }
 
     if (code && !autoConnected && peer && status === 'idle') {
-      console.log('[QR] Auto-connecting with code:', code)
+
       setInputCode(code)
       setShowReceive(true)
       setAutoConnected(true)
@@ -804,7 +796,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   // Auto-connect from UnifiedTransferFlow (clientInputCode)
   useEffect(() => {
     if (clientInputCode && peer && status === 'connecting' && !hasActiveConnection) {
-      console.log('[ConnectionManager] Auto-connecting from store state:', clientInputCode)
+
       connect(clientInputCode)
     }
   }, [clientInputCode, peer, status, hasActiveConnection, connect])
@@ -830,7 +822,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       toast.success('Code shared!')
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        console.error('Share failed:', error)
+
       }
     }
   }
