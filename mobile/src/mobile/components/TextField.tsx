@@ -1,3 +1,4 @@
+import type { ReturnKeyTypeOptions } from "react-native";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 interface TextFieldProps {
@@ -7,6 +8,8 @@ interface TextFieldProps {
   onChangeText: (value: string) => void;
   autoCapitalize?: "none" | "characters" | "words" | "sentences";
   secureTextEntry?: boolean;
+  returnKeyType?: ReturnKeyTypeOptions;
+  onSubmitEditing?: () => void;
 }
 
 export function TextField({
@@ -16,6 +19,8 @@ export function TextField({
   onChangeText,
   autoCapitalize = "none",
   secureTextEntry = false,
+  returnKeyType = "done",
+  onSubmitEditing,
 }: TextFieldProps) {
   return (
     <View style={styles.container}>
@@ -27,6 +32,8 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor="#6f6f6f"
         secureTextEntry={secureTextEntry}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
         style={styles.input}
         value={value}
       />
