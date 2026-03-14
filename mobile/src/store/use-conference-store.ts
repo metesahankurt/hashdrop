@@ -127,9 +127,14 @@ export const useConferenceStore = create<ConferenceStore>((set) => ({
   setCallStartTime: (time) => set({ callStartTime: time }),
 
   addWaitingParticipant: (p) =>
-    set((state) => ({
-      waitingParticipants: [...state.waitingParticipants, p],
-    })),
+    set((state) => {
+      if (state.waitingParticipants.some((item) => item.identity === p.identity)) {
+        return state;
+      }
+      return {
+        waitingParticipants: [...state.waitingParticipants, p],
+      };
+    }),
   setWaitingParticipants: (participants) => set({ waitingParticipants: participants }),
   removeWaitingParticipant: (identity) =>
     set((state) => ({

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -104,6 +104,10 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
         connect={true}
         audio={false}
         video={false}
+        options={{
+          adaptiveStream: false,
+          dynacast: false,
+        }}
         connectOptions={{
           autoSubscribe: true,
           rtcConfig: { iceTransportPolicy: "relay" },
@@ -149,6 +153,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
   const cameraTracks = useTracks([Track.Source.Camera]);
   const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
   const hostWaitingCount = waitingParticipants.length;
+  const inRoomHandledRef = useRef(false);
   const allParticipants = useMemo(() => {
     const items = new Map<
       string,
@@ -160,10 +165,11 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
       }
     >();
 
-    if (localParticipant?.identity) {
-      items.set(localParticipant.identity, {
-        identity: localParticipant.identity,
-        name: getParticipantName({ name: username, identity: localParticipant.identity }),
+    const localIdentity = localParticipant?.identity || identity;
+    if (localIdentity) {
+      items.set(localIdentity, {
+        identity: localIdentity,
+        name: getParticipantName({ name: username, identity: localIdentity }),
         isMicrophoneEnabled: !isMicMuted,
         isCameraEnabled: !isCameraOff,
       });
@@ -179,10 +185,11 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     }
 
     return Array.from(items.values());
-  }, [localParticipant, participants, username, isMicMuted, isCameraOff]);
+  }, [localParticipant, participants, username, identity, isMicMuted, isCameraOff]);
 
   useEffect(() => {
     if (!room || !localParticipant) return;
+    let cancelled = false;
 
     const sendJoinRequest = async () => {
       try {
@@ -196,6 +203,8 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     };
 
     const handleConnected = async () => {
+      if (cancelled || inRoomHandledRef.current) return;
+      inRoomHandledRef.current = true;
       if (role === "host") {
         setStatus("in-room");
         setCallStartTime(Date.now());
@@ -208,12 +217,16 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     };
 
     const handleDisconnected = (reason?: DisconnectReason) => {
+      inRoomHandledRef.current = false;
       if (
         reason === DisconnectReason.PARTICIPANT_REMOVED ||
         reason === DisconnectReason.ROOM_DELETED
       ) {
         setStatus("denied");
-      } else if (reason !== DisconnectReason.CLIENT_INITIATED) {
+      } else if (
+        reason &&
+        reason !== DisconnectReason.CLIENT_INITIATED
+      ) {
         setStatus("ended");
       }
     };
@@ -304,6 +317,8 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     }
 
     return () => {
+      cancelled = true;
+      inRoomHandledRef.current = false;
       room.off(RoomEvent.Connected, handleConnected);
       room.off(RoomEvent.Disconnected, handleDisconnected);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
@@ -323,7 +338,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     setStatus,
     setCallStartTime,
     addWaitingParticipant,
-    setWaitingParticipants,
     removeWaitingParticipant,
     addChatMessage,
   ]);
