@@ -11,6 +11,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
+import { getIceServers } from '@/lib/webrtc-ice'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { toast } from 'sonner'
 import type { DataConnection } from 'peerjs'
@@ -26,21 +27,6 @@ const PEER_SERVER_CONFIG = {
   secure: true,
   debug: 3,
 } as const
-const PEER_ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80?transport=udp',
-      'turn:openrelay.metered.ca:80?transport=tcp',
-      'turn:openrelay.metered.ca:443?transport=tcp',
-      'turns:openrelay.metered.ca:443?transport=tcp',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-] as const
 
 function logChatroom(event: string, details?: unknown) {
   console.log(`[ChatRoom] ${event}`, details ?? '')
@@ -880,10 +866,11 @@ export function ChatRoomView({
     const peerId = codeToCallPeerId(code)
     const announcedRef = { current: new Set<string>() }
 
+    const iceServers = await getIceServers()
     const peerConfig = {
       ...PEER_SERVER_CONFIG,
       config: {
-        iceServers: PEER_ICE_SERVERS,
+        iceServers,
         iceTransportPolicy: 'all',
         iceCandidatePoolSize: 10
       }
@@ -998,10 +985,11 @@ export function ChatRoomView({
 
     const announcedRef = { current: new Set<string>() }
 
+    const iceServers = await getIceServers()
     const peerConfig = {
       ...PEER_SERVER_CONFIG,
       config: {
-        iceServers: PEER_ICE_SERVERS,
+        iceServers,
         iceTransportPolicy: 'all',
         iceCandidatePoolSize: 10
       }

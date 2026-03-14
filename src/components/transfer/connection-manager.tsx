@@ -15,6 +15,7 @@ import { QRCodeDisplay } from './qr-code-display'
 import { QrScanner } from './qr-scanner'
 import { getPreferences } from '@/lib/preferences'
 import { formatErrorForToast } from '@/lib/error-handler'
+import { getIceServers } from '@/lib/webrtc-ice'
 
 // Type for file metadata received over the connection
 interface FileMetaData {
@@ -472,13 +473,14 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     let retryCount = 0
     const MAX_RETRIES = 3 // Retry up to 3 times for reliability
     
-    const createPeer = () => {
+    const createPeer = async () => {
       try {
         console.log('[FileTransfer] Creating peer with ID:', peerId)
 
         const peerHost = 'hashdrop.onrender.com'
         const peerPort = 443
         const peerPath = '/'
+        const iceServers = await getIceServers()
 
         const newPeer = new Peer(peerId, {
           host: peerHost,
@@ -487,15 +489,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           secure: true,
           debug: 2,
           config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              {
-                urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443?transport=tcp'],
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-              }
-            ]
+            iceServers
           }
         })
 
@@ -510,7 +504,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
               const delay = 2000 * retryCount // Exponential: 2s, 4s, 6s
               console.log(`[Peer] Retry attempt ${retryCount}/${MAX_RETRIES} in ${delay}ms`)
               addLog(`Retrying connection (${retryCount}/${MAX_RETRIES})...`, 'warning')
-              setTimeout(createPeer, delay)
+              setTimeout(() => {
+                void createPeer()
+              }, delay)
             } else {
               // Only show error toast on final failure
               toast.error('Could not connect to network. Please refresh the page.')
@@ -597,7 +593,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       }
     }
 
-    createPeer()
+    void createPeer()
   }, [peerId, peer, handleConnection, setMyId, setPeer, addLog, hasActiveConnection, refreshCode])
 
 
