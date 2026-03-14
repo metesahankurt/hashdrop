@@ -214,6 +214,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
   const [receivedChunks, setReceivedChunks] = useState<Array<{index: number, blob: Blob}>>([])
   const [receivedSize, setReceivedSize] = useState(0)
   const [meta, setMeta] = useState<FileMetaData | null>(null)
+  const verificationStartedRef = useRef(false)
 
   const handleReceiveData = useCallback((data: unknown) => {
     // 0. Handle Text Message
@@ -277,6 +278,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       setMeta(data)
       setReceivedChunks([])
       setReceivedSize(0)
+      verificationStartedRef.current = false
 
       setMode('receive')
       setFile({ name: data.name, size: data.size, type: data.fileType } as File)
@@ -373,7 +375,9 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     }
     
     // When transfer completes, VERIFY HASH then prepare file
-    if (status === 'completed' && meta && receivedChunks.length > 0) {
+    // Guard: only run once and only after all bytes have arrived in state
+    if (status === 'completed' && meta && receivedSize >= meta.size && receivedChunks.length > 0 && !verificationStartedRef.current) {
+      verificationStartedRef.current = true
       const verifyAndPrepare = async () => {
         try {
           // Sort chunks by index before reconstruction
