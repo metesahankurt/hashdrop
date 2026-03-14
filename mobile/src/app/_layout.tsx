@@ -1,4 +1,7 @@
 import "react-native-gesture-handler";
+import { registerGlobals } from "@livekit/react-native-webrtc";
+
+registerGlobals();
 
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";

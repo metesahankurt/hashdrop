@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { WebView } from "react-native-webview";
 import { Lock, MessageSquare, Plus, LogIn } from "lucide-react-native";
 import Toast from "react-native-toast-message";
 import * as Haptics from "expo-haptics";
@@ -11,7 +12,6 @@ import { TextField } from "@/mobile/components/TextField";
 import { generateSecureCode, isValidCode } from "@/lib/code-generator";
 import { useChatRoomStore } from "@/store/use-chat-room-store";
 import { useProfileStore } from "@/mobile/state/use-profile-store";
-import { ChatRoom } from "./ChatRoom";
 
 const PlusIcon = Plus as any;
 const LogInIcon = LogIn as any;
@@ -37,8 +37,9 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 export function ChatRoomView() {
-  const { username } = useProfileStore();
-  const { status, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
+  const { username: profileUsername } = useProfileStore();
+  const { status, roomName, username: storeUsername, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
+  const username = storeUsername || profileUsername;
   const [mode, setMode] = useState<"select" | "join">("select");
   const [joinCode, setJoinCode] = useState("");
   const [password, setPassword] = useState("");
@@ -130,7 +131,21 @@ export function ChatRoomView() {
   };
 
   if (status === "connected") {
-    return <ChatRoom livekitUrl={LIVEKIT_URL} onLeave={handleLeave} />;
+    const displayName = username || `User-${roomName.slice(-4)}`;
+    const chatUrl = `${API_BASE}/chatroom/${encodeURIComponent(roomName)}?autoAccept=1&from=${encodeURIComponent(displayName)}`;
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0d0d0d" }}>
+        <WebView
+          source={{ uri: chatUrl }}
+          style={{ flex: 1 }}
+          onNavigationStateChange={(state) => {
+            if (state.url && !state.url.includes("/chatroom/")) {
+              handleLeave();
+            }
+          }}
+        />
+      </View>
+    );
   }
 
   return (

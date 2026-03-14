@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     token.addGrant({
       roomJoin: true,
       room: roomName,
-      canPublish: false,
+      canPublish: true,
       canSubscribe: true,
       canPublishData: true,
     })

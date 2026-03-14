@@ -3,14 +3,12 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
-// react-native-webrtc runs native module code at evaluation time,
-// which crashes in Expo Go. We intercept the resolution and redirect
-// to a harmless stub so the app doesn't crash on startup.
-//
-// To use real WebRTC in a dev build, set WEBRTC_STUB=false:
-//   WEBRTC_STUB=false npx expo run:ios
-//   WEBRTC_STUB=false npx expo run:android
-if (process.env.WEBRTC_STUB !== "false") {
+const originalResolveRequest = config.resolver?.resolveRequest;
+config.resolver = config.resolver ?? {};
+
+if (process.env.WEBRTC_STUB === "true") {
+  // Expo Go mode: redirect all WebRTC/LiveKit packages to no-op stubs so the
+  // app doesn't crash on startup (native modules aren't available in Expo Go).
   const webrtcStubPath = path.resolve(
     __dirname,
     "src/mobile/mocks/react-native-webrtc.ts",
@@ -19,20 +17,33 @@ if (process.env.WEBRTC_STUB !== "false") {
     __dirname,
     "src/mobile/mocks/livekit-react-native.ts",
   );
-  const LIVEKIT_PACKAGES = [
-    "@livekit/react-native",
-    "@livekit/react-native-webrtc",
-  ];
 
-  const originalResolveRequest = config.resolver?.resolveRequest;
-
-  config.resolver = config.resolver ?? {};
   config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (moduleName === "react-native-webrtc") {
       return { filePath: webrtcStubPath, type: "sourceFile" };
     }
-    if (LIVEKIT_PACKAGES.includes(moduleName)) {
+    if (
+      moduleName === "@livekit/react-native" ||
+      moduleName === "@livekit/react-native-webrtc"
+    ) {
       return { filePath: livekitStubPath, type: "sourceFile" };
+    }
+    if (originalResolveRequest) {
+      return originalResolveRequest(context, moduleName, platform);
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  };
+} else {
+  // Dev build mode: redirect bare `react-native-webrtc` imports to
+  // @livekit/react-native-webrtc (they share the same API; only one
+  // webrtc.xcframework can be linked at a time).
+  config.resolver.resolveRequest = (context, moduleName, platform) => {
+    if (moduleName === "react-native-webrtc") {
+      return context.resolveRequest(
+        context,
+        "@livekit/react-native-webrtc",
+        platform,
+      );
     }
     if (originalResolveRequest) {
       return originalResolveRequest(context, moduleName, platform);

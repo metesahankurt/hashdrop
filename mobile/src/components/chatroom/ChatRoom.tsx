@@ -18,6 +18,7 @@ import {
   useRoomContext,
   useParticipants,
   useLocalParticipant,
+  AudioSession,
 } from "@livekit/react-native";
 import { RoomEvent } from "livekit-client";
 import { X, Send, Copy, Users, MessageSquare } from "lucide-react-native";
@@ -36,6 +37,15 @@ interface ChatRoomProps {
 
 export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
   const { token, status } = useChatRoomStore();
+
+  // iOS requires an active AVAudioSession for WebRTC ICE to work reliably,
+  // even in data-only rooms. Start it when the component mounts.
+  useEffect(() => {
+    AudioSession.startAudioSession();
+    return () => {
+      AudioSession.stopAudioSession();
+    };
+  }, []);
 
   // Stable callbacks — inline arrow functions re-create on every render, which
   // causes useLiveKitRoom's connect useEffect to re-fire (onError is in its deps).
@@ -61,6 +71,17 @@ export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
         connect={status !== "idle"}
         audio={false}
         video={false}
+        options={{
+          adaptiveStream: false,
+          dynacast: false,
+        }}
+        connectOptions={{
+          // Force TURN relay so ICE succeeds even through strict NAT/firewalls.
+          rtcConfig: { iceTransportPolicy: 'relay' },
+          // Give ICE more time (default 15s is too tight for some mobile networks).
+          peerConnectionTimeout: 30_000,
+          autoSubscribe: true,
+        }}
         onConnected={handleConnected}
         onDisconnected={handleDisconnected}
         onError={handleError}
@@ -91,11 +112,12 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
   const [showParticipants, setShowParticipants] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  // Log room + participant state on mount and changes
+  // Log room + participant state on mount only
   useEffect(() => {
     console.log('[ChatRoom][MOBILE] ChatRoomContent mounted — roomName:', roomName, 'identity:', identity, 'username:', username);
     console.log('[ChatRoom][MOBILE] room object:', room ? 'present' : 'null/undefined');
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     console.log('[ChatRoom][MOBILE] useParticipants() count:', participants.length, participants.map((p: any) => ({ id: p.identity, meta: p.metadata })));

@@ -19,47 +19,67 @@ function JoinRoomContent({ code }: { code: string }) {
   const searchParams = useSearchParams()
   const hasPassword = searchParams.get('pwd') === '1'
   const from = searchParams.get('from')
+  const autoAccept = searchParams.get('autoAccept') === '1'
   const router = useRouter()
   const [accepted, setAccepted] = useState(false)
 
+  // Embedded mobile WebView mode: skip all gates, no header
+  if (autoAccept) {
+    return (
+      <ChatRoomView
+        initialUsername={from || 'Anonymous'}
+        initialAction="join"
+        incomingCode={code}
+        incomingHasPassword={hasPassword}
+        embedded
+      />
+    )
+  }
+
   if (!accepted) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative z-10">
-        <IncomingRequestScreen
-          mode="chatroom"
-          from={from}
-          code={code}
-          hasPassword={hasPassword}
-          onAccept={() => setAccepted(true)}
-          onDecline={() => router.push('/')}
-        />
-      </div>
+      <>
+        <MinimalHeader />
+        <div className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative z-10">
+          <IncomingRequestScreen
+            mode="chatroom"
+            from={from}
+            code={code}
+            hasPassword={hasPassword}
+            onAccept={() => setAccepted(true)}
+            onDecline={() => router.push('/')}
+          />
+        </div>
+      </>
     )
   }
 
   return (
-    <WithUsernameGate
-      icon={<MessageSquare className="w-7 h-7 text-primary" />}
-      title="Chat"
-      highlight="Room"
-      description="Instant encrypted messaging rooms. Up to 50 people."
-      hint="You will appear in the chat room with this name"
-      mode="chatroom"
-      skipEntry
-      skipToJoin
-    >
-      {(username) => {
-        console.log('[JoinRoomContent] Username from WithUsernameGate:', username)
-        return (
-          <ChatRoomView
-            initialUsername={username}
-            initialAction="join"
-            incomingCode={code}
-            incomingHasPassword={hasPassword}
-          />
-        )
-      }}
-    </WithUsernameGate>
+    <>
+      <MinimalHeader />
+      <WithUsernameGate
+        icon={<MessageSquare className="w-7 h-7 text-primary" />}
+        title="Chat"
+        highlight="Room"
+        description="Instant encrypted messaging rooms. Up to 50 people."
+        hint="You will appear in the chat room with this name"
+        mode="chatroom"
+        skipEntry
+        skipToJoin
+      >
+        {(username) => {
+          console.log('[JoinRoomContent] Username from WithUsernameGate:', username)
+          return (
+            <ChatRoomView
+              initialUsername={username}
+              initialAction="join"
+              incomingCode={code}
+              incomingHasPassword={hasPassword}
+            />
+          )
+        }}
+      </WithUsernameGate>
+    </>
   )
 }
 
@@ -68,16 +88,13 @@ function JoinRoomPage({ params }: PageProps) {
   const decodedCode = decodeURIComponent(code)
 
   return (
-    <>
-      <MinimalHeader />
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-primary animate-spin" />
-        </div>
-      }>
-        <JoinRoomContent code={decodedCode} />
-      </Suspense>
-    </>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary animate-spin" />
+      </div>
+    }>
+      <JoinRoomContent code={decodedCode} />
+    </Suspense>
   )
 }
 
