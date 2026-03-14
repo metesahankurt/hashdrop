@@ -22,7 +22,7 @@ export function getDefaultIceServers(): RTCIceServer[] {
 }
 
 export function getIceTransportPolicy(): RTCIceTransportPolicy {
-  return 'relay'
+  return 'all'
 }
 
 export async function getIceServers(): Promise<RTCIceServer[]> {

@@ -1004,16 +1004,16 @@ export function ChatRoomView({
     })
     const newPeer = new Peer(joinerPeerId, peerConfig)
 
-    // Connection timeout - if not connected in 30 seconds, show error
+    // Connection timeout - TURN fallback can take a while on strict NATs.
     const connectionTimeout = setTimeout(() => {
       if (useChatRoomStore.getState().status !== 'connected') {
-        console.error('[ChatRoom] Connection timeout after 30 seconds')
+        console.error('[ChatRoom] Connection timeout after 60 seconds')
         toast.error('Connection timeout. The room may be closed or unreachable.')
         setStatus('failed')
         setStep('join')
         try { newPeer.destroy() } catch { /* ignore */ }
       }
-    }, 30000)
+    }, 60000)
 
     newPeer.on('open', (id) => {
       logChatroom('joinRoom:peer-open', { peerId: id, hostPeerId, roomCode: code })
