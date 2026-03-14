@@ -110,7 +110,8 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
         video={false}
         connectOptions={{
           autoSubscribe: true,
-          rtcConfig: { iceTransportPolicy: "all" },
+          rtcConfig: { iceTransportPolicy: "relay" },
+          peerConnectionTimeout: 30_000,
         }}
       >
         <RoomContent onLeave={onLeave} />
@@ -409,7 +410,11 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
                       const res = await fetch(`${API_BASE}/api/conference/admit`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ roomName, identity: participant.identity }),
+                        body: JSON.stringify({
+                          roomName,
+                          participantIdentity: participant.identity,
+                          username: participant.username,
+                        }),
                       });
                       if (!res.ok) throw new Error("Failed to admit participant");
                       removeWaitingParticipant(participant.identity);
