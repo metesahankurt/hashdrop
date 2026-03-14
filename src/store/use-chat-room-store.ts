@@ -13,6 +13,9 @@ export interface RoomMessage {
   fileUrl?: string
   fileName?: string
   fileMime?: string
+  previewUrl?: string
+  status?: 'sending' | 'sent' | 'failed'
+  progress?: number
 }
 
 interface ChatRoomState {

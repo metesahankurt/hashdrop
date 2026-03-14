@@ -35,6 +35,14 @@ type PendingChatFile = {
   receivedCount: number
 }
 
+declare global {
+  interface Window {
+    ReactNativeWebView?: {
+      postMessage: (message: string) => void
+    }
+  }
+}
+
 function getParticipantUsername(participant?: { metadata?: string; identity?: string }) {
   try {
     const metadata = JSON.parse(participant?.metadata || '{}') as { username?: string }
@@ -75,6 +83,10 @@ function LinkText({ text }: { text: string }) {
       )}
     </span>
   )
+}
+
+function isDataOrBlobUrl(url: string) {
+  return url.startsWith('data:') || url.startsWith('blob:')
 }
 
 interface PasswordSetupScreenProps {
@@ -325,6 +337,7 @@ function LiveChatRoom({
   const [showQr, setShowQr] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
+  const [expandedImage, setExpandedImage] = useState<{ url: string; name?: string } | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -370,7 +383,7 @@ function LiveChatRoom({
           <button
             onClick={() => {
               if (embedded) {
-                (window as any).ReactNativeWebView?.postMessage(JSON.stringify({ type: 'leave' }))
+                window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'leave' }))
               } else {
                 onLeave()
               }
@@ -490,16 +503,43 @@ function LiveChatRoom({
                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${msg.isLocal ? 'bg-primary/20 border border-primary/30 rounded-br-sm' : 'glass-card rounded-bl-sm'}`}>
                   {msg.fileUrl ? (
                     <>
-                      <span>{msg.text}</span>
+                      {!!msg.text && <span>{msg.text}</span>}
                       {msg.fileMime?.startsWith('image/') ? (
-                        <img
-                          src={msg.fileUrl}
-                          alt={msg.fileName}
-                          className="mt-1 max-w-[200px] max-h-[160px] object-contain rounded-lg cursor-pointer"
-                          onClick={() => window.open(msg.fileUrl, '_blank')}
-                        />
+                        <div className="mt-1.5 space-y-1.5">
+                          <button
+                            type="button"
+                            className="relative block overflow-hidden rounded-lg"
+                            onClick={() => setExpandedImage({ url: msg.fileUrl!, name: msg.fileName })}
+                          >
+                            <img
+                              src={msg.previewUrl || msg.fileUrl}
+                              alt={msg.fileName}
+                              className="max-w-[220px] max-h-[220px] object-cover rounded-lg"
+                            />
+                            {msg.status === 'sending' && (
+                              <div className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                                <div className="flex items-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-xs text-white">
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Uploading{typeof msg.progress === 'number' ? ` ${Math.round(msg.progress)}%` : ''}</span>
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-muted/80 truncate">{msg.fileName}</span>
+                            {msg.status === 'failed' && (
+                              <span className="text-[11px] text-red-400 shrink-0">Failed</span>
+                            )}
+                          </div>
+                        </div>
                       ) : (
-                        <a href={msg.fileUrl} download={msg.fileName} className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline">
+                        <a
+                          href={msg.fileUrl}
+                          download={msg.fileName}
+                          target={isDataOrBlobUrl(msg.fileUrl) ? undefined : '_blank'}
+                          rel={isDataOrBlobUrl(msg.fileUrl) ? undefined : 'noopener noreferrer'}
+                          className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        >
                           <Paperclip className="w-3 h-3" />{msg.fileName}
                         </a>
                       )}
@@ -508,7 +548,11 @@ function LiveChatRoom({
                     <LinkText text={msg.text} />
                   )}
                 </div>
-                <span className="text-[10px] text-muted mt-0.5 px-1">{formatTime(msg.timestamp)}</span>
+                <div className="flex items-center gap-1.5 text-[10px] text-muted mt-0.5 px-1">
+                  <span>{formatTime(msg.timestamp)}</span>
+                  {msg.status === 'sending' && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {msg.status === 'failed' && <span className="text-red-400">Failed</span>}
+                </div>
               </motion.div>
             )
           })}
@@ -565,6 +609,39 @@ function LiveChatRoom({
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {expandedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[90] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setExpandedImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              className="relative max-w-5xl max-h-full"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center"
+                onClick={() => setExpandedImage(null)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <img
+                src={expandedImage.url}
+                alt={expandedImage.name || 'Attachment'}
+                className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -922,8 +999,24 @@ export function ChatRoomView({
     const CHUNK_BYTES = 9000
     const totalChunks = Math.ceil(file.size / CHUNK_BYTES)
     const encode = (obj: ChatPayload) => new TextEncoder().encode(JSON.stringify(obj))
+    const localMessageId = `file-${fileId}-local`
+    const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
 
     try {
+      addMessage({
+        id: localMessageId,
+        from: localUsername,
+        text: file.type.startsWith('image/') ? '' : `📎 ${file.name}`,
+        timestamp: Date.now(),
+        isLocal: true,
+        fileUrl: previewUrl || '',
+        previewUrl,
+        fileName: file.name,
+        fileMime: file.type || 'application/octet-stream',
+        status: 'sending',
+        progress: 0,
+      })
+
       await room.localParticipant.publishData(
         encode({
           type: 'file-start',
@@ -946,26 +1039,38 @@ export function ChatRoomView({
           encode({ type: 'file-chunk', fileId, index: i, data: btoa(binary) }),
           { reliable: true },
         )
+        useChatRoomStore.setState((state) => ({
+          messages: state.messages.map((msg) =>
+            msg.id === localMessageId
+              ? { ...msg, progress: ((i + 1) / totalChunks) * 100 }
+              : msg,
+          ),
+        }))
       }
 
       await room.localParticipant.publishData(encode({ type: 'file-end', fileId }), { reliable: true })
-
-      const reader = new FileReader()
-      reader.onload = () => {
-        addMessage({
-          id: `file-${fileId}-local`,
-          from: localUsername,
-          text: `📎 ${file.name}`,
-          timestamp: Date.now(),
-          isLocal: true,
-          fileUrl: reader.result as string,
-          fileName: file.name,
-          fileMime: file.type || 'application/octet-stream',
-        })
-      }
-      reader.readAsDataURL(file)
+      useChatRoomStore.setState((state) => ({
+        messages: state.messages.map((msg) =>
+          msg.id === localMessageId
+            ? {
+                ...msg,
+                fileUrl: previewUrl || msg.fileUrl,
+                text: file.type.startsWith('image/') ? '' : `📎 ${file.name}`,
+                status: 'sent',
+                progress: 100,
+              }
+            : msg,
+        ),
+      }))
     } catch (error) {
       console.error('[ChatRoom] file send failed', error)
+      useChatRoomStore.setState((state) => ({
+        messages: state.messages.map((msg) =>
+          msg.id === localMessageId
+            ? { ...msg, status: 'failed', progress: 0 }
+            : msg,
+        ),
+      }))
       toast.error('Failed to send file')
     }
   }, [addMessage, initialUsername, username])
