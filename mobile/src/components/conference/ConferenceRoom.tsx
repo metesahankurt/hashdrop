@@ -76,10 +76,6 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
     };
   }, []);
 
-  if (status === "waiting") {
-    return <ConferenceWaiting onLeave={onLeave} />;
-  }
-
   if (status === "ended" || status === "denied") {
     return (
       <SafeAreaView style={styles.endedScreen}>
@@ -122,6 +118,7 @@ export function ConferenceRoom({ livekitUrl, onLeave }: ConferenceRoomProps) {
 
 function RoomContent({ onLeave }: { onLeave: () => void }) {
   const {
+    status,
     roomName,
     role,
     identity,
@@ -152,11 +149,37 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
   const cameraTracks = useTracks([Track.Source.Camera]);
   const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
   const hostWaitingCount = waitingParticipants.length;
+  const allParticipants = useMemo(() => {
+    const items = new Map<
+      string,
+      {
+        identity: string;
+        name: string;
+        isMicrophoneEnabled?: boolean;
+        isCameraEnabled?: boolean;
+      }
+    >();
 
-  const participantList = useMemo(
-    () => participants.filter((participant) => participant.identity !== identity),
-    [participants, identity],
-  );
+    if (localParticipant?.identity) {
+      items.set(localParticipant.identity, {
+        identity: localParticipant.identity,
+        name: getParticipantName({ name: username, identity: localParticipant.identity }),
+        isMicrophoneEnabled: !isMicMuted,
+        isCameraEnabled: !isCameraOff,
+      });
+    }
+
+    for (const participant of participants) {
+      items.set(participant.identity, {
+        identity: participant.identity,
+        name: getParticipantName(participant),
+        isMicrophoneEnabled: participant.isMicrophoneEnabled,
+        isCameraEnabled: participant.isCameraEnabled,
+      });
+    }
+
+    return Array.from(items.values());
+  }, [localParticipant, participants, username, isMicMuted, isCameraOff]);
 
   useEffect(() => {
     if (!room || !localParticipant) return;
@@ -205,13 +228,16 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
         isWaiting = false;
       }
       if (!isWaiting) {
-        Toast.show({ type: "success", text1: `${participantName} joined` });
+        console.log("[Conference][MOBILE] participant joined:", participantName);
       }
     };
 
     const handleParticipantDisconnected = (participant: RemoteParticipant) => {
       removeWaitingParticipant(participant.identity);
-      Toast.show({ type: "info", text1: `${getParticipantName(participant)} left` });
+      console.log(
+        "[Conference][MOBILE] participant left:",
+        getParticipantName(participant),
+      );
     };
 
     const handleDataReceived = (
@@ -262,7 +288,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
       if (participant.permissions?.canPublish && role !== "host") {
         setStatus("in-room");
         setCallStartTime(Date.now());
-        Toast.show({ type: "success", text1: "You were admitted" });
+        console.log("[Conference][MOBILE] admitted to room");
       }
     };
 
@@ -374,9 +400,17 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     return (
       <SafeAreaView style={styles.container}>
         <ConferenceParticipants
-          participants={participantList}
+          participants={allParticipants}
           onClose={() => setIsParticipantsOpen(false)}
         />
+      </SafeAreaView>
+    );
+  }
+
+  if (status === "waiting") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ConferenceWaiting onLeave={onLeave} />
       </SafeAreaView>
     );
   }
@@ -388,7 +422,7 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
         <Text style={styles.roomName}>{roomName}</Text>
         <View style={styles.participantBadge}>
           <Users size={12} color="#8b8b8b" />
-          <Text style={styles.participantCount}>{participants.length}</Text>
+          <Text style={styles.participantCount}>{allParticipants.length}</Text>
         </View>
       </View>
 
