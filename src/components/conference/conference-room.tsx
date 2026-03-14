@@ -88,8 +88,8 @@ export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomPr
           {/* Main area */}
           <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? `gap-1.5 flex-col ${role === 'host' && waitingParticipants.length > 0 ? 'pt-[6rem]' : ''}` : 'gap-3'}`}>
             {/* Video grid */}
-            <div className={isMobileEmbed ? 'w-full shrink-0' : 'flex-1 min-w-0 min-h-0'}>
-              <div className={isMobileEmbed ? 'aspect-[10/14] max-h-[50vh] min-h-[260px] w-full' : 'h-full'}>
+            <div className={isMobileEmbed ? 'w-full flex-1 min-h-0' : 'flex-1 min-w-0 min-h-0'}>
+              <div className={isMobileEmbed ? 'h-full min-h-0 w-full' : 'h-full'}>
                 <ConferenceGrid isMobileEmbed={isMobileEmbed} />
               </div>
             </div>
