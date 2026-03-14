@@ -94,15 +94,17 @@ export function ConferenceView({
   };
 
   const createRoom = async () => {
+    if (expoGoBridgeHandlers) {
+      const roomName = createdCode || generateSecureCode();
+      setCreatedCode(roomName);
+      expoGoBridgeHandlers.onCreate(roomName, {
+        autoEnter: true,
+      });
+      return;
+    }
     if (isExpoGo) {
       const roomName = createdCode || generateSecureCode();
       setCreatedCode(roomName);
-      if (expoGoBridgeHandlers) {
-        expoGoBridgeHandlers.onCreate(roomName, {
-          autoEnter: true,
-        });
-        return;
-      }
       requireDevelopmentBuild();
       return;
     }
@@ -138,11 +140,11 @@ export function ConferenceView({
       Toast.show({ type: "error", text1: "Enter a room code" });
       return;
     }
+    if (expoGoBridgeHandlers) {
+      expoGoBridgeHandlers.onJoin(code, { autoEnter: true });
+      return;
+    }
     if (isExpoGo) {
-      if (expoGoBridgeHandlers) {
-        expoGoBridgeHandlers.onJoin(code, { autoEnter: true });
-        return;
-      }
       requireDevelopmentBuild();
       return;
     }

@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import Constants from "expo-constants";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RefreshCw } from "lucide-react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
@@ -41,7 +40,6 @@ export function ConferenceScreen() {
   const routeRefreshNonce = useMainNavigationStore(
     (state) => state.routeRefreshNonce,
   );
-  const isExpoGo = Constants.executionEnvironment === "storeClient";
   const webViewRef = useRef<WebView>(null);
   const previousRefreshNonceRef = useRef(routeRefreshNonce);
 
@@ -146,10 +144,6 @@ export function ConferenceScreen() {
     }
     closeBridgeToAppHome();
   }, [bridgeRoute, routeRefreshNonce]);
-
-  if (!isExpoGo) {
-    return <ConferenceView />;
-  }
 
   if (!bridgeRoute) {
     return (
