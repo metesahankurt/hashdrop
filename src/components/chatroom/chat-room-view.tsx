@@ -1,40 +1,51 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import Peer from 'peerjs'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare, ArrowRight, Copy, Check, Clock,
-  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, ShieldCheck, QrCode, Paperclip
+  Send, X, Share2, ScanLine, Loader2, ChevronLeft, Eye, EyeOff, Lock, QrCode, Paperclip
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { toast } from 'sonner'
+import { useSearchParams } from 'next/navigation'
+import { Room, RoomEvent, type RemoteParticipant } from 'livekit-client'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
-import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
-import { getIceServers, getIceTransportPolicy } from '@/lib/webrtc-ice'
+import { generateSecureCode } from '@/lib/code-generator'
 import { QrScanner } from '@/components/transfer/qr-scanner'
-import { toast } from 'sonner'
-import type { DataConnection } from 'peerjs'
-import { useSearchParams } from 'next/navigation'
 
 const CODE_EXPIRY_MS = 10 * 60 * 1000
-const MAX_PEERS = 49
 const BASE_URL = 'https://hashdrop.metesahankurt.cloud'
-const PEER_SERVER_CONFIG = {
-  host: 'hashdrop.onrender.com',
-  port: 443,
-  path: '/',
-  secure: true,
-  debug: 3,
-} as const
+const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL
 
-function logChatroom(event: string, details?: unknown) {
-  console.log(`[ChatRoom] ${event}`, details ?? '')
+type ChatPayload =
+  | { type: 'chat'; payload: RoomMessage }
+  | { type: 'file-start'; fileId: string; filename: string; mimeType: string; totalChunks: number; totalSize: number; sender: string }
+  | { type: 'file-chunk'; fileId: string; index: number; data: string }
+  | { type: 'file-end'; fileId: string }
+
+type PendingChatFile = {
+  chunks: string[]
+  totalChunks: number
+  filename: string
+  mimeType: string
+  sender: string
+  receivedCount: number
+}
+
+function getParticipantUsername(participant?: { metadata?: string; identity?: string }) {
+  try {
+    const metadata = JSON.parse(participant?.metadata || '{}') as { username?: string }
+    return metadata.username || participant?.identity || 'Participant'
+  } catch {
+    return participant?.identity || 'Participant'
+  }
 }
 
 async function hashPassword(password: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function formatTime(ts: number) {
@@ -48,17 +59,23 @@ function LinkText({ text }: { text: string }) {
     <span>
       {parts.map((part, i) =>
         urlRegex.test(part) ? (
-          <a key={i} href={part} target="_blank" rel="noopener noreferrer"
-            className="underline text-primary hover:text-primary/80 break-all">{part}</a>
-        ) : <span key={i}>{part}</span>
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-primary hover:text-primary/80 break-all"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
       )}
     </span>
   )
 }
 
-// ============================================================
-// PASSWORD SETUP SCREEN — shown when creating a room
-// ============================================================
 interface PasswordSetupScreenProps {
   roomCode: string
   onConfirm: (hash: string | null) => void
@@ -69,23 +86,22 @@ function PasswordSetupScreen({ roomCode, onConfirm }: PasswordSetupScreenProps) 
   const [showPwd, setShowPwd] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const handleSkip = () => onConfirm(null)
   const handleSet = async () => {
     const trimmed = password.trim()
-    if (!trimmed) { onConfirm(null); return }
-    const hash = await hashPassword(trimmed)
-    onConfirm(hash)
-  }
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(roomCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (!trimmed) {
+      onConfirm(null)
+      return
+    }
+    onConfirm(await hashPassword(trimmed))
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-md mx-auto space-y-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="w-full max-w-md mx-auto space-y-5"
+    >
       <div className="text-center space-y-2">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
           <MessageSquare className="w-7 h-7 text-primary" />
@@ -94,48 +110,54 @@ function PasswordSetupScreen({ roomCode, onConfirm }: PasswordSetupScreenProps) 
         <p className="text-xs text-muted">Your room code is ready. Optionally add a password.</p>
       </div>
 
-      {/* Room code preview */}
       <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
         <span className="flex-1 font-mono text-lg font-bold text-primary tracking-widest">{roomCode}</span>
-        <button onClick={copyCode} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors" title="Copy code">
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(roomCode)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+          }}
+          className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          title="Copy code"
+        >
           {copied ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4 text-muted" />}
         </button>
       </div>
 
       <div className="glass-card rounded-2xl p-5 space-y-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted flex items-center gap-1.5"><Lock className="w-3 h-3" /> Password (optional)</p>
+          <p className="text-xs text-muted flex items-center gap-1.5">
+            <Lock className="w-3 h-3" />
+            Password (optional)
+          </p>
           <div className="relative">
             <input
               type={showPwd ? 'text' : 'password'}
               placeholder="Leave empty for no password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSet()}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void handleSet()}
               className="glass-input w-full text-sm pr-9"
               style={{ fontSize: '16px' }}
               autoFocus
             />
-            <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
+            <button
+              onClick={() => setShowPwd(!showPwd)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+              type="button"
+            >
               {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={handleSkip}
-            className="glass-btn flex-1 py-2.5 rounded-xl text-sm text-muted hover:text-foreground"
-          >
-            No Password
+          <button onClick={() => onConfirm(null)} className="glass-btn flex-1 py-2.5 rounded-xl text-sm">
+            Skip Password
           </button>
-          <button
-            onClick={handleSet}
-            disabled={!password.trim()}
-            className="glass-btn-primary flex-1 py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            <ShieldCheck className="w-4 h-4" />
-            Set Password
+          <button onClick={() => void handleSet()} className="glass-btn-primary flex-1 py-2.5 rounded-xl text-sm">
+            Create Room
           </button>
         </div>
       </div>
@@ -143,128 +165,113 @@ function PasswordSetupScreen({ roomCode, onConfirm }: PasswordSetupScreenProps) 
   )
 }
 
-// ============================================================
-// JOIN SCREEN — shown when user wants to join an existing room
-// ============================================================
-interface JoinScreenProps {
+function JoinScreen({
+  username,
+  initialCode,
+  incomingHasPassword,
+  onBack,
+  onJoin,
+}: {
   username: string
-  initialCode?: string | null
+  initialCode?: string
   incomingHasPassword?: boolean
   onBack: () => void
-  onJoin: (code: string, pwdHash: string | null) => void
-}
-
-function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin }: JoinScreenProps) {
+  onJoin: (code: string, passwordHash: string | null) => Promise<void> | void
+}) {
   const [inputCode, setInputCode] = useState(initialCode || '')
-  const [joinPassword, setJoinPassword] = useState('')
-  const [showPwd, setShowPwd] = useState(false)
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [isJoining, setIsJoining] = useState(false)
-  const [hasAttemptedAutoJoin, setHasAttemptedAutoJoin] = useState(false)
-  const status = useChatRoomStore(state => state.status)
+  const [joinPassword, setJoinPassword] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
 
-  // Auto-join only if there is an initial code AND the room is NOT password-protected
-  // (if password-protected, we need the user to enter the password first)
-  // IMPORTANT: Also wait for username to be available before auto-joining
-  useEffect(() => {
-    const trimmedUsername = username?.trim()
-    if (initialCode && !incomingHasPassword && !hasAttemptedAutoJoin && trimmedUsername) {
-      console.log('[JoinScreen] Auto-joining with username:', trimmedUsername, 'code:', initialCode)
-      setHasAttemptedAutoJoin(true)
-      setIsJoining(true)
-      // Use a delay to ensure all state is properly synchronized
-      // Longer delay helps with PC browsers that may need more time
-      setTimeout(() => {
-        console.log('[JoinScreen] Executing auto-join after delay')
-        onJoin(initialCode, null)
-      }, 300)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialCode, incomingHasPassword, hasAttemptedAutoJoin, username])
-
-  // Reset isJoining when status becomes 'failed' or 'connected'
-  useEffect(() => {
-    if (status === 'failed' || status === 'connected') {
+  const executeJoin = useCallback(async () => {
+    const normalized = inputCode.trim().toUpperCase()
+    if (!normalized) return
+    setIsJoining(true)
+    try {
+      const hash = joinPassword.trim() ? await hashPassword(joinPassword.trim()) : null
+      await onJoin(normalized, hash)
+    } finally {
       setIsJoining(false)
     }
-  }, [status])
+  }, [inputCode, joinPassword, onJoin])
 
-  const handleJoin = async () => {
-    if (!inputCode.trim()) return
-    setIsJoining(true)
-    const hash = joinPassword ? await hashPassword(joinPassword) : null
-    await onJoin(inputCode.trim(), hash)
-  }
-
-  // If auto-joining (non-password link) and still attempting, show spinner
-  if (initialCode && !incomingHasPassword && isJoining) {
-    return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md mx-auto flex flex-col items-center gap-4 py-12">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-        <p className="text-muted text-sm">Connecting to room: <span className="text-primary font-mono">{initialCode}</span></p>
-      </motion.div>
-    )
-  }
+  useEffect(() => {
+    if (!initialCode || !username) return
+    const timer = setTimeout(() => {
+      void executeJoin()
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [initialCode, username, executeJoin])
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-      className="w-full max-w-md mx-auto space-y-5">
-      <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-lg transition-all text-muted hover:text-foreground">
-          <ChevronLeft className="w-5 h-5" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="w-full max-w-md mx-auto space-y-5"
+    >
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="glass-btn px-3 py-2 rounded-xl text-sm flex items-center gap-1.5">
+          <ChevronLeft className="w-4 h-4" />
+          Back
         </button>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">Join Room</h2>
-          <p className="text-xs text-muted">Joining as <span className="text-primary">{username}</span></p>
+      </div>
+
+      <div className="text-center space-y-2">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
+          <MessageSquare className="w-7 h-7 text-primary" />
         </div>
+        <h2 className="text-xl font-semibold text-foreground">Join Room</h2>
+        <p className="text-xs text-muted">Enter the room code you received.</p>
       </div>
 
       <div className="glass-card rounded-2xl p-5 space-y-4">
-        {/* Code input */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Room code (e.g. Cosmic-Falcon)"
-            value={inputCode}
-            onChange={e => setInputCode(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            className="glass-input flex-1 text-base font-mono text-center"
-            style={{ fontSize: '16px' }}
-            autoFocus={!initialCode}
-            readOnly={!!initialCode}
-          />
-          <button onClick={() => setShowQRScanner(true)} className="glass-card px-3 rounded-xl text-muted hover:text-foreground hover:bg-white/10 transition-all">
-            <ScanLine className="w-4 h-4" />
-          </button>
+        <div className="space-y-1">
+          <p className="text-xs text-muted">Room Code</p>
+          <div className="flex gap-2">
+            <input
+              value={inputCode}
+              onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+              placeholder="Room code (e.g. COSMIC-FALCON)"
+              className="glass-input flex-1 font-mono tracking-widest text-sm"
+              style={{ fontSize: '16px' }}
+              autoFocus={!initialCode}
+            />
+            <button onClick={() => setShowQRScanner(true)} className="glass-icon-btn w-11 h-11 shrink-0">
+              <ScanLine className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Password hint banner if incoming link is password-protected */}
-        {initialCode && incomingHasPassword && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-400">
-            <Lock className="w-3.5 h-3.5 shrink-0" />
-            This room is password protected. Enter the password to join.
+        {(incomingHasPassword || joinPassword) && (
+          <div className="space-y-1">
+            <p className="text-xs text-muted flex items-center gap-1.5">
+              <Lock className="w-3 h-3" />
+              Password
+            </p>
+            <div className="relative">
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={joinPassword}
+                onChange={(e) => setJoinPassword(e.target.value)}
+                placeholder="Enter room password"
+                className="glass-input w-full pr-9"
+                style={{ fontSize: '16px' }}
+              />
+              <button
+                onClick={() => setShowPwd(!showPwd)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+                type="button"
+              >
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Password field — always show for manual join, show for password-protected link */}
-        <div className="relative">
-          <input
-            type={showPwd ? 'text' : 'password'}
-            placeholder={incomingHasPassword ? 'Enter room password' : 'Password (if any)'}
-            value={joinPassword}
-            onChange={e => setJoinPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleJoin()}
-            className="glass-input w-full text-sm pr-9"
-            style={{ fontSize: '16px' }}
-            autoFocus={!!(initialCode && incomingHasPassword)}
-          />
-          <button onClick={() => setShowPwd(!showPwd)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" type="button">
-            {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
-
         <button
-          onClick={handleJoin}
+          onClick={() => void executeJoin()}
           disabled={!inputCode.trim() || isJoining || (!!incomingHasPassword && !joinPassword.trim())}
           className="glass-btn-primary w-full py-2.5 rounded-xl text-sm disabled:opacity-40 flex items-center justify-center gap-2"
         >
@@ -274,7 +281,11 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
 
       {showQRScanner && (
         <QrScanner
-          onCodeScanned={(code) => { setInputCode(code); setShowQRScanner(false); toast.success('QR scanned!') }}
+          onCodeScanned={(code) => {
+            setInputCode(code)
+            setShowQRScanner(false)
+            toast.success('QR scanned!')
+          }}
           onClose={() => setShowQRScanner(false)}
         />
       )}
@@ -282,147 +293,56 @@ function JoinScreen({ username, initialCode, incomingHasPassword, onBack, onJoin
   )
 }
 
-// ============================================================
-// LIVE CHAT ROOM
-// ============================================================
-interface LiveChatRoomProps {
+function LiveChatRoom({
+  username,
+  roomCode,
+  roomHasPassword,
+  timeLeft,
+  participants,
+  onSendMessage,
+  onSendFile,
+  onLeave,
+}: {
   username: string
   roomCode: string
   roomHasPassword: boolean
   timeLeft: number
+  participants: Map<string, string>
+  onSendMessage: (text: string) => void
+  onSendFile: (file: File) => Promise<void>
   onLeave: () => void
-}
-
-function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }: LiveChatRoomProps) {
-  const { messages, participants, dataConnections, addMessage } = useChatRoomStore()
+}) {
+  const { messages } = useChatRoomStore()
   const [input, setInput] = useState('')
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
-  const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
   const [isSending, setIsSending] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [canShare] = useState(() => typeof navigator !== 'undefined' && !!navigator.share)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const participantList = useMemo(() => Array.from(participants.entries()), [participants])
 
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
-
-  // Scroll to bottom on new messages — scroll the container, NOT the document
   useEffect(() => {
     const container = messagesContainerRef.current
-    if (container) {
-      container.scrollTop = container.scrollHeight
-    }
+    if (container) container.scrollTop = container.scrollHeight
   }, [messages])
 
-  // Focus input on mount — use preventScroll to stop mobile browsers from scrolling the page
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 80)
     return () => clearTimeout(t)
   }, [])
 
-  // On iOS Safari, the virtual keyboard can push the input out of view.
-  // Since the chat is in a fixed container, we only need to ensure
-  // the parent scrollable area shows the input — NOT scrollIntoView on the document.
-  const handleInputFocus = useCallback(() => {
-    // no-op: the fixed container handles visibility
-  }, [])
-
-  const sendMessage = useCallback(() => {
-    const text = input.trim()
-    if (!text) return
-    const msg: RoomMessage = { id: crypto.randomUUID(), from: username, text, timestamp: Date.now(), isLocal: true }
-    addMessage(msg)
-    dataConnections.forEach(conn => { try { conn.send({ type: 'chat', payload: { ...msg, isLocal: false } }) } catch { /* ignore */ } })
-    setInput('')
-  }, [input, username, addMessage, dataConnections])
-
-  const sendFileToRoom = useCallback(async (file: File) => {
-    const MAX = 5 * 1024 * 1024
-    if (file.size > MAX) {
-      toast.error('File too large (max 5MB)')
-      return
-    }
-    setIsSending(true)
-    const fileId = crypto.randomUUID()
-    const CHUNK_BYTES = 9000
-    const totalChunks = Math.ceil(file.size / CHUNK_BYTES)
-
-    try {
-      const startMsg = { type: 'file-start', fileId, filename: file.name, mimeType: file.type || 'application/octet-stream', totalChunks, totalSize: file.size, sender: username }
-      dataConnections.forEach(conn => { try { conn.send(startMsg) } catch { /* ignore */ } })
-
-      for (let i = 0; i < totalChunks; i++) {
-        const slice = file.slice(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES)
-        const ab = await slice.arrayBuffer()
-        const bytes = new Uint8Array(ab)
-        let binary = ''
-        for (let j = 0; j < bytes.byteLength; j++) binary += String.fromCharCode(bytes[j])
-        const b64 = btoa(binary)
-        const chunkMsg = { type: 'file-chunk', fileId, index: i, data: b64 }
-        dataConnections.forEach(conn => { try { conn.send(chunkMsg) } catch { /* ignore */ } })
-      }
-
-      dataConnections.forEach(conn => { try { conn.send({ type: 'file-end', fileId }) } catch { /* ignore */ } })
-
-      const reader = new FileReader()
-      reader.onload = () => {
-        addMessage({
-          id: `file-${fileId}-local`,
-          from: username,
-          text: `📎 ${file.name}`,
-          timestamp: Date.now(),
-          isLocal: true,
-          fileUrl: reader.result as string,
-          fileName: file.name,
-          fileMime: file.type || 'application/octet-stream',
-        })
-      }
-      reader.readAsDataURL(file)
-    } catch {
-      toast.error('Failed to send file')
-    } finally {
-      setIsSending(false)
-    }
-  }, [username, addMessage, dataConnections])
-
-  const handleLeave = () => {
-    dataConnections.forEach(conn => { try { conn.send({ type: 'leave', username }) } catch { /* ignore */ } })
-    onLeave()
-  }
-
   const buildInviteUrl = () => {
     const { username: uname } = useUsernameStore.getState()
     const fromParam = uname ? `?from=${encodeURIComponent(uname)}` : ''
-    const pwdParam = roomHasPassword
-      ? (fromParam ? '&pwd=1' : '?pwd=1')
-      : ''
+    const pwdParam = roomHasPassword ? (fromParam ? '&pwd=1' : '?pwd=1') : ''
     return `${BASE_URL}/chatroom/${encodeURIComponent(roomCode)}${fromParam}${pwdParam}`
-  }
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(buildInviteUrl())
-    setCopied(true)
-    toast.success(roomHasPassword ? 'Protected invite link copied!' : 'Invite link copied!')
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const shareCode = async () => {
-    try {
-      await navigator.share({
-        title: 'HashDrop Chat Room',
-        text: `Join room: ${roomCode}${roomHasPassword ? ' (protected)' : ''}`,
-        url: buildInviteUrl(),
-      })
-    } catch { /* ignore */ }
   }
 
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col h-full min-h-0">
-
-      {/* ── Header ─────────────────────────────────────── */}
       <div className="glass-card rounded-t-2xl shrink-0 border-b-0 overflow-hidden">
-        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-black/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -440,7 +360,8 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
               <p className="text-xs text-muted font-mono">{roomCode}</p>
             </div>
           </div>
-          <button onClick={handleLeave}
+          <button
+            onClick={onLeave}
             className="p-1.5 hover:bg-danger/20 rounded-lg transition-all text-muted hover:text-danger flex items-center gap-1.5 px-3"
             title="Leave Room"
           >
@@ -449,9 +370,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
           </button>
         </div>
 
-        {/* Info panel — invite link + participants */}
         <div className="px-4 py-3 bg-black/20 border-t border-white/5 space-y-3">
-          {/* Invite link row */}
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-medium text-muted">Invite Link</span>
@@ -469,14 +388,29 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                 </a>
               </div>
               <div className="flex gap-2 shrink-0">
-                <button onClick={copyCode}
-                  className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(buildInviteUrl())
+                    setCopied(true)
+                    toast.success(roomHasPassword ? 'Protected invite link copied!' : 'Invite link copied!')
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                >
                   {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>Copy</span>
                 </button>
                 {canShare && (
-                  <button onClick={shareCode}
-                    className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg">
+                  <button
+                    onClick={() =>
+                      navigator.share({
+                        title: 'HashDrop Chat Room',
+                        text: `Join room: ${roomCode}${roomHasPassword ? ' (protected)' : ''}`,
+                        url: buildInviteUrl(),
+                      }).catch(() => undefined)
+                    }
+                    className="glass-btn flex-1 sm:flex-none px-3 py-2 text-xs flex items-center justify-center gap-1.5 rounded-lg"
+                  >
                     <Share2 className="w-3.5 h-3.5" />
                     <span>Share</span>
                   </button>
@@ -497,7 +431,6 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             )}
           </div>
 
-          {/* Expiry */}
           {timeLeft > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-muted">
               <Clock className="w-3.5 h-3.5" />
@@ -505,7 +438,6 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             </div>
           )}
 
-          {/* Participants */}
           <div className="flex items-start sm:items-center gap-2">
             <span className="text-xs font-medium text-muted shrink-0 mt-1 sm:mt-0">Participants:</span>
             <div className="flex gap-1.5 flex-wrap">
@@ -522,7 +454,6 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
         </div>
       </div>
 
-      {/* ── Messages ───────────────────────────────────── */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto glass-card border-t-0 border-b-0 rounded-none px-3 md:px-4 py-4 space-y-2 min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
@@ -531,18 +462,22 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
           </div>
         )}
         <AnimatePresence initial={false}>
-          {messages.map(msg => {
+          {messages.map((msg) => {
             if (msg.isSystem) {
               return (
-                <motion.div key={msg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="flex items-center justify-center py-1">
+                <motion.div key={msg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center py-1">
                   <span className="text-xs text-muted/60 italic">{msg.text}</span>
                 </motion.div>
               )
             }
             return (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }}
-                className={`flex flex-col ${msg.isLocal ? 'items-end' : 'items-start'}`}>
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15 }}
+                className={`flex flex-col ${msg.isLocal ? 'items-end' : 'items-start'}`}
+              >
                 {!msg.isLocal && <span className="text-xs text-primary font-medium ml-1 mb-0.5">{msg.from}</span>}
                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-sm ${msg.isLocal ? 'bg-primary/20 border border-primary/30 rounded-br-sm' : 'glass-card rounded-bl-sm'}`}>
                   {msg.fileUrl ? (
@@ -556,11 +491,7 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
                           onClick={() => window.open(msg.fileUrl, '_blank')}
                         />
                       ) : (
-                        <a
-                          href={msg.fileUrl}
-                          download={msg.fileName}
-                          className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline"
-                        >
+                        <a href={msg.fileUrl} download={msg.fileName} className="mt-1 flex items-center gap-1.5 text-xs text-primary hover:underline">
                           <Paperclip className="w-3 h-3" />{msg.fileName}
                         </a>
                       )}
@@ -574,10 +505,8 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             )
           })}
         </AnimatePresence>
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Input ──────────────────────────────────────── */}
       <div className="glass-card border-t-0 rounded-b-2xl px-3 py-3 shrink-0">
         <div className="flex gap-2">
           <input
@@ -585,9 +514,11 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             type="file"
             accept="image/*,video/*,.pdf,.doc,.docx,.zip,.txt"
             className="hidden"
-            onChange={e => {
-              const f = e.target.files?.[0]
-              if (f) sendFileToRoom(f)
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setIsSending(true)
+              void onSendFile(file).finally(() => setIsSending(false))
               e.target.value = ''
             }}
           />
@@ -595,28 +526,30 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
             ref={inputRef}
             type="text"
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (!input.trim()) return
+                onSendMessage(input.trim())
+                setInput('')
+              }
             }}
             placeholder="Type a message... (Enter)"
             className="glass-input flex-1 text-sm py-2.5 px-3 rounded-xl"
             style={{ fontSize: '16px' }}
-            onFocus={handleInputFocus}
           />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isSending}
-            className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40"
-            title="Attach file"
-          >
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isSending} className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40" title="Attach file">
             {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
           </button>
           <button
             type="button"
-            onClick={sendMessage}
+            onClick={() => {
+              if (!input.trim()) return
+              onSendMessage(input.trim())
+              setInput('')
+            }}
             disabled={!input.trim()}
             className="w-10 h-10 shrink-0 glass-icon-btn disabled:opacity-40 disabled:cursor-not-allowed"
           >
@@ -628,9 +561,6 @@ function LiveChatRoom({ username, roomCode, roomHasPassword, timeLeft, onLeave }
   )
 }
 
-// ============================================================
-// MAIN — ChatRoomView
-// ============================================================
 type Step = 'password-setup' | 'creating' | 'join' | 'chatting'
 
 export function ChatRoomView({
@@ -641,64 +571,46 @@ export function ChatRoomView({
 }: {
   initialUsername?: string
   initialAction?: 'create' | 'join'
-  /** Room code passed directly from /chatroom/[code] route */
   incomingCode?: string
   incomingHasPassword?: boolean
 }) {
   const searchParams = useSearchParams()
-  const urlMode = searchParams?.get('mode')
   const urlCode = searchParams?.get('code')
   const urlPwd = searchParams?.get('pwd')
-  // Prefer prop-based code (from /chatroom/[code] route), fallback to URL ?code= param
-  const incomingCode = incomingCodeProp ?? urlCode
-  // Use prop if available, fallback to URL param
+  const incomingCode = incomingCodeProp ?? urlCode ?? undefined
   const hasIncomingPassword = incomingHasPassword ?? (urlPwd === '1')
 
   const {
-    setPeer, setStatus, username, setUsername, roomCode, setRoomCode, setRoomPasswordHash,
-    addMessage, addParticipant, addDataConnection, removeParticipant, removeDataConnection, resetRoom,
+    setStatus, username, setUsername, roomCode, setRoomCode, setRoomPasswordHash,
+    addMessage, addParticipant, removeParticipant, resetRoom,
   } = useChatRoomStore()
+  const participants = useChatRoomStore((state) => state.participants)
 
-  // Set username immediately (synchronously) if provided - MUST happen before any other logic
-  // This is critical for auto-join functionality when accessing via invite link
   if (initialUsername && !username) {
-    console.log('[ChatRoom] Setting initial username synchronously:', initialUsername)
     setUsername(initialUsername)
   }
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      console.log('[ChatRoom] Component unmounting, username was:', username)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Determine initial step:
-  // - If we have an incoming code → go straight to join
-  // - If action is explicitly 'join' → join screen
-  // - Otherwise → password setup before creating
-  const initialStep: Step = incomingCode
-    ? 'join'
-    : initialAction === 'join'
-    ? 'join'
-    : 'password-setup'
-
+  const initialStep: Step = incomingCode ? 'join' : initialAction === 'join' ? 'join' : 'password-setup'
   const [step, setStep] = useState<Step>(initialStep)
   const [timeLeft, setTimeLeft] = useState(CODE_EXPIRY_MS / 1000)
-  const [, setIsCreating] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [pendingRoomCode] = useState(() => generateSecureCode())
   const [roomHasPassword, setRoomHasPassword] = useState(false)
   const mountedRef = useRef(true)
-  const expiryRef = useRef(Date.now() + CODE_EXPIRY_MS)
+  const roomRef = useRef<Room | null>(null)
+  const pendingFilesRef = useRef<Map<string, PendingChatFile>>(new Map())
+  const expiryRef = useRef(0)
 
   useEffect(() => {
     mountedRef.current = true
-    return () => { mountedRef.current = false; resetRoom() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    expiryRef.current = Date.now() + CODE_EXPIRY_MS
+    return () => {
+      mountedRef.current = false
+      roomRef.current?.disconnect()
+      resetRoom()
+    }
+  }, [resetRoom])
 
-  // Countdown timer (only relevant while chatting as host)
   useEffect(() => {
     const interval = setInterval(() => {
       const left = Math.max(0, Math.ceil((expiryRef.current - Date.now()) / 1000))
@@ -707,480 +619,6 @@ export function ChatRoomView({
     return () => clearInterval(interval)
   }, [])
 
-  const addSystemMsg = useCallback((text: string) => {
-    addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
-  }, [addMessage])
-
-  type PendingChatFile = {
-    chunks: string[]
-    totalChunks: number
-    filename: string
-    mimeType: string
-    sender: string
-    receivedCount: number
-  }
-  const pendingFilesRef = useRef<Map<string, PendingChatFile>>(new Map())
-
-  const handleLeave = useCallback(() => {
-    resetRoom()
-    setStep('password-setup')
-    setIsCreating(false)
-    setRoomHasPassword(false)
-  }, [resetRoom])
-
-  const setupConn = useCallback((conn: DataConnection, remotePeerId: string, localUsername: string, localPwdHash: string | null, announcedRef: React.MutableRefObject<Set<string>>) => {
-    conn.on('data', (raw) => {
-      const data = raw as { type: string; payload?: RoomMessage; username?: string; hash?: string; participants?: [string, string][]; peerId?: string } & Record<string, unknown>
-
-      if (data.type === 'chat' && data.payload) {
-        addMessage({ ...data.payload, isLocal: false })
-        // Host rebroadcast
-        const { peer, dataConnections: conns } = useChatRoomStore.getState()
-        if (peer?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
-          conns.forEach((c, id) => {
-            if (id !== remotePeerId) {
-              try { c.send({ type: 'chat', payload: data.payload }) } catch { /* ignore */ }
-            }
-          })
-        }
-      } else if (data.type === 'announce' && data.username) {
-        const { participants: existingP } = useChatRoomStore.getState()
-        const alreadyKnown = existingP.has(remotePeerId)
-        addParticipant(remotePeerId, data.username)
-        if (!alreadyKnown) addSystemMsg(`${data.username} joined the room`)
-        if (!announcedRef.current.has(remotePeerId)) {
-          announcedRef.current.add(remotePeerId)
-          conn.send({ type: 'announce', username: localUsername })
-          const { participants: p } = useChatRoomStore.getState()
-          conn.send({ type: 'participants', participants: Array.from(p.entries()) })
-          const { peer: localPeer, dataConnections: conns } = useChatRoomStore.getState()
-          if (localPeer?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
-            conns.forEach((c, id) => {
-              if (id !== remotePeerId) {
-                try { c.send({ type: 'announce-broadcast', username: data.username, peerId: remotePeerId }) } catch { /* ignore */ }
-              }
-            })
-          }
-        }
-      } else if (data.type === 'participants' && data.participants) {
-        const { peer: localPeer } = useChatRoomStore.getState()
-        data.participants.forEach(([pid, uname]) => { if (pid !== localPeer?.id) addParticipant(pid, uname) })
-      } else if (data.type === 'leave' && data.username) {
-        removeParticipant(remotePeerId)
-        removeDataConnection(remotePeerId)
-        addSystemMsg(`${data.username} left the room`)
-      } else if (data.type === 'announce-broadcast' && data.username && data.peerId) {
-        const { participants: existingP2 } = useChatRoomStore.getState()
-        if (!existingP2.has(data.peerId as string)) {
-          addParticipant(data.peerId as string, data.username as string)
-          addSystemMsg(`${data.username} joined the room`)
-        }
-      } else if (data.type === 'file-start' && data.fileId) {
-        pendingFilesRef.current.set(data.fileId as string, {
-          chunks: new Array(data.totalChunks as number).fill(''),
-          totalChunks: data.totalChunks as number,
-          filename: data.filename as string,
-          mimeType: (data.mimeType as string) || 'application/octet-stream',
-          sender: data.sender as string,
-          receivedCount: 0,
-        })
-        const { peer: lp2, dataConnections: dc2 } = useChatRoomStore.getState()
-        if (lp2?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
-          dc2.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
-        }
-      } else if (data.type === 'file-chunk' && data.fileId) {
-        const pf = pendingFilesRef.current.get(data.fileId as string)
-        if (pf) {
-          pf.chunks[data.index as number] = data.data as string
-          pf.receivedCount++
-        }
-        const { peer: lp3, dataConnections: dc3 } = useChatRoomStore.getState()
-        if (lp3?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
-          dc3.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
-        }
-      } else if (data.type === 'file-end' && data.fileId) {
-        const pf = pendingFilesRef.current.get(data.fileId as string)
-        if (pf && pf.receivedCount >= pf.totalChunks) {
-          const fileUrl = `data:${pf.mimeType};base64,${pf.chunks.join('')}`
-          addMessage({
-            id: `file-${data.fileId as string}`,
-            from: pf.sender,
-            text: `📎 ${pf.filename}`,
-            timestamp: Date.now(),
-            isLocal: false,
-            fileUrl,
-            fileName: pf.filename,
-            fileMime: pf.mimeType,
-          })
-          pendingFilesRef.current.delete(data.fileId as string)
-        }
-        const { peer: lp4, dataConnections: dc4 } = useChatRoomStore.getState()
-        if (lp4?.id === codeToCallPeerId(useChatRoomStore.getState().roomCode)) {
-          dc4.forEach((c, cid) => { if (cid !== remotePeerId) { try { c.send(data) } catch { /* ignore */ } } })
-        }
-      } else if (data.type === 'auth') {
-        if (localPwdHash) {
-          if (data.hash === localPwdHash) conn.send({ type: 'auth-ok' })
-          else { conn.send({ type: 'auth-rejected' }); setTimeout(() => conn.close(), 300) }
-        } else {
-          conn.send({ type: 'auth-ok' })
-        }
-      } else if (data.type === 'auth-rejected') {
-        toast.error('Wrong password - access denied')
-        handleLeave()
-      }
-    })
-
-    conn.on('close', () => {
-      const { participants } = useChatRoomStore.getState()
-      const uname = participants.get(remotePeerId)
-      removeParticipant(remotePeerId)
-      removeDataConnection(remotePeerId)
-      if (uname) addSystemMsg(`${uname} left the room`)
-    })
-
-    conn.on('error', err => console.error('[ChatRoom]', err))
-    addDataConnection(remotePeerId, conn)
-  }, [addMessage, addParticipant, removeParticipant, addDataConnection, removeDataConnection, addSystemMsg, handleLeave])
-
-  // Create room: called after password setup (hash may be null for no password)
-  const createRoom = useCallback(async (code: string, pwdHash: string | null) => {
-    // Ensure username is set in store before creating room
-    let currentUsername = useChatRoomStore.getState().username
-    if (!currentUsername && initialUsername) {
-      console.log('[ChatRoom] Username not in store for room creation, setting from initialUsername:', initialUsername)
-      setUsername(initialUsername)
-      currentUsername = initialUsername
-    }
-    if (!currentUsername) {
-      console.error('[ChatRoom] No username found for room creation, aborting')
-      return
-    }
-
-    setIsCreating(true)
-    setRoomCode(code)
-    setRoomPasswordHash(pwdHash)
-    setRoomHasPassword(!!pwdHash)
-    setStatus('generating')
-
-    const peerId = codeToCallPeerId(code)
-    const announcedRef = { current: new Set<string>() }
-
-    const iceServers = await getIceServers()
-    const peerConfig = {
-      ...PEER_SERVER_CONFIG,
-      config: {
-        iceServers,
-        iceTransportPolicy: getIceTransportPolicy(),
-        iceCandidatePoolSize: 10
-      }
-    }
-
-    logChatroom('createRoom:init-peer', { peerId, roomCode: code, peerConfig: PEER_SERVER_CONFIG })
-    const newPeer = new Peer(peerId, peerConfig)
-
-    newPeer.on('open', () => {
-      logChatroom('createRoom:peer-open', { peerId: newPeer.id, roomCode: code })
-      if (!mountedRef.current) return
-      setPeer(newPeer)
-      setStatus('connected')
-      setStep('chatting')
-      setIsCreating(false)
-      addSystemMsg(pwdHash ? 'Protected room created! Share the invite link.' : 'Room is ready! Share the invite link.')
-    })
-
-    newPeer.on('connection', (conn) => {
-      logChatroom('createRoom:incoming-connection', {
-        remotePeer: conn.peer,
-        connectionId: conn.connectionId,
-        open: conn.open,
-      })
-      const { dataConnections } = useChatRoomStore.getState()
-      if (dataConnections.size >= MAX_PEERS) {
-        console.warn('[ChatRoom] Max peers reached, rejecting connection')
-        conn.close()
-        return
-      }
-
-      // Monitor ICE for incoming connections
-      if (conn.peerConnection) {
-        conn.peerConnection.oniceconnectionstatechange = () => {
-          logChatroom('createRoom:incoming-ice-state', {
-            remotePeer: conn.peer,
-            iceConnectionState: conn.peerConnection?.iceConnectionState,
-            connectionState: conn.peerConnection?.connectionState,
-          })
-        }
-      }
-
-      conn.on('open', () => {
-        logChatroom('createRoom:incoming-open', {
-          remotePeer: conn.peer,
-          connectionId: conn.connectionId,
-        })
-        setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef)
-        conn.send({ type: 'announce', username: currentUsername })
-        const { participants: p } = useChatRoomStore.getState()
-        conn.send({ type: 'participants', participants: Array.from(p.entries()) })
-        announcedRef.current.add(conn.peer)
-      })
-
-      conn.on('error', (err) => {
-        console.error('[ChatRoom] createRoom:incoming-error', {
-          type: (err as any)?.type,
-          message: (err as any)?.message,
-          error: err,
-        })
-      })
-    })
-
-    newPeer.on('error', (err) => {
-      console.error('[ChatRoom] createRoom:peer-error', {
-        type: err.type,
-        message: err.message,
-        roomCode: code,
-        peerId,
-        peerConfig: PEER_SERVER_CONFIG,
-      })
-      if (err.type === 'unavailable-id') toast.error('This code is already in use, try again.')
-      else toast.error('Connection error')
-      setStatus('failed')
-      setIsCreating(false)
-      setStep('password-setup')
-    })
-  }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
-
-  // Password setup confirmed → create room
-  const handlePasswordSetupConfirm = useCallback((pwdHash: string | null) => {
-    setStep('creating')
-    createRoom(pendingRoomCode, pwdHash)
-  }, [createRoom, pendingRoomCode])
-
-  // Join an existing room
-  const handleJoin = useCallback(async (code: string, pwdHash: string | null) => {
-    // Ensure username is set in store before attempting to join
-    let currentUsername = useChatRoomStore.getState().username
-    if (!currentUsername && initialUsername) {
-      console.log('[ChatRoom] Username not in store, setting from initialUsername:', initialUsername)
-      setUsername(initialUsername)
-      currentUsername = initialUsername
-    }
-
-    console.log('[ChatRoom] handleJoin called:', { code, hasPassword: !!pwdHash, username: currentUsername })
-
-    if (!currentUsername) {
-      console.error('[ChatRoom] No username found, aborting join')
-      toast.error('Please set a username first')
-      setStatus('failed')
-      return
-    }
-
-    setRoomCode(code)
-    setRoomPasswordHash(pwdHash)
-    setStatus('generating')
-
-    const joinerPeerId = codeToCallPeerId(generateSecureCode())
-    const hostPeerId = codeToCallPeerId(code)
-    console.log('[ChatRoom] Peer IDs:', { joiner: joinerPeerId, host: hostPeerId })
-
-    const announcedRef = { current: new Set<string>() }
-
-    const iceServers = await getIceServers()
-    const peerConfig = {
-      ...PEER_SERVER_CONFIG,
-      config: {
-        iceServers,
-        iceTransportPolicy: getIceTransportPolicy(),
-        iceCandidatePoolSize: 10
-      }
-    }
-
-    logChatroom('joinRoom:init-peer', {
-      roomCode: code,
-      joinerPeerId,
-      hostPeerId,
-      peerConfig: PEER_SERVER_CONFIG,
-      hasPassword: !!pwdHash,
-    })
-    const newPeer = new Peer(joinerPeerId, peerConfig)
-
-    // Connection timeout - TURN fallback can take a while on strict NATs.
-    const connectionTimeout = setTimeout(() => {
-      if (useChatRoomStore.getState().status !== 'connected') {
-        console.error('[ChatRoom] Connection timeout after 60 seconds')
-        toast.error('Connection timeout. The room may be closed or unreachable.')
-        setStatus('failed')
-        setStep('join')
-        try { newPeer.destroy() } catch { /* ignore */ }
-      }
-    }, 60000)
-
-    newPeer.on('open', (id) => {
-      logChatroom('joinRoom:peer-open', { peerId: id, hostPeerId, roomCode: code })
-      if (!mountedRef.current) {
-        console.warn('[ChatRoom] Component unmounted, aborting')
-        clearTimeout(connectionTimeout)
-        return
-      }
-      setPeer(newPeer)
-
-      logChatroom('joinRoom:attempt-connect', { hostPeerId, roomCode: code })
-
-      // Add a delay before attempting connection to ensure signaling server is ready
-      // This is especially important on desktop browsers
-      setTimeout(() => {
-        logChatroom('joinRoom:connect-after-delay', { hostPeerId, roomCode: code })
-
-        const conn = newPeer.connect(hostPeerId, {
-          reliable: true,
-          serialization: 'json',
-          metadata: { username: currentUsername }
-        })
-
-        connectToPeer(conn)
-      }, 800)
-    })
-
-    function connectToPeer(conn: DataConnection) {
-      logChatroom('joinRoom:data-connection-created', {
-        peer: conn.peer,
-        open: conn.open,
-        type: conn.type
-      })
-
-      // Data connection timeout - if connection not opened in 25 seconds, fail
-      const dataConnTimeout = setTimeout(() => {
-        console.error('[ChatRoom] Data connection timeout after 25 seconds')
-        console.error('[ChatRoom] Connection state:', {
-          open: conn.open,
-          peerConnection: conn.peerConnection?.connectionState,
-          iceConnectionState: conn.peerConnection?.iceConnectionState,
-          iceGatheringState: conn.peerConnection?.iceGatheringState
-        })
-        toast.error('Could not establish connection to the room host. The room may be closed.')
-        setStatus('failed')
-        setStep('join')
-        clearTimeout(connectionTimeout)
-        try { conn.close() } catch { /* ignore */ }
-      }, 25000)
-
-      // Monitor ICE connection state (peerConnection might not be ready immediately)
-      setTimeout(() => {
-        if (conn.peerConnection) {
-          logChatroom('joinRoom:setup-ice-monitoring', { hostPeerId, roomCode: code })
-          conn.peerConnection.oniceconnectionstatechange = () => {
-            logChatroom('joinRoom:ice-connection-state', {
-              iceConnectionState: conn.peerConnection?.iceConnectionState,
-              connectionState: conn.peerConnection?.connectionState,
-            })
-            // If ICE fails, provide more info
-            if (conn.peerConnection?.iceConnectionState === 'failed') {
-              console.error('[ChatRoom] ICE connection failed - peer-to-peer connection could not be established')
-            }
-          }
-          conn.peerConnection.onicegatheringstatechange = () => {
-            logChatroom('joinRoom:ice-gathering-state', {
-              iceGatheringState: conn.peerConnection?.iceGatheringState,
-            })
-          }
-          conn.peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-              logChatroom('joinRoom:ice-candidate', {
-                candidateType: event.candidate.type,
-                protocol: event.candidate.protocol,
-              })
-            } else {
-              logChatroom('joinRoom:ice-gathering-complete')
-            }
-          }
-          logChatroom('joinRoom:initial-connection-state', {
-            connectionState: conn.peerConnection.connectionState,
-          })
-        } else {
-          console.warn('[ChatRoom] peerConnection not available yet')
-        }
-      }, 100)
-
-      conn.on('open', () => {
-        logChatroom('joinRoom:data-connection-open', {
-          hostPeerId,
-          connectionId: conn.connectionId,
-        })
-        clearTimeout(connectionTimeout)
-        clearTimeout(dataConnTimeout)
-        setupConn(conn, hostPeerId, currentUsername, null, announcedRef)
-        conn.send({ type: 'auth', hash: pwdHash || '' })
-        conn.send({ type: 'announce', username: currentUsername })
-        announcedRef.current.add(hostPeerId)
-        setStatus('connected')
-        setStep('chatting')
-        addSystemMsg('Connected to room!')
-      })
-
-      conn.on('error', (err) => {
-        console.error('[ChatRoom] joinRoom:data-connection-error', {
-          type: (err as any)?.type,
-          message: (err as any)?.message,
-          error: err,
-          hostPeerId,
-          roomCode: code,
-        })
-        clearTimeout(connectionTimeout)
-        clearTimeout(dataConnTimeout)
-
-        // Provide more specific error messages
-        const errorType = (err as any).type
-        if (errorType === 'peer-unavailable') {
-          toast.error('Room host is not available. They may have closed the room.')
-        } else if (errorType === 'network') {
-          toast.error('Network error. Please check your connection.')
-        } else {
-          toast.error('Could not join room. The room may be closed.')
-        }
-
-        setStatus('failed')
-        setStep('join')
-      })
-
-      conn.on('close', () => {
-        console.warn('[ChatRoom] Data connection closed before opening')
-        clearTimeout(dataConnTimeout)
-      })
-    }
-
-    newPeer.on('error', (err) => {
-      console.error('[ChatRoom] joinRoom:peer-error', {
-        type: err.type,
-        message: err.message,
-        error: err,
-        roomCode: code,
-        joinerPeerId,
-        hostPeerId,
-        peerConfig: PEER_SERVER_CONFIG,
-      })
-      clearTimeout(connectionTimeout)
-      toast.error(`Connection error: ${err.type || 'Unknown'}`)
-      setStatus('failed')
-      setStep('join')
-    })
-
-    newPeer.on('disconnected', () => {
-      console.warn('[ChatRoom] joinRoom:peer-disconnected', {
-        roomCode: code,
-        joinerPeerId,
-      })
-    })
-
-    newPeer.on('close', () => {
-      console.warn('[ChatRoom] joinRoom:peer-close', {
-        roomCode: code,
-        joinerPeerId,
-      })
-      clearTimeout(connectionTimeout)
-    })
-  }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
-
-  // Prevent body/document scroll when chat room is mounted (mobile Safari included)
   useEffect(() => {
     const scrollY = window.scrollY
     document.documentElement.style.overflow = 'hidden'
@@ -1201,15 +639,300 @@ export function ChatRoomView({
     }
   }, [])
 
+  const addSystemMsg = useCallback((text: string) => {
+    addMessage({ id: crypto.randomUUID(), from: 'system', text, timestamp: Date.now(), isLocal: false, isSystem: true })
+  }, [addMessage])
+
+  const handleRoomEventWireup = useCallback((room: Room, localUsername: string) => {
+    room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+      const remoteName = getParticipantUsername(participant)
+      addParticipant(participant.identity, remoteName)
+      addSystemMsg(`${remoteName} joined the room`)
+    })
+
+    room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+      const remoteName = getParticipantUsername(participant)
+      removeParticipant(participant.identity)
+      addSystemMsg(`${remoteName} left the room`)
+    })
+
+    room.on(RoomEvent.Disconnected, () => {
+      if (!mountedRef.current) return
+      setStatus('ended')
+    })
+
+    room.on(RoomEvent.DataReceived, (payload, participant) => {
+      try {
+        const data = JSON.parse(new TextDecoder().decode(payload)) as ChatPayload
+        const sender = participant ? getParticipantUsername(participant) : 'Participant'
+
+        if (data.type === 'chat') {
+          addMessage({
+            ...data.payload,
+            from: sender,
+            isLocal: false,
+          })
+          return
+        }
+
+        if (data.type === 'file-start') {
+          pendingFilesRef.current.set(data.fileId, {
+            chunks: new Array(data.totalChunks).fill(''),
+            totalChunks: data.totalChunks,
+            filename: data.filename,
+            mimeType: data.mimeType,
+            sender: data.sender,
+            receivedCount: 0,
+          })
+          return
+        }
+
+        if (data.type === 'file-chunk') {
+          const pending = pendingFilesRef.current.get(data.fileId)
+          if (!pending) return
+          pending.chunks[data.index] = data.data
+          pending.receivedCount += 1
+          return
+        }
+
+        if (data.type === 'file-end') {
+          const pending = pendingFilesRef.current.get(data.fileId)
+          if (!pending || pending.receivedCount < pending.totalChunks) return
+          const fileUrl = `data:${pending.mimeType};base64,${pending.chunks.join('')}`
+          addMessage({
+            id: `file-${data.fileId}`,
+            from: sender,
+            text: `📎 ${pending.filename}`,
+            timestamp: Date.now(),
+            isLocal: false,
+            fileUrl,
+            fileName: pending.filename,
+            fileMime: pending.mimeType,
+          })
+          pendingFilesRef.current.delete(data.fileId)
+        }
+      } catch (error) {
+        console.error('[ChatRoom] Failed to parse data payload', error)
+      }
+    })
+
+    room.remoteParticipants.forEach((participant) => {
+      addParticipant(participant.identity, getParticipantUsername(participant))
+    })
+
+    addSystemMsg(`Connected as ${localUsername}`)
+  }, [addParticipant, addMessage, addSystemMsg, removeParticipant, setStatus])
+
+  const connectToChatRoom = useCallback(async ({
+    endpoint,
+    roomName,
+    localUsername,
+    passwordHash,
+  }: {
+    endpoint: '/api/chatroom/create' | '/api/chatroom/join'
+    roomName: string
+    localUsername: string
+    passwordHash: string | null
+  }) => {
+    if (!LIVEKIT_URL) {
+      toast.error('Chat service is not configured.')
+      setStatus('failed')
+      return
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        roomName,
+        username: localUsername,
+        passwordHash,
+      }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to join chat room')
+    }
+
+    const room = new Room({
+      adaptiveStream: false,
+      dynacast: false,
+    })
+
+    roomRef.current?.disconnect()
+    roomRef.current = room
+
+    await room.connect(LIVEKIT_URL, data.token, {
+      autoSubscribe: true,
+    })
+
+    handleRoomEventWireup(room, localUsername)
+    setRoomCode(roomName)
+    setRoomPasswordHash(passwordHash)
+    setRoomHasPassword(Boolean(passwordHash))
+    setStatus('connected')
+    setStep('chatting')
+    setIsCreating(false)
+  }, [handleRoomEventWireup, setRoomCode, setRoomPasswordHash, setStatus])
+
+  const createRoom = useCallback(async (code: string, passwordHash: string | null) => {
+    let currentUsername = useChatRoomStore.getState().username
+    if (!currentUsername && initialUsername) {
+      setUsername(initialUsername)
+      currentUsername = initialUsername
+    }
+    if (!currentUsername) return
+
+    setIsCreating(true)
+    setStatus('generating')
+    try {
+      await connectToChatRoom({
+        endpoint: '/api/chatroom/create',
+        roomName: code,
+        localUsername: currentUsername,
+        passwordHash,
+      })
+      addSystemMsg(passwordHash ? 'Protected room created! Share the invite link.' : 'Room is ready! Share the invite link.')
+    } catch (error) {
+      console.error('[ChatRoom] create failed', error)
+      toast.error(error instanceof Error ? error.message : 'Could not create room')
+      setStatus('failed')
+      setIsCreating(false)
+      setStep('password-setup')
+    }
+  }, [addSystemMsg, connectToChatRoom, initialUsername, setStatus, setUsername])
+
+  const handleJoin = useCallback(async (code: string, passwordHash: string | null) => {
+    let currentUsername = useChatRoomStore.getState().username
+    if (!currentUsername && initialUsername) {
+      setUsername(initialUsername)
+      currentUsername = initialUsername
+    }
+    if (!currentUsername) {
+      toast.error('Please set a username first')
+      return
+    }
+
+    setStatus('joining')
+    try {
+      await connectToChatRoom({
+        endpoint: '/api/chatroom/join',
+        roomName: code,
+        localUsername: currentUsername,
+        passwordHash,
+      })
+      addSystemMsg('Connected to room!')
+    } catch (error) {
+      console.error('[ChatRoom] join failed', error)
+      toast.error(error instanceof Error ? error.message : 'Could not join room')
+      setStatus('failed')
+      setStep('join')
+    }
+  }, [addSystemMsg, connectToChatRoom, initialUsername, setStatus, setUsername])
+
+  const handleLeave = useCallback(() => {
+    roomRef.current?.disconnect()
+    roomRef.current = null
+    resetRoom()
+    setStep('password-setup')
+    setIsCreating(false)
+    setRoomHasPassword(false)
+  }, [resetRoom])
+
+  const sendMessage = useCallback((text: string) => {
+    const room = roomRef.current
+    const localUsername = username || initialUsername || 'You'
+    if (!room?.localParticipant || !text.trim()) return
+
+    const msg: RoomMessage = {
+      id: crypto.randomUUID(),
+      from: localUsername,
+      text,
+      timestamp: Date.now(),
+      isLocal: true,
+    }
+    addMessage(msg)
+    void room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: 'chat', payload: { ...msg, isLocal: false } satisfies RoomMessage })),
+      { reliable: true },
+    )
+  }, [addMessage, initialUsername, username])
+
+  const sendFileToRoom = useCallback(async (file: File) => {
+    const room = roomRef.current
+    const localUsername = username || initialUsername || 'You'
+    if (!room?.localParticipant) return
+
+    const MAX = 5 * 1024 * 1024
+    if (file.size > MAX) {
+      toast.error('File too large (max 5MB)')
+      return
+    }
+
+    const fileId = crypto.randomUUID()
+    const CHUNK_BYTES = 9000
+    const totalChunks = Math.ceil(file.size / CHUNK_BYTES)
+    const encode = (obj: ChatPayload) => new TextEncoder().encode(JSON.stringify(obj))
+
+    try {
+      await room.localParticipant.publishData(
+        encode({
+          type: 'file-start',
+          fileId,
+          filename: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          totalChunks,
+          totalSize: file.size,
+          sender: localUsername,
+        }),
+        { reliable: true },
+      )
+
+      for (let i = 0; i < totalChunks; i += 1) {
+        const slice = file.slice(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES)
+        const bytes = new Uint8Array(await slice.arrayBuffer())
+        let binary = ''
+        for (let j = 0; j < bytes.byteLength; j += 1) binary += String.fromCharCode(bytes[j])
+        await room.localParticipant.publishData(
+          encode({ type: 'file-chunk', fileId, index: i, data: btoa(binary) }),
+          { reliable: true },
+        )
+      }
+
+      await room.localParticipant.publishData(encode({ type: 'file-end', fileId }), { reliable: true })
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        addMessage({
+          id: `file-${fileId}-local`,
+          from: localUsername,
+          text: `📎 ${file.name}`,
+          timestamp: Date.now(),
+          isLocal: true,
+          fileUrl: reader.result as string,
+          fileName: file.name,
+          fileMime: file.type || 'application/octet-stream',
+        })
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('[ChatRoom] file send failed', error)
+      toast.error('Failed to send file')
+    }
+  }, [addMessage, initialUsername, username])
+
+  const participantMap = useMemo(() => new Map(participants), [participants])
+
   return (
     <div className="fixed left-0 right-0 bottom-0 top-20 flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6">
       <AnimatePresence mode="wait">
-
-        {/* Password setup step */}
         {step === 'password-setup' && (
-          <motion.div key="password-setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col items-center justify-center">
-            <PasswordSetupScreen roomCode={pendingRoomCode} onConfirm={handlePasswordSetupConfirm} />
+          <motion.div key="password-setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center">
+            <PasswordSetupScreen roomCode={pendingRoomCode} onConfirm={(hash) => {
+              setStep('creating')
+              void createRoom(pendingRoomCode, hash)
+            }} />
             <motion.button
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1222,16 +945,13 @@ export function ChatRoomView({
           </motion.div>
         )}
 
-        {/* Creating spinner */}
         {step === 'creating' && (
-          <motion.div key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="flex-1 flex flex-col items-center justify-center gap-4">
+          <motion.div key="creating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
-            <p className="text-sm text-muted">Creating room...</p>
+            <p className="text-sm text-muted">{isCreating ? 'Creating room...' : 'Preparing chat room...'}</p>
           </motion.div>
         )}
 
-        {/* Join screen */}
         {step === 'join' && (
           <motion.div key="join" className="w-full flex-1 flex flex-col items-center justify-center">
             <JoinScreen
@@ -1244,7 +964,6 @@ export function ChatRoomView({
           </motion.div>
         )}
 
-        {/* Live chat */}
         {step === 'chatting' && (
           <motion.div key="chatting" className="w-full h-full flex-1 flex flex-col min-h-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <LiveChatRoom
@@ -1252,6 +971,9 @@ export function ChatRoomView({
               roomCode={roomCode}
               roomHasPassword={roomHasPassword}
               timeLeft={timeLeft}
+              participants={participantMap}
+              onSendMessage={sendMessage}
+              onSendFile={sendFileToRoom}
               onLeave={handleLeave}
             />
           </motion.div>
