@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
@@ -13,6 +13,7 @@ import { TextField } from "@/mobile/components/TextField";
 import { generateSecureCode, isValidCode } from "@/lib/code-generator";
 import { useChatRoomStore } from "@/store/use-chat-room-store";
 import { useProfileStore } from "@/mobile/state/use-profile-store";
+import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 
 const PlusIcon = Plus as any;
 const LogInIcon = LogIn as any;
@@ -43,7 +44,8 @@ export function ChatRoomView() {
   const dockClearance = Math.max(insets.bottom, 10) + 64;
   const { username: profileUsername } = useProfileStore();
   const { status, roomName, username: storeUsername, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
-  const username = storeUsername || profileUsername;
+  // Always prefer profileUsername so the user never has to type their name again
+  const username = profileUsername || storeUsername;
   const [mode, setMode] = useState<"select" | "join">("select");
   const [joinCode, setJoinCode] = useState("");
   const [password, setPassword] = useState("");
@@ -51,6 +53,17 @@ export function ChatRoomView() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const isExpoGo = Constants.executionEnvironment === "storeClient";
+
+  // When the user presses the Chat dock button while already on this screen,
+  // the navigation store increments routeRefreshNonce — use that to go back to select.
+  const routeRefreshNonce = useMainNavigationStore((s) => s.routeRefreshNonce);
+  const skipFirstNonce = useRef(true);
+  useEffect(() => {
+    if (skipFirstNonce.current) { skipFirstNonce.current = false; return; }
+    reset();
+    setMode("select");
+    setJoinCode("");
+  }, [routeRefreshNonce]);
 
   const handleCreate = async () => {
     if (isExpoGo) {
@@ -138,10 +151,15 @@ export function ChatRoomView() {
     const displayName = username || `User-${roomName.slice(-4)}`;
     const chatUrl = `${API_BASE}/chatroom/${encodeURIComponent(roomName)}?autoAccept=1&from=${encodeURIComponent(displayName)}&topInset=${Math.round(insets.top)}`;
     const topPx = Math.round(insets.top);
-    // Inject padding directly into the web page's fixed container so it clears the status bar/Dynamic Island.
-    // Retries handle cases where React hydration finishes after DOMContentLoaded.
+    // 1) Push the fixed container below the status bar / Dynamic Island.
+    // 2) Kill all native bounce / overscroll so the page feels like a native screen.
     const injectedJavaScript = `
       (function() {
+        // Disable bounce & overscroll
+        document.documentElement.style.overscrollBehavior = 'none';
+        document.body.style.overscrollBehavior = 'none';
+
+        // Apply top-inset to the fixed container (retries until React hydrates)
         function apply() {
           var el = document.querySelector('div.fixed.top-0');
           if (el) { el.style.paddingTop = '${topPx}px'; return true; }
@@ -161,7 +179,16 @@ export function ChatRoomView() {
           style={{ flex: 1 }}
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustContentInsets={false}
+          scrollEnabled={false}
+          bounces={false}
+          overScrollMode="never"
           injectedJavaScript={injectedJavaScript}
+          onMessage={(event) => {
+            try {
+              const data = JSON.parse(event.nativeEvent.data) as { type: string };
+              if (data.type === 'leave') handleLeave();
+            } catch {}
+          }}
           onNavigationStateChange={(state) => {
             if (state.url && !state.url.includes("/chatroom/")) {
               handleLeave();

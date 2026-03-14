@@ -172,12 +172,14 @@ function JoinScreen({
   incomingHasPassword,
   onBack,
   onJoin,
+  embedded = false,
 }: {
   username: string
   initialCode?: string
   incomingHasPassword?: boolean
   onBack: () => void
   onJoin: (code: string, passwordHash: string | null) => Promise<void> | void
+  embedded?: boolean
 }) {
   const [inputCode, setInputCode] = useState(initialCode || '')
   const [showQRScanner, setShowQRScanner] = useState(false)
@@ -212,12 +214,14 @@ function JoinScreen({
       exit={{ opacity: 0, y: -20 }}
       className="w-full max-w-md mx-auto space-y-5"
     >
-      <div className="flex items-center justify-between">
-        <button onClick={onBack} className="glass-btn px-3 py-2 rounded-xl text-sm flex items-center gap-1.5">
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-      </div>
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="glass-btn px-3 py-2 rounded-xl text-sm flex items-center gap-1.5">
+            <ChevronLeft className="w-4 h-4" />
+            Back
+          </button>
+        </div>
+      )}
 
       <div className="text-center space-y-2">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
@@ -303,6 +307,7 @@ function LiveChatRoom({
   onSendMessage,
   onSendFile,
   onLeave,
+  embedded = false,
 }: {
   username: string
   roomCode: string
@@ -312,6 +317,7 @@ function LiveChatRoom({
   onSendMessage: (text: string) => void
   onSendFile: (file: File) => Promise<void>
   onLeave: () => void
+  embedded?: boolean
 }) {
   const { messages } = useChatRoomStore()
   const [input, setInput] = useState('')
@@ -362,11 +368,17 @@ function LiveChatRoom({
             </div>
           </div>
           <button
-            onClick={onLeave}
+            onClick={() => {
+              if (embedded) {
+                (window as any).ReactNativeWebView?.postMessage(JSON.stringify({ type: 'leave' }))
+              } else {
+                onLeave()
+              }
+            }}
             className="p-1.5 hover:bg-danger/20 rounded-lg transition-all text-muted hover:text-danger flex items-center gap-1.5 px-3"
             title="Leave Room"
           >
-            <span className="text-xs font-medium hidden sm:inline">Leave</span>
+            {!embedded && <span className="text-xs font-medium hidden sm:inline">Leave</span>}
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -379,14 +391,9 @@ function LiveChatRoom({
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
-                <a
-                  href={buildInviteUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="truncate text-xs text-primary hover:underline block w-full"
-                >
+                <span className="truncate text-xs text-primary block w-full select-none cursor-default">
                   {BASE_URL}/chatroom/{roomCode}{roomHasPassword ? '?pwd=1' : ''}
-                </a>
+                </span>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
@@ -977,15 +984,17 @@ export function ChatRoomView({
               setStep('creating')
               void createRoom(pendingRoomCode, hash)
             }} />
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              onClick={() => setStep('join')}
-              className="mt-6 text-xs text-muted hover:text-foreground underline transition-colors"
-            >
-              Join an existing room
-            </motion.button>
+            {!embedded && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                onClick={() => setStep('join')}
+                className="mt-6 text-xs text-muted hover:text-foreground underline transition-colors"
+              >
+                Join an existing room
+              </motion.button>
+            )}
           </motion.div>
         )}
 
@@ -1004,6 +1013,7 @@ export function ChatRoomView({
               incomingHasPassword={hasIncomingPassword}
               onBack={() => setStep('password-setup')}
               onJoin={handleJoin}
+              embedded={embedded}
             />
           </motion.div>
         )}
@@ -1019,6 +1029,7 @@ export function ChatRoomView({
               onSendMessage={sendMessage}
               onSendFile={sendFileToRoom}
               onLeave={handleLeave}
+              embedded={embedded}
             />
           </motion.div>
         )}
