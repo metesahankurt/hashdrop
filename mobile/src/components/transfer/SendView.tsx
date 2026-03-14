@@ -93,7 +93,7 @@ export function SendView({ onBack }: SendViewProps) {
       const peer = new (Peer as any)(peerId, {
         host: PEERJS_SERVER,
         port: 443,
-        path: "/peerjs",
+        path: "/",
         secure: true,
       });
 

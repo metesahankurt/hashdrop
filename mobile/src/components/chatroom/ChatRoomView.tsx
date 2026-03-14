@@ -41,7 +41,7 @@ export function ChatRoomView() {
       const peer = new (Peer as any)(peerId, {
         host: "hashdrop.onrender.com",
         port: 443,
-        path: "/peerjs",
+        path: "/",
         secure: true,
       });
 
@@ -124,7 +124,7 @@ export function ChatRoomView() {
       const peer = new (Peer as any)(myId, {
         host: "hashdrop.onrender.com",
         port: 443,
-        path: "/peerjs",
+        path: "/",
         secure: true,
       });
 

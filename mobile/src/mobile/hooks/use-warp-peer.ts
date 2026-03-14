@@ -14,7 +14,6 @@ import {
 } from "@/lib/code-generator";
 
 const PEERJS_HOST = "hashdrop.onrender.com";
-const PEERJS_PATH = "/peerjs";
 const CODE_EXPIRY_MS = 5 * 60 * 1000;
 
 // Relay base URL — set EXPO_PUBLIC_WEB_URL in .env (e.g. http://192.168.1.x:3000)
@@ -46,7 +45,7 @@ async function createPeer(peerId: string) {
   return new (Peer as any)(peerId, {
     host: PEERJS_HOST,
     port: 443,
-    path: PEERJS_PATH,
+    path: "/",
     secure: true,
   });
 }
