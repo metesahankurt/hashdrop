@@ -21,6 +21,10 @@ export function getDefaultIceServers(): RTCIceServer[] {
   return DEFAULT_ICE_SERVERS
 }
 
+export function getIceTransportPolicy(): RTCIceTransportPolicy {
+  return 'relay'
+}
+
 export async function getIceServers(): Promise<RTCIceServer[]> {
   if (cachedIceServers) {
     return cachedIceServers

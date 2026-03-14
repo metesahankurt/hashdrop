@@ -15,7 +15,7 @@ import { QRCodeDisplay } from './qr-code-display'
 import { QrScanner } from './qr-scanner'
 import { getPreferences } from '@/lib/preferences'
 import { formatErrorForToast } from '@/lib/error-handler'
-import { getIceServers } from '@/lib/webrtc-ice'
+import { getIceServers, getIceTransportPolicy } from '@/lib/webrtc-ice'
 
 // Type for file metadata received over the connection
 interface FileMetaData {
@@ -489,7 +489,8 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
           secure: true,
           debug: 2,
           config: {
-            iceServers
+            iceServers,
+            iceTransportPolicy: getIceTransportPolicy(),
           }
         })
 

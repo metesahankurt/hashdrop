@@ -11,7 +11,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { useChatRoomStore, type RoomMessage } from '@/store/use-chat-room-store'
 import { useUsernameStore } from '@/store/use-username-store'
 import { generateSecureCode, codeToCallPeerId } from '@/lib/code-generator'
-import { getIceServers } from '@/lib/webrtc-ice'
+import { getIceServers, getIceTransportPolicy } from '@/lib/webrtc-ice'
 import { QrScanner } from '@/components/transfer/qr-scanner'
 import { toast } from 'sonner'
 import type { DataConnection } from 'peerjs'
@@ -871,7 +871,7 @@ export function ChatRoomView({
       ...PEER_SERVER_CONFIG,
       config: {
         iceServers,
-        iceTransportPolicy: 'all',
+        iceTransportPolicy: getIceTransportPolicy(),
         iceCandidatePoolSize: 10
       }
     }
@@ -990,7 +990,7 @@ export function ChatRoomView({
       ...PEER_SERVER_CONFIG,
       config: {
         iceServers,
-        iceTransportPolicy: 'all',
+        iceTransportPolicy: getIceTransportPolicy(),
         iceCandidatePoolSize: 10
       }
     }
