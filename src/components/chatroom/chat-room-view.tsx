@@ -646,26 +646,33 @@ export function ChatRoomView({
 
   // Sets up event listeners only — call this BEFORE room.connect() so no events are missed
   const setupRoomListeners = useCallback((room: Room) => {
+    console.log('[ChatRoom][WEB] setupRoomListeners called — attaching event listeners')
+
     room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
       const remoteName = getParticipantUsername(participant)
+      console.log('[ChatRoom][WEB] ParticipantConnected:', participant.identity, 'name:', remoteName, 'metadata:', participant.metadata)
       addParticipant(participant.identity, remoteName)
       addSystemMsg(`${remoteName} joined the room`)
     })
 
     room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
       const remoteName = getParticipantUsername(participant)
+      console.log('[ChatRoom][WEB] ParticipantDisconnected:', participant.identity, 'name:', remoteName)
       removeParticipant(participant.identity)
       addSystemMsg(`${remoteName} left the room`)
     })
 
-    room.on(RoomEvent.Disconnected, () => {
+    room.on(RoomEvent.Disconnected, (reason) => {
+      console.log('[ChatRoom][WEB] Disconnected from room, reason:', reason)
       if (!mountedRef.current) return
       setStatus('ended')
     })
 
     room.on(RoomEvent.DataReceived, (payload, participant) => {
       try {
-        const data = JSON.parse(new TextDecoder().decode(payload)) as ChatPayload
+        const raw = new TextDecoder().decode(payload)
+        console.log('[ChatRoom][WEB] DataReceived raw:', raw.slice(0, 200), 'from:', participant?.identity)
+        const data = JSON.parse(raw) as ChatPayload
         const sender = participant ? getParticipantUsername(participant) : 'Participant'
 
         if (data.type === 'chat') {
@@ -743,10 +750,13 @@ export function ChatRoomView({
     passwordHash: string | null
   }) => {
     if (!LIVEKIT_URL) {
+      console.error('[ChatRoom][WEB] LIVEKIT_URL is not set!')
       toast.error('Chat service is not configured.')
       setStatus('failed')
       return
     }
+
+    console.log('[ChatRoom][WEB] connectToChatRoom — endpoint:', endpoint, 'room:', roomName, 'user:', localUsername, 'livekit:', LIVEKIT_URL)
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -759,6 +769,7 @@ export function ChatRoomView({
     })
 
     const data = await response.json()
+    console.log('[ChatRoom][WEB] API response status:', response.status, 'data:', JSON.stringify(data).slice(0, 200))
     if (!response.ok) {
       throw new Error(data.error || 'Failed to join chat room')
     }
@@ -774,12 +785,16 @@ export function ChatRoomView({
     // Attach listeners BEFORE connecting so no ParticipantConnected events are missed
     setupRoomListeners(room)
 
+    console.log('[ChatRoom][WEB] Calling room.connect() to:', LIVEKIT_URL)
     await room.connect(LIVEKIT_URL, data.token, {
       autoSubscribe: true,
     })
+    console.log('[ChatRoom][WEB] room.connect() resolved — localIdentity:', room.localParticipant?.identity)
 
     // Sync any participants already in the room when we connected
-    room.remoteParticipants.forEach((participant) => {
+    const existing = Array.from(room.remoteParticipants.values())
+    console.log('[ChatRoom][WEB] remoteParticipants after connect:', existing.length, existing.map(p => ({ id: p.identity, meta: p.metadata })))
+    existing.forEach((participant) => {
       addParticipant(participant.identity, getParticipantUsername(participant))
     })
 

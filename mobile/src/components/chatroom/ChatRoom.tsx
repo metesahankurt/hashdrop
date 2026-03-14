@@ -45,8 +45,15 @@ export function ChatRoom({ livekitUrl, onLeave }: ChatRoomProps) {
         connect={status !== "idle"}
         audio={false}
         video={false}
-        onDisconnected={onLeave}
+        onConnected={() => {
+          console.log('[ChatRoom][MOBILE] LiveKitRoom onConnected — serverUrl:', livekitUrl);
+        }}
+        onDisconnected={() => {
+          console.log('[ChatRoom][MOBILE] LiveKitRoom onDisconnected');
+          onLeave();
+        }}
         onError={(error) => {
+          console.error('[ChatRoom][MOBILE] LiveKitRoom onError:', error?.message, error);
           Toast.show({ type: "error", text1: "Connection failed", text2: error?.message ?? "Could not connect to room" });
         }}
       >
@@ -76,14 +83,33 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
   const [showParticipants, setShowParticipants] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
+  // Log room + participant state on mount and changes
+  useEffect(() => {
+    console.log('[ChatRoom][MOBILE] ChatRoomContent mounted — roomName:', roomName, 'identity:', identity, 'username:', username);
+    console.log('[ChatRoom][MOBILE] room object:', room ? 'present' : 'null/undefined');
+  });
+
+  useEffect(() => {
+    console.log('[ChatRoom][MOBILE] useParticipants() count:', participants.length, participants.map((p: any) => ({ id: p.identity, meta: p.metadata })));
+  }, [participants]);
+
   // Listen for incoming messages
   useEffect(() => {
-    if (!room) return;
+    if (!room) {
+      console.log('[ChatRoom][MOBILE] DataReceived useEffect — room is null, skipping');
+      return;
+    }
+    console.log('[ChatRoom][MOBILE] Attaching DataReceived listener');
     const handler = (payload: Uint8Array, participant: any) => {
       try {
         const text = new TextDecoder().decode(payload);
+        console.log('[ChatRoom][MOBILE] DataReceived raw:', text.slice(0, 200), 'from:', participant?.identity);
         const data = JSON.parse(text);
-        if (data?.type !== "chat") return;
+        if (data?.type !== "chat") {
+          console.log('[ChatRoom][MOBILE] DataReceived — ignored, type:', data?.type);
+          return;
+        }
+        console.log('[ChatRoom][MOBILE] DataReceived chat — sender:', data.sender, 'content:', data.content, 'senderIdentity:', data.senderIdentity);
         addMessage({
           id: `msg-${data.timestamp}-${data.senderIdentity}`,
           type: "text",
@@ -92,8 +118,8 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
           content: data.content,
           timestamp: data.timestamp,
         });
-      } catch {
-        // ignore malformed data
+      } catch (e) {
+        console.error('[ChatRoom][MOBILE] DataReceived parse error:', e);
       }
     };
     room.on(RoomEvent.DataReceived, handler);
@@ -105,6 +131,7 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
     if (!room) return;
     const onJoin = (participant: any) => {
       const name = getUsername(participant);
+      console.log('[ChatRoom][MOBILE] ParticipantConnected:', participant.identity, 'name:', name, 'metadata:', participant.metadata);
       addMessage({
         id: `sys-join-${Date.now()}-${participant.identity}`,
         type: "system",
@@ -116,6 +143,7 @@ function ChatRoomContent({ onLeave }: { onLeave: () => void }) {
     };
     const onLeaveP = (participant: any) => {
       const name = getUsername(participant);
+      console.log('[ChatRoom][MOBILE] ParticipantDisconnected:', participant.identity, 'name:', name);
       addMessage({
         id: `sys-leave-${Date.now()}-${participant.identity}`,
         type: "system",

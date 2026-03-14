@@ -57,12 +57,14 @@ export function ChatRoomView() {
     try {
       const roomName = generateSecureCode();
       const passwordHash = password.trim() ? await hashPassword(password.trim()) : null;
+      console.log('[ChatRoom][MOBILE] handleCreate — roomName:', roomName, 'API:', API_BASE, 'LIVEKIT_URL:', LIVEKIT_URL);
       const res = await fetch(`${API_BASE}/api/chatroom/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomName, username, passwordHash }),
       });
       const data = await res.json();
+      console.log('[ChatRoom][MOBILE] create response status:', res.status, 'data:', JSON.stringify(data).slice(0, 200));
       if (!res.ok) throw new Error(data.error || "Failed to create room");
       setRoomInfo({ roomName: data.roomName, token: data.token, identity: data.identity, username, hasPassword: !!password.trim() });
       addMessage({
@@ -95,12 +97,14 @@ export function ChatRoomView() {
     setLoading(true);
     try {
       const passwordHash = joinPassword.trim() ? await hashPassword(joinPassword.trim()) : null;
+      console.log('[ChatRoom][MOBILE] handleJoin — code:', code, 'API:', API_BASE, 'LIVEKIT_URL:', LIVEKIT_URL);
       const res = await fetch(`${API_BASE}/api/chatroom/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomName: code, username, passwordHash }),
       });
       const data = await res.json();
+      console.log('[ChatRoom][MOBILE] join response status:', res.status, 'data:', JSON.stringify(data).slice(0, 200));
       if (!res.ok) throw new Error(data.error || "Room not found");
       setRoomInfo({ roomName: data.roomName || code, token: data.token, identity: data.identity, username });
       addMessage({
