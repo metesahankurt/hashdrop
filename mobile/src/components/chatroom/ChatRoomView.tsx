@@ -1,110 +1,82 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
-import { MessageSquare, Plus, LogIn, Lock } from "lucide-react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Lock, MessageSquare, Plus, LogIn } from "lucide-react-native";
 import Toast from "react-native-toast-message";
+import * as Haptics from "expo-haptics";
+import Constants from "expo-constants";
+
+import { AppShell } from "@/mobile/components/AppShell";
+import { PrimaryButton } from "@/mobile/components/PrimaryButton";
+import { TextField } from "@/mobile/components/TextField";
+import { generateSecureCode, isValidCode } from "@/lib/code-generator";
 import { useChatRoomStore } from "@/store/use-chat-room-store";
-import { useUsernameStore } from "@/store/use-username-store";
-import { generateSecureCode, codeToPeerId, isValidCode } from "@/lib/code-generator";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { GlassCard } from "@/components/ui/GlassCard";
+import { useProfileStore } from "@/mobile/state/use-profile-store";
 import { ChatRoom } from "./ChatRoom";
 
-type SetupMode = "select" | "create" | "join";
+const PlusIcon = Plus as any;
+const LogInIcon = LogIn as any;
+const LockIcon = Lock as any;
+const MessageSquareIcon = MessageSquare as any;
+
+const ACCENT = "#f59e0b";
+const LIVEKIT_URL =
+  process.env.EXPO_PUBLIC_LIVEKIT_URL || "wss://your-project.livekit.cloud";
+const API_BASE =
+  process.env.EXPO_PUBLIC_API_URL || "https://hashdrop.metesahankurt.cloud";
+
+const EXPO_GO_ERROR =
+  "Chat room requires a development build.\n\nRun:\n  npx expo run:ios\n  npx expo run:android";
+
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export function ChatRoomView() {
-  const { username } = useUsernameStore();
-  const { status, roomCode, setRoomCode, setStatus, setMyPeerId, addMessage, addParticipant, reset } = useChatRoomStore();
-  const [mode, setMode] = useState<SetupMode>("select");
+  const { username } = useProfileStore();
+  const { status, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
+  const [mode, setMode] = useState<"select" | "join">("select");
   const [joinCode, setJoinCode] = useState("");
   const [password, setPassword] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  if (status === "connected") {
-    return <ChatRoom onLeave={() => { reset(); setMode("select"); }} />;
-  }
+  const isExpoGo = Constants.executionEnvironment === "storeClient";
 
   const handleCreate = async () => {
+    if (isExpoGo) {
+      Alert.alert("Development Build Required", EXPO_GO_ERROR);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
-    const code = generateSecureCode();
-    setRoomCode(code);
-
     try {
-      const { Peer } = await import("react-native-webrtc");
-      const peerId = codeToPeerId(code);
-      const peer = new (Peer as any)(peerId, {
-        host: "hashdrop.onrender.com",
-        port: 443,
-        path: "/",
-        secure: true,
+      const roomName = generateSecureCode();
+      const passwordHash = password.trim() ? await hashPassword(password.trim()) : null;
+      const res = await fetch(`${API_BASE}/api/chatroom/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName, username, passwordHash }),
       });
-
-      peer.on("open", (id: string) => {
-        setMyPeerId(id);
-        setStatus("connected");
-        addParticipant({ peerId: id, username, joinedAt: Date.now() });
-        addMessage({
-          id: Date.now().toString(),
-          type: "system",
-          senderId: "system",
-          senderName: "System",
-          content: `Room ${code} created. Share this code to invite others.`,
-          timestamp: Date.now(),
-        });
-        setLoading(false);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create room");
+      setRoomInfo({ roomName: data.roomName, token: data.token, identity: data.identity, username, hasPassword: !!password.trim() });
+      addMessage({
+        id: `sys-${Date.now()}`,
+        type: "system",
+        sender: "system",
+        senderIdentity: "system",
+        content: `Room ${data.roomName} created. Share the code to invite others.`,
+        timestamp: Date.now(),
       });
-
-      peer.on("connection", (conn: any) => {
-        conn.on("open", () => {
-          conn.on("data", (data: any) => {
-            if (data.type === "join") {
-              addParticipant({ peerId: conn.peer, username: data.username, joinedAt: Date.now() });
-              addMessage({
-                id: Date.now().toString(),
-                type: "system",
-                senderId: "system",
-                senderName: "System",
-                content: `${data.username} joined the room.`,
-                timestamp: Date.now(),
-              });
-            } else if (data.type === "message") {
-              addMessage({
-                id: data.id,
-                type: "text",
-                senderId: conn.peer,
-                senderName: data.username,
-                content: data.content,
-                timestamp: data.timestamp,
-              });
-            }
-          });
-
-          conn.on("close", () => {
-            addMessage({
-              id: Date.now().toString(),
-              type: "system",
-              senderId: "system",
-              senderName: "System",
-              content: "A participant left the room.",
-              timestamp: Date.now(),
-            });
-          });
-        });
-      });
-
-      peer.on("error", (err: any) => {
-        Toast.show({ type: "error", text1: "Failed to create room" });
-        setLoading(false);
-        reset();
-      });
+      setStatus("connected");
     } catch (err: any) {
       Toast.show({ type: "error", text1: err.message });
+    } finally {
       setLoading(false);
     }
   };
@@ -115,142 +87,270 @@ export function ChatRoomView() {
       Toast.show({ type: "error", text1: "Invalid room code" });
       return;
     }
+    if (isExpoGo) {
+      Alert.alert("Development Build Required", EXPO_GO_ERROR);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
-    setRoomCode(code);
-
     try {
-      const { Peer } = await import("react-native-webrtc");
-      const myId = `guest-${Date.now()}`;
-      const peer = new (Peer as any)(myId, {
-        host: "hashdrop.onrender.com",
-        port: 443,
-        path: "/",
-        secure: true,
+      const passwordHash = joinPassword.trim() ? await hashPassword(joinPassword.trim()) : null;
+      const res = await fetch(`${API_BASE}/api/chatroom/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomName: code, username, passwordHash }),
       });
-
-      peer.on("open", (id: string) => {
-        setMyPeerId(id);
-        const hostPeerId = codeToPeerId(code);
-        const conn = peer.connect(hostPeerId, { reliable: true });
-
-        conn.on("open", () => {
-          conn.send({ type: "join", username });
-          addParticipant({ peerId: id, username, joinedAt: Date.now() });
-          setStatus("connected");
-          setLoading(false);
-
-          conn.on("data", (data: any) => {
-            if (data.type === "message") {
-              addMessage({
-                id: data.id,
-                type: "text",
-                senderId: conn.peer,
-                senderName: data.username,
-                content: data.content,
-                timestamp: data.timestamp,
-              });
-            }
-          });
-        });
-
-        conn.on("error", () => {
-          Toast.show({ type: "error", text1: "Failed to connect — check the code" });
-          setLoading(false);
-          reset();
-        });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Room not found");
+      setRoomInfo({ roomName: data.roomName || code, token: data.token, identity: data.identity, username });
+      addMessage({
+        id: `sys-${Date.now()}`,
+        type: "system",
+        sender: "system",
+        senderIdentity: "system",
+        content: `You joined room ${data.roomName || code}.`,
+        timestamp: Date.now(),
       });
-
-      peer.on("error", () => {
-        Toast.show({ type: "error", text1: "Connection failed" });
-        setLoading(false);
-        reset();
-      });
+      setStatus("connected");
     } catch (err: any) {
       Toast.show({ type: "error", text1: err.message });
+    } finally {
       setLoading(false);
     }
   };
 
+  const handleLeave = () => {
+    reset();
+    setMode("select");
+    setJoinCode("");
+  };
+
+  if (status === "connected") {
+    return <ChatRoom livekitUrl={LIVEKIT_URL} onLeave={handleLeave} />;
+  }
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Chat Room</Text>
-      <Text style={styles.subtitle}>
-        P2P encrypted group chat — up to 50 participants, no server storage.
-      </Text>
+    <AppShell
+      title="Chat Room"
+      subtitle="Private room-based messaging — create a space or join one with a code."
+    >
+      {/* Hero card */}
+      <View style={styles.heroCard}>
+        <View style={styles.orbLarge} />
+        <View style={styles.orbSmall} />
+
+        <View style={styles.heroTopRow}>
+          <Text style={styles.heroKicker}>ROOM MESSAGING</Text>
+          <View style={styles.heroPill}>
+            <LockIcon size={11} stroke={ACCENT} strokeWidth={2.4} />
+            <Text style={styles.heroPillText}>Encrypted</Text>
+          </View>
+        </View>
+
+        <Text style={styles.heroTitle}>Start a private room in seconds.</Text>
+        <Text style={styles.heroSubtitle}>
+          Share a code and chat in real time. No accounts, no history.
+        </Text>
+
+        <View style={styles.chipRow}>
+          <View style={styles.chip}><Text style={styles.chipText}>Code-based entry</Text></View>
+          <View style={styles.chip}><Text style={styles.chipText}>E2E encrypted</Text></View>
+          <View style={styles.chip}><Text style={styles.chipText}>Up to 50 people</Text></View>
+        </View>
+      </View>
 
       {mode === "select" && (
-        <View style={styles.cards}>
-          <TouchableOpacity style={styles.card} onPress={() => setMode("create")} activeOpacity={0.75}>
-            <View style={[styles.iconBg, { backgroundColor: "rgba(62,207,142,0.12)" }]}>
-              <Plus size={28} color="#3ecf8e" />
+        <>
+          <View style={styles.card}>
+            <View style={styles.cardTop}>
+              <View style={[styles.iconWrap, { backgroundColor: `${ACCENT}18`, borderColor: `${ACCENT}2f` }]}>
+                <PlusIcon size={20} stroke={ACCENT} strokeWidth={2.2} />
+              </View>
+              <View style={[styles.badge, { backgroundColor: `${ACCENT}14`, borderColor: `${ACCENT}2b` }]}>
+                <Text style={[styles.badgeText, { color: ACCENT }]}>CREATE</Text>
+              </View>
             </View>
-            <Text style={styles.cardTitle}>Create Room</Text>
-            <Text style={styles.cardDesc}>Start a new encrypted chat room and share the code.</Text>
-          </TouchableOpacity>
+            <Text style={styles.cardTitle}>Create a room</Text>
+            <Text style={styles.cardDesc}>
+              Generate a room code and share it with anyone you want to chat with.
+            </Text>
+            <TextField
+              label="Password (optional)"
+              placeholder="Leave empty for no password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <PrimaryButton onPress={handleCreate} disabled={loading}>
+              {loading ? "Creating…" : "Create room"}
+            </PrimaryButton>
+          </View>
 
-          <TouchableOpacity style={styles.card} onPress={() => setMode("join")} activeOpacity={0.75}>
-            <View style={[styles.iconBg, { backgroundColor: "rgba(129,140,248,0.12)" }]}>
-              <LogIn size={28} color="#818cf8" />
+          <View style={styles.card}>
+            <View style={styles.cardTop}>
+              <View style={[styles.iconWrap, { backgroundColor: "rgba(129,140,248,0.12)", borderColor: "rgba(129,140,248,0.2)" }]}>
+                <LogInIcon size={20} stroke="#818cf8" strokeWidth={2.2} />
+              </View>
+              <View style={[styles.badge, { backgroundColor: "rgba(129,140,248,0.12)", borderColor: "rgba(129,140,248,0.2)" }]}>
+                <Text style={[styles.badgeText, { color: "#818cf8" }]}>JOIN</Text>
+              </View>
             </View>
-            <Text style={styles.cardTitle}>Join Room</Text>
-            <Text style={styles.cardDesc}>Enter a room code to join an existing chat.</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {mode === "create" && (
-        <GlassCard style={{ gap: 12 }}>
-          <Text style={styles.sectionLabel}>Create Chat Room</Text>
-          <Text style={styles.desc}>An encrypted room will be created with a shareable code.</Text>
-          <Button onPress={handleCreate} loading={loading}>
-            Create Room
-          </Button>
-          <Button variant="ghost" onPress={() => setMode("select")}>
-            Cancel
-          </Button>
-        </GlassCard>
+            <Text style={styles.cardTitle}>Join a room</Text>
+            <Text style={styles.cardDesc}>
+              Enter a room code to join an existing chat session.
+            </Text>
+            <PrimaryButton onPress={() => setMode("join")} tone="secondary">
+              Join room
+            </PrimaryButton>
+          </View>
+        </>
       )}
 
       {mode === "join" && (
-        <GlassCard style={{ gap: 12 }}>
-          <Text style={styles.sectionLabel}>Join Chat Room</Text>
-          <Input
+        <View style={styles.formCard}>
+          <View style={styles.cardTop}>
+            <View style={[styles.iconWrap, { backgroundColor: "rgba(129,140,248,0.12)", borderColor: "rgba(129,140,248,0.2)" }]}>
+              <MessageSquareIcon size={20} stroke="#818cf8" strokeWidth={2.2} />
+            </View>
+            <View style={[styles.badge, { backgroundColor: "rgba(129,140,248,0.12)", borderColor: "rgba(129,140,248,0.2)" }]}>
+              <Text style={[styles.badgeText, { color: "#818cf8" }]}>JOIN</Text>
+            </View>
+          </View>
+
+          <Text style={styles.cardTitle}>Enter room code</Text>
+
+          <TextField
+            label="Room code"
             placeholder="COSMIC-FALCON"
             value={joinCode}
             onChangeText={(t) => setJoinCode(t.toUpperCase())}
             autoCapitalize="characters"
-            autoCorrect={false}
-            label="Room Code"
           />
-          <Button onPress={handleJoin} loading={loading} disabled={!joinCode.trim()}>
-            Join
-          </Button>
-          <Button variant="ghost" onPress={() => setMode("select")}>
-            Cancel
-          </Button>
-        </GlassCard>
+          <TextField
+            label="Password (if required)"
+            placeholder="Leave empty if no password"
+            value={joinPassword}
+            onChangeText={setJoinPassword}
+            secureTextEntry
+          />
+
+          <PrimaryButton
+            onPress={handleJoin}
+            disabled={loading || !isValidCode(joinCode.trim().toUpperCase())}
+          >
+            {loading ? "Connecting…" : "Join room"}
+          </PrimaryButton>
+
+          <PrimaryButton onPress={() => { setMode("select"); setJoinCode(""); }} tone="secondary">
+            Back
+          </PrimaryButton>
+        </View>
       )}
-    </ScrollView>
+    </AppShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0d0d0d" },
-  content: { padding: 20, gap: 16 },
-  title: { fontSize: 26, fontWeight: "700", color: "#ededed", marginBottom: 4 },
-  subtitle: { fontSize: 14, color: "#8b8b8b", lineHeight: 20, marginBottom: 8 },
-  cards: { gap: 12 },
-  card: {
-    backgroundColor: "rgba(255,255,255,0.04)",
+  heroCard: {
+    overflow: "hidden",
+    position: "relative",
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 16,
+    backgroundColor: "#131313",
     padding: 20,
     gap: 10,
   },
-  iconBg: { width: 52, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  cardTitle: { fontSize: 17, fontWeight: "600", color: "#ededed" },
-  cardDesc: { fontSize: 13, color: "#8b8b8b", lineHeight: 18 },
-  sectionLabel: { fontSize: 16, fontWeight: "600", color: "#ededed" },
-  desc: { fontSize: 13, color: "#8b8b8b" },
+  orbLarge: {
+    position: "absolute",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(245,158,11,0.12)",
+    top: -60,
+    right: -50,
+  },
+  orbSmall: {
+    position: "absolute",
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    bottom: -36,
+    left: -30,
+  },
+  heroTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  heroKicker: { color: ACCENT, fontSize: 12, fontWeight: "800", letterSpacing: 1.2 },
+  heroPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(245,158,11,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  heroPillText: { color: ACCENT, fontSize: 11, fontWeight: "800" },
+  heroTitle: {
+    color: "#ededed",
+    fontSize: 26,
+    fontWeight: "800",
+    lineHeight: 30,
+    maxWidth: "85%",
+  },
+  heroSubtitle: { color: "#8b8b8b", fontSize: 13, lineHeight: 19, maxWidth: "90%" },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 },
+  chip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  chipText: { color: "#d4d4d4", fontSize: 11, fontWeight: "700" },
+  card: {
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 18,
+    gap: 12,
+  },
+  formCard: {
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    padding: 18,
+    gap: 14,
+  },
+  cardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  badgeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
+  cardTitle: { color: "#ededed", fontSize: 18, fontWeight: "700" },
+  cardDesc: { color: "#8b8b8b", fontSize: 13, lineHeight: 19 },
 });

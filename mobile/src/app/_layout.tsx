@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
 import { FloatingDock } from "@/mobile/components/FloatingDock";
 import { MainNavigationAnimationProvider } from "@/mobile/navigation/MainNavigationAnimationProvider";
@@ -23,6 +24,7 @@ export default function RootLayout() {
           />
           <FloatingDock />
         </View>
+        <Toast />
       </MainNavigationAnimationProvider>
     </SafeAreaProvider>
   );

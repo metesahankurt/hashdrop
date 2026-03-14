@@ -6,6 +6,7 @@ interface TextFieldProps {
   value: string;
   onChangeText: (value: string) => void;
   autoCapitalize?: "none" | "characters" | "words" | "sentences";
+  secureTextEntry?: boolean;
 }
 
 export function TextField({
@@ -14,6 +15,7 @@ export function TextField({
   value,
   onChangeText,
   autoCapitalize = "none",
+  secureTextEntry = false,
 }: TextFieldProps) {
   return (
     <View style={styles.container}>
@@ -24,6 +26,7 @@ export function TextField({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor="#6f6f6f"
+        secureTextEntry={secureTextEntry}
         style={styles.input}
         value={value}
       />
