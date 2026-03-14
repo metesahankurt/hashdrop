@@ -550,17 +550,43 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             addLog(`Incoming connection failed: ${errorInfo.title}`, 'error')
           })
 
-          // Timeout: if ICE never completes, fail visibly instead of hanging forever
+          // Timeout: if ICE never completes, auto-upload files to relay as fallback
           const incomingTimeout = setTimeout(() => {
             if (!conn.open) {
-              console.error('[Peer] Incoming connection ICE timeout')
+              console.error('[Peer] Incoming connection ICE timeout — attempting relay fallback')
               conn.close()
-              setStatus('failed')
-              toast.error('Connection Timeout', {
-                description: 'Receiver could not establish a connection. Ask them to try again.',
-                duration: 6000,
-              })
-              addLog('Incoming connection ICE timeout — receiver unreachable', 'error')
+              addLog('P2P connection failed — uploading files to server relay...', 'warning')
+
+              const { files: filesToUpload, displayCode: code } = useWarpStore.getState()
+              if (filesToUpload.length > 0 && code) {
+                const toastId = toast.loading('Direct connection failed. Uploading files to server...')
+                const formData = new FormData()
+                for (const f of filesToUpload) formData.append('file', f, f.name)
+                fetch(`/api/relay/${code}`, { method: 'POST', body: formData })
+                  .then(res => {
+                    if (res.ok) {
+                      toast.dismiss(toastId)
+                      toast.success('Files uploaded to server! Receiver will download automatically.')
+                      addLog('Files uploaded to relay — receiver can download via server', 'success')
+                    } else {
+                      toast.dismiss(toastId)
+                      toast.error('Server upload failed. Ask receiver to try again.')
+                      setStatus('failed')
+                    }
+                  })
+                  .catch(() => {
+                    toast.dismiss(toastId)
+                    toast.error('Connection failed. Please try again.')
+                    setStatus('failed')
+                  })
+              } else {
+                setStatus('failed')
+                toast.error('Connection Timeout', {
+                  description: 'Receiver could not connect. Try again.',
+                  duration: 6000,
+                })
+                addLog('Incoming connection ICE timeout — receiver unreachable', 'error')
+              }
             }
           }, 60000)
 
@@ -701,11 +727,34 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       if (!hasConnected && !relayFound && conn.open === false) {
         conn.close()
         setStatus('failed')
-        toast.error('Connection Timeout', {
-          description: 'Could not reach the other peer. Make sure they are online and try again.',
-          duration: 6000
+        toast.error('Direct connection failed', {
+          description: 'Waiting for sender to share via server relay...',
+          duration: 8000,
         })
-        addLog('Connection timeout - peer unreachable. Check that the sender has the app open.', 'error')
+        addLog('P2P timeout — waiting for sender to upload via relay...', 'warning')
+
+        // Continue polling relay as fallback — sender may auto-upload files
+        let fallbackStopped = false
+        const fallbackPoll = setInterval(async () => {
+          if (fallbackStopped) { clearInterval(fallbackPoll); return }
+          try {
+            const res = await fetch(`/api/relay/${normalized}`)
+            if (res.ok) {
+              const json = await res.json()
+              if (Array.isArray(json.files) && json.files.length > 0) {
+                fallbackStopped = true
+                clearInterval(fallbackPoll)
+                setRelayFiles(json.files)
+                setRelayCode(normalized)
+                setStatus('idle')
+                addLog(`Relay fallback: ${json.files.length} file(s) ready for download`, 'success')
+                toast.success('Files available! Sender used server relay.')
+              }
+            }
+          } catch { /* ignore */ }
+        }, 3000)
+        // Stop fallback poll after 5 minutes
+        setTimeout(() => { fallbackStopped = true; clearInterval(fallbackPoll) }, 5 * 60 * 1000)
       }
     }, 60000) // 60 seconds — gives mobile time to tap "Upload & share"
 
