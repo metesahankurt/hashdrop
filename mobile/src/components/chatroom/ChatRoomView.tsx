@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { WebView } from "react-native-webview";
 import { Lock, MessageSquare, Plus, LogIn } from "lucide-react-native";
 import Toast from "react-native-toast-message";
@@ -37,6 +39,8 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 export function ChatRoomView() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { username: profileUsername } = useProfileStore();
   const { status, roomName, username: storeUsername, setRoomInfo, setStatus, addMessage, reset } = useChatRoomStore();
   const username = storeUsername || profileUsername;
@@ -134,10 +138,12 @@ export function ChatRoomView() {
     const displayName = username || `User-${roomName.slice(-4)}`;
     const chatUrl = `${API_BASE}/chatroom/${encodeURIComponent(roomName)}?autoAccept=1&from=${encodeURIComponent(displayName)}`;
     return (
-      <View style={{ flex: 1, backgroundColor: "#0d0d0d" }}>
+      <View style={{ flex: 1, backgroundColor: "#0d0d0d", paddingTop: insets.top, paddingBottom: tabBarHeight }}>
         <WebView
           source={{ uri: chatUrl }}
           style={{ flex: 1 }}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
           onNavigationStateChange={(state) => {
             if (state.url && !state.url.includes("/chatroom/")) {
               handleLeave();

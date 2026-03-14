@@ -965,7 +965,7 @@ export function ChatRoomView({
   const participantMap = useMemo(() => new Map(participants), [participants])
 
   return (
-    <div className={`fixed left-0 right-0 bottom-0 ${embedded ? 'top-0' : 'top-20'} flex flex-col z-10 overflow-hidden px-4 md:px-8 pb-6`}>
+    <div className={`fixed left-0 right-0 bottom-0 ${embedded ? 'top-0' : 'top-20'} flex flex-col z-10 overflow-hidden px-4 md:px-8 ${embedded ? 'pb-2' : 'pb-6'}`}>
       <AnimatePresence mode="wait">
         {step === 'password-setup' && (
           <motion.div key="password-setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center">
