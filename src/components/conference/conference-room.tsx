@@ -77,19 +77,19 @@ export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomPr
     <>
       <AudioRenderer />
       <div className="fixed inset-0 top-0 flex flex-col bg-background z-40">
-        <div className={`flex-1 min-h-0 flex flex-col ${isMobileEmbed ? 'gap-1.5 p-1.5' : 'gap-3 p-3 md:p-4'}`}>
+        <div className={`flex-1 min-h-0 flex flex-col ${isMobileEmbed ? 'gap-1.5 p-1.5 pb-[6.75rem]' : 'gap-3 p-3 md:p-4'}`}>
           {/* Admit panel — host only */}
           {role === 'host' && waitingParticipants.length > 0 && (
-            <div className="shrink-0">
+            <div className={isMobileEmbed ? 'absolute inset-x-1.5 top-1.5 z-30 max-h-[24vh] overflow-y-auto' : 'shrink-0'}>
               <ConferenceAdmitPanel />
             </div>
           )}
 
           {/* Main area */}
-          <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? 'gap-1.5 flex-col' : 'gap-3'}`}>
+          <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? `gap-1.5 flex-col ${role === 'host' && waitingParticipants.length > 0 ? 'pt-[6rem]' : ''}` : 'gap-3'}`}>
             {/* Video grid */}
             <div className={isMobileEmbed ? 'w-full shrink-0' : 'flex-1 min-w-0 min-h-0'}>
-              <div className={isMobileEmbed ? 'aspect-[4/5] max-h-[46vh] min-h-[250px] w-full' : 'h-full'}>
+              <div className={isMobileEmbed ? 'aspect-[10/14] max-h-[50vh] min-h-[260px] w-full' : 'h-full'}>
                 <ConferenceGrid isMobileEmbed={isMobileEmbed} />
               </div>
             </div>
@@ -104,7 +104,7 @@ export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomPr
                   transition={{ duration: 0.2 }}
                   className={
                     showMobilePanelOverlay
-                      ? 'absolute inset-x-2 bottom-24 top-2 z-50 overflow-hidden rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl'
+                      ? 'absolute inset-x-1.5 top-1.5 bottom-[6.75rem] z-50 overflow-hidden rounded-2xl border border-white/10 bg-background/95 backdrop-blur-xl'
                       : 'shrink-0 overflow-hidden h-full'
                   }
                 >
@@ -125,7 +125,7 @@ export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomPr
           </div>
 
           {/* Controls */}
-          <div className={`glass-card shrink-0 ${isMobileEmbed ? 'rounded-[20px] px-2.5 py-2' : 'rounded-2xl px-4 py-3'}`}>
+          <div className={`glass-card shrink-0 ${isMobileEmbed ? 'rounded-[20px] px-2.5 py-2 fixed left-1.5 right-1.5 bottom-1.5 z-40' : 'rounded-2xl px-4 py-3'}`}>
             <ConferenceControls onLeave={onLeave} isMobileEmbed={isMobileEmbed} />
           </div>
         </div>

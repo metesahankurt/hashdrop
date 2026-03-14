@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParticipants, useTracks } from '@livekit/components-react'
+import { useLocalParticipant, useParticipants, useTracks } from '@livekit/components-react'
 import { Track, LocalVideoTrack, RemoteVideoTrack } from 'livekit-client'
 import { useRoomContext } from '@livekit/components-react'
 import { ConferenceTile } from './conference-tile'
@@ -26,8 +26,14 @@ function getGridCols(n: number) {
 export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
   const room = useRoomContext()
   const participants = useParticipants()
+  const { localParticipant } = useLocalParticipant()
   const { pinnedIdentity, identity: localIdentity } = useConferenceStore()
   const [isScreenExpanded, setIsScreenExpanded] = useState(false)
+  const currentLocalIdentity = localParticipant?.identity ?? localIdentity
+  const allParticipants = [
+    ...(localParticipant ? [localParticipant] : []),
+    ...participants.filter((participant) => participant.identity !== localParticipant?.identity),
+  ]
 
   // Active speakers from room
   const activeSpeakerIds = room.activeSpeakers.map((s) => s.identity)
@@ -37,7 +43,7 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
   const activeScreen = screenTracks.find((t) => t.publication?.track)
 
   const pinnedParticipant = pinnedIdentity
-    ? participants.find((p) => p.identity === pinnedIdentity)
+    ? allParticipants.find((p) => p.identity === pinnedIdentity)
     : null
 
   // Presentation mode: active screen share
@@ -67,14 +73,14 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
             'flex gap-2 overflow-y-auto shrink-0',
             isMobileEmbed ? 'w-full flex-row overflow-x-auto overflow-y-hidden' : 'w-44 flex-col'
           )}>
-            {participants.map((p) => (
+            {allParticipants.map((p) => (
               <div key={p.identity} className={clsx(
                 'aspect-video shrink-0',
                 isMobileEmbed ? 'w-32' : 'w-full'
               )}>
                 <ConferenceTile
                   participant={p}
-                  isLocal={p.identity === localIdentity}
+                  isLocal={p.identity === currentLocalIdentity}
                   size="small"
                   isActiveSpeaker={activeSpeakerIds.includes(p.identity)}
                 />
@@ -88,13 +94,13 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
 
   // Spotlight/pinned mode
   if (pinnedParticipant) {
-    const others = participants.filter((p) => p.identity !== pinnedParticipant.identity)
+    const others = allParticipants.filter((p) => p.identity !== pinnedParticipant.identity)
     return (
       <div className={clsx('flex h-full', isMobileEmbed ? 'gap-2 flex-col' : 'gap-3')}>
         <div className="flex-1 min-w-0 min-h-0">
           <ConferenceTile
             participant={pinnedParticipant}
-            isLocal={pinnedParticipant.identity === localIdentity}
+            isLocal={pinnedParticipant.identity === currentLocalIdentity}
             size="large"
             isActiveSpeaker={activeSpeakerIds.includes(pinnedParticipant.identity)}
           />
@@ -111,7 +117,7 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
               )}>
                 <ConferenceTile
                   participant={p}
-                  isLocal={p.identity === localIdentity}
+                  isLocal={p.identity === currentLocalIdentity}
                   size="small"
                   isActiveSpeaker={activeSpeakerIds.includes(p.identity)}
                 />
@@ -124,7 +130,7 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
   }
 
   // Normal grid
-  const cols = getGridCols(participants.length)
+  const cols = getGridCols(allParticipants.length)
   const gridClass = {
     1: 'grid-cols-1',
     2: 'grid-cols-2',
@@ -137,13 +143,17 @@ export function ConferenceGrid({ isMobileEmbed }: { isMobileEmbed?: boolean }) {
   return (
     <div className={clsx(
       'grid gap-2 h-full auto-rows-fr',
-      isMobileEmbed && participants.length === 1 ? 'grid-cols-1' : gridClass
+      isMobileEmbed
+        ? allParticipants.length <= 2
+          ? 'grid-cols-1'
+          : 'grid-cols-2'
+        : gridClass
     )}>
-      {participants.map((p) => (
+      {allParticipants.map((p) => (
         <ConferenceTile
           key={p.identity}
           participant={p}
-          isLocal={p.identity === localIdentity}
+          isLocal={p.identity === currentLocalIdentity}
           isActiveSpeaker={activeSpeakerIds.includes(p.identity)}
         />
       ))}

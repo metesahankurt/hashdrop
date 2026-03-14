@@ -1,6 +1,6 @@
 'use client'
 
-import { useParticipants } from '@livekit/components-react'
+import { useLocalParticipant, useParticipants } from '@livekit/components-react'
 import { X, Mic, MicOff, Video, VideoOff, Crown } from 'lucide-react'
 import { useConferenceStore } from '@/store/use-conference-store'
 
@@ -15,13 +15,19 @@ function getParticipantInfo(metadata?: string, identity?: string) {
 
 export function ConferenceParticipants({ onClose }: { onClose: () => void }) {
   const participants = useParticipants()
-  const { identity: localIdentity, role: myRole } = useConferenceStore()
+  const { localParticipant } = useLocalParticipant()
+  const { identity: localIdentity } = useConferenceStore()
+  const currentLocalIdentity = localParticipant?.identity ?? localIdentity
+  const allParticipants = [
+    ...(localParticipant ? [localParticipant] : []),
+    ...participants.filter((participant) => participant.identity !== localParticipant?.identity),
+  ]
 
   return (
     <div className="glass-card rounded-2xl flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/8">
         <span className="text-sm font-medium text-foreground">
-          Participants <span className="text-muted text-xs ml-1">({participants.length})</span>
+          Participants <span className="text-muted text-xs ml-1">({allParticipants.length})</span>
         </span>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-muted hover:text-foreground transition-colors">
           <X className="w-4 h-4" />
@@ -29,9 +35,9 @@ export function ConferenceParticipants({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-        {participants.map((p) => {
+        {allParticipants.map((p) => {
           const { username, role } = getParticipantInfo(p.metadata, p.identity)
-          const isLocal = p.identity === localIdentity
+          const isLocal = p.identity === currentLocalIdentity
           const micOn = p.isMicrophoneEnabled
           const camOn = p.isCameraEnabled
 

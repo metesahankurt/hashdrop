@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useRoomContext, useLocalParticipant } from '@livekit/components-react'
+import { useLocalParticipant, useParticipants } from '@livekit/components-react'
 import {
   Mic, MicOff, Video, VideoOff, Monitor, MonitorOff,
   MessageSquare, Users, PhoneOff, Volume2, VolumeOff, Link2, Settings, RefreshCw, Ellipsis,
@@ -26,8 +26,8 @@ function formatDuration(seconds: number) {
 }
 
 export function ConferenceControls({ onLeave, isMobileEmbed }: ConferenceControlsProps) {
-  const room = useRoomContext()
   const { localParticipant } = useLocalParticipant()
+  const participants = useParticipants()
   const [showDeviceSettings, setShowDeviceSettings] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
 
@@ -77,7 +77,7 @@ export function ConferenceControls({ onLeave, isMobileEmbed }: ConferenceControl
     }
   }, [localParticipant, setScreenSharing])
 
-  const participantCount = room.numParticipants
+  const participantCount = participants.length + (localParticipant ? 1 : 0)
   const toggleChat = () => {
     setChatOpen(!isChatOpen)
     if (isParticipantsOpen) setParticipantsOpen(false)
@@ -255,7 +255,7 @@ export function ConferenceControls({ onLeave, isMobileEmbed }: ConferenceControl
       </div>
 
       {isMobileEmbed && showMoreMenu && (
-        <div className="order-4 rounded-2xl border border-white/10 bg-black/70 backdrop-blur-xl p-2 grid grid-cols-4 gap-2">
+        <div className="absolute left-0 right-0 bottom-full mb-2 rounded-2xl border border-white/10 bg-black/80 backdrop-blur-xl p-2 grid grid-cols-5 gap-2 z-30 shadow-2xl">
           <CtrlBtn
             onClick={() => setSpeakerMuted(!isSpeakerMuted)}
             active={!isSpeakerMuted}
