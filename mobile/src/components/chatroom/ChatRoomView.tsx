@@ -154,6 +154,47 @@ function createAutofillScript(password: string, topPx: number) {
       var password = ${escapedPassword};
       var hasPassword = !!password;
 
+      function injectHideStyles() {
+        if (document.getElementById('hashdrop-mobile-hide-notifications')) {
+          return;
+        }
+
+        var style = document.createElement('style');
+        style.id = 'hashdrop-mobile-hide-notifications';
+        style.textContent = [
+          '[data-sonner-toaster], .sonner-toaster, .toast-container, .toaster, .hot-toast, [data-toast], [data-toaster] { display: none !important; }',
+          '[role="alert"], [role="status"] { display: none !important; }',
+          '[aria-live="polite"], [aria-live="assertive"] { display: none !important; }'
+        ].join('\\n');
+        document.head.appendChild(style);
+      }
+
+      function hideNotifications() {
+        var selectors = [
+          '[data-sonner-toaster]',
+          '.sonner-toaster',
+          '.toast-container',
+          '.toaster',
+          '.hot-toast',
+          '[data-toast]',
+          '[data-toaster]',
+          '[role="alert"]',
+          '[role="status"]',
+          '[aria-live="polite"]',
+          '[aria-live="assertive"]'
+        ];
+
+        selectors.forEach(function(selector) {
+          Array.prototype.forEach.call(document.querySelectorAll(selector), function(node) {
+            if (node && node.style) {
+              node.style.display = 'none';
+              node.style.visibility = 'hidden';
+              node.style.pointerEvents = 'none';
+            }
+          });
+        });
+      }
+
       function applyTopInset() {
         var el = document.querySelector('div.fixed.top-0');
         if (el) {
@@ -207,11 +248,21 @@ function createAutofillScript(password: string, topPx: number) {
         return clickJoinButton();
       }
 
+      injectHideStyles();
+      hideNotifications();
       applyTopInset();
+
+      var observer = new MutationObserver(function() {
+        injectHideStyles();
+        hideNotifications();
+        applyTopInset();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
 
       var attempts = 0;
       var timer = setInterval(function() {
         attempts += 1;
+        hideNotifications();
         applyTopInset();
         if (autofillPassword() || attempts > 60) {
           clearInterval(timer);
