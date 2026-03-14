@@ -540,8 +540,33 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
             return
           }
 
+          // Attach error handler immediately so ICE failures aren't silently swallowed
+          conn.on('error', (err) => {
+            console.error('[Peer] Incoming connection error:', err)
+            clearTimeout(incomingTimeout)
+            setStatus('failed')
+            const errorInfo = formatErrorForToast(err, 'transfer-interrupted')
+            toast.error(errorInfo.title, { description: errorInfo.description, duration: errorInfo.duration })
+            addLog(`Incoming connection failed: ${errorInfo.title}`, 'error')
+          })
+
+          // Timeout: if ICE never completes, fail visibly instead of hanging forever
+          const incomingTimeout = setTimeout(() => {
+            if (!conn.open) {
+              console.error('[Peer] Incoming connection ICE timeout')
+              conn.close()
+              setStatus('failed')
+              toast.error('Connection Timeout', {
+                description: 'Receiver could not establish a connection. Ask them to try again.',
+                duration: 6000,
+              })
+              addLog('Incoming connection ICE timeout — receiver unreachable', 'error')
+            }
+          }, 60000)
+
           // Wait for the connection to be open before handling (avoids "not open" send errors)
           conn.on('open', () => {
+            clearTimeout(incomingTimeout)
             handleConnectionRef.current(conn)
           })
         })
