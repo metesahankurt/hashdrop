@@ -19,6 +19,17 @@ import { useSearchParams } from 'next/navigation'
 const CODE_EXPIRY_MS = 10 * 60 * 1000
 const MAX_PEERS = 49
 const BASE_URL = 'https://hashdrop.metesahankurt.cloud'
+const PEER_SERVER_CONFIG = {
+  host: 'hashdrop.onrender.com',
+  port: 443,
+  path: '/',
+  secure: true,
+  debug: 3,
+} as const
+
+function logChatroom(event: string, details?: unknown) {
+  console.log(`[ChatRoom] ${event}`, details ?? '')
+}
 
 async function hashPassword(password: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
@@ -855,7 +866,7 @@ export function ChatRoomView({
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
+      ...PEER_SERVER_CONFIG,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -878,9 +889,11 @@ export function ChatRoomView({
       }
     }
 
+    logChatroom('createRoom:init-peer', { peerId, roomCode: code, peerConfig: PEER_SERVER_CONFIG })
     const newPeer = new Peer(peerId, peerConfig)
 
     newPeer.on('open', () => {
+      logChatroom('createRoom:peer-open', { peerId: newPeer.id, roomCode: code })
       if (!mountedRef.current) return
       setPeer(newPeer)
       setStatus('connected')
@@ -890,7 +903,11 @@ export function ChatRoomView({
     })
 
     newPeer.on('connection', (conn) => {
-      console.log('[ChatRoom] Incoming connection from:', conn.peer)
+      logChatroom('createRoom:incoming-connection', {
+        remotePeer: conn.peer,
+        connectionId: conn.connectionId,
+        open: conn.open,
+      })
       const { dataConnections } = useChatRoomStore.getState()
       if (dataConnections.size >= MAX_PEERS) {
         console.warn('[ChatRoom] Max peers reached, rejecting connection')
@@ -901,12 +918,19 @@ export function ChatRoomView({
       // Monitor ICE for incoming connections
       if (conn.peerConnection) {
         conn.peerConnection.oniceconnectionstatechange = () => {
-          console.log('[ChatRoom Host] ICE state for', conn.peer, ':', conn.peerConnection?.iceConnectionState)
+          logChatroom('createRoom:incoming-ice-state', {
+            remotePeer: conn.peer,
+            iceConnectionState: conn.peerConnection?.iceConnectionState,
+            connectionState: conn.peerConnection?.connectionState,
+          })
         }
       }
 
       conn.on('open', () => {
-        console.log('[ChatRoom] Incoming connection opened from:', conn.peer)
+        logChatroom('createRoom:incoming-open', {
+          remotePeer: conn.peer,
+          connectionId: conn.connectionId,
+        })
         setupConn(conn, conn.peer, currentUsername, pwdHash, announcedRef)
         conn.send({ type: 'announce', username: currentUsername })
         const { participants: p } = useChatRoomStore.getState()
@@ -915,11 +939,22 @@ export function ChatRoomView({
       })
 
       conn.on('error', (err) => {
-        console.error('[ChatRoom] Incoming connection error:', err)
+        console.error('[ChatRoom] createRoom:incoming-error', {
+          type: (err as any)?.type,
+          message: (err as any)?.message,
+          error: err,
+        })
       })
     })
 
     newPeer.on('error', (err) => {
+      console.error('[ChatRoom] createRoom:peer-error', {
+        type: err.type,
+        message: err.message,
+        roomCode: code,
+        peerId,
+        peerConfig: PEER_SERVER_CONFIG,
+      })
       if (err.type === 'unavailable-id') toast.error('This code is already in use, try again.')
       else toast.error('Connection error')
       setStatus('failed')
@@ -964,7 +999,7 @@ export function ChatRoomView({
     const announcedRef = { current: new Set<string>() }
 
     const peerConfig = {
-      host: 'hashdrop.onrender.com', port: 443, path: '/', secure: true, debug: 3,
+      ...PEER_SERVER_CONFIG,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -987,6 +1022,13 @@ export function ChatRoomView({
       }
     }
 
+    logChatroom('joinRoom:init-peer', {
+      roomCode: code,
+      joinerPeerId,
+      hostPeerId,
+      peerConfig: PEER_SERVER_CONFIG,
+      hasPassword: !!pwdHash,
+    })
     const newPeer = new Peer(joinerPeerId, peerConfig)
 
     // Connection timeout - if not connected in 30 seconds, show error
@@ -1001,7 +1043,7 @@ export function ChatRoomView({
     }, 30000)
 
     newPeer.on('open', (id) => {
-      console.log('[ChatRoom] Peer opened:', id)
+      logChatroom('joinRoom:peer-open', { peerId: id, hostPeerId, roomCode: code })
       if (!mountedRef.current) {
         console.warn('[ChatRoom] Component unmounted, aborting')
         clearTimeout(connectionTimeout)
@@ -1009,25 +1051,12 @@ export function ChatRoomView({
       }
       setPeer(newPeer)
 
-      console.log('[ChatRoom] Attempting to connect to host:', hostPeerId)
+      logChatroom('joinRoom:attempt-connect', { hostPeerId, roomCode: code })
 
       // Add a delay before attempting connection to ensure signaling server is ready
       // This is especially important on desktop browsers
       setTimeout(() => {
-        console.log('[ChatRoom] Initiating connection to host after delay...')
-
-        // Try to check if peer exists first (best effort - listAllPeers might not be available)
-        if (typeof (newPeer as any).listAllPeers === 'function') {
-          (newPeer as any).listAllPeers((peers: string[]) => {
-            console.log('[ChatRoom] Available peers:', peers)
-            const hostExists = peers.includes(hostPeerId)
-            console.log('[ChatRoom] Host peer exists:', hostExists)
-
-            if (!hostExists) {
-              console.warn('[ChatRoom] Host peer not found in peer list, attempting connection anyway...')
-            }
-          })
-        }
+        logChatroom('joinRoom:connect-after-delay', { hostPeerId, roomCode: code })
 
         const conn = newPeer.connect(hostPeerId, {
           reliable: true,
@@ -1040,7 +1069,7 @@ export function ChatRoomView({
     })
 
     function connectToPeer(conn: DataConnection) {
-      console.log('[ChatRoom] Connection object created:', {
+      logChatroom('joinRoom:data-connection-created', {
         peer: conn.peer,
         open: conn.open,
         type: conn.type
@@ -1065,32 +1094,45 @@ export function ChatRoomView({
       // Monitor ICE connection state (peerConnection might not be ready immediately)
       setTimeout(() => {
         if (conn.peerConnection) {
-          console.log('[ChatRoom] Setting up ICE monitoring')
+          logChatroom('joinRoom:setup-ice-monitoring', { hostPeerId, roomCode: code })
           conn.peerConnection.oniceconnectionstatechange = () => {
-            console.log('[ChatRoom] ICE connection state:', conn.peerConnection?.iceConnectionState)
+            logChatroom('joinRoom:ice-connection-state', {
+              iceConnectionState: conn.peerConnection?.iceConnectionState,
+              connectionState: conn.peerConnection?.connectionState,
+            })
             // If ICE fails, provide more info
             if (conn.peerConnection?.iceConnectionState === 'failed') {
               console.error('[ChatRoom] ICE connection failed - peer-to-peer connection could not be established')
             }
           }
           conn.peerConnection.onicegatheringstatechange = () => {
-            console.log('[ChatRoom] ICE gathering state:', conn.peerConnection?.iceGatheringState)
+            logChatroom('joinRoom:ice-gathering-state', {
+              iceGatheringState: conn.peerConnection?.iceGatheringState,
+            })
           }
           conn.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
-              console.log('[ChatRoom] ICE candidate:', event.candidate.type, event.candidate.protocol)
+              logChatroom('joinRoom:ice-candidate', {
+                candidateType: event.candidate.type,
+                protocol: event.candidate.protocol,
+              })
             } else {
-              console.log('[ChatRoom] ICE gathering complete')
+              logChatroom('joinRoom:ice-gathering-complete')
             }
           }
-          console.log('[ChatRoom] Current connection state:', conn.peerConnection.connectionState)
+          logChatroom('joinRoom:initial-connection-state', {
+            connectionState: conn.peerConnection.connectionState,
+          })
         } else {
           console.warn('[ChatRoom] peerConnection not available yet')
         }
       }, 100)
 
       conn.on('open', () => {
-        console.log('[ChatRoom] Data connection opened successfully')
+        logChatroom('joinRoom:data-connection-open', {
+          hostPeerId,
+          connectionId: conn.connectionId,
+        })
         clearTimeout(connectionTimeout)
         clearTimeout(dataConnTimeout)
         setupConn(conn, hostPeerId, currentUsername, null, announcedRef)
@@ -1103,8 +1145,13 @@ export function ChatRoomView({
       })
 
       conn.on('error', (err) => {
-        console.error('[ChatRoom] Data connection error:', err)
-        console.error('[ChatRoom] Error type:', (err as any).type)
+        console.error('[ChatRoom] joinRoom:data-connection-error', {
+          type: (err as any)?.type,
+          message: (err as any)?.message,
+          error: err,
+          hostPeerId,
+          roomCode: code,
+        })
         clearTimeout(connectionTimeout)
         clearTimeout(dataConnTimeout)
 
@@ -1129,7 +1176,15 @@ export function ChatRoomView({
     }
 
     newPeer.on('error', (err) => {
-      console.error('[ChatRoom] Peer error:', err)
+      console.error('[ChatRoom] joinRoom:peer-error', {
+        type: err.type,
+        message: err.message,
+        error: err,
+        roomCode: code,
+        joinerPeerId,
+        hostPeerId,
+        peerConfig: PEER_SERVER_CONFIG,
+      })
       clearTimeout(connectionTimeout)
       toast.error(`Connection error: ${err.type || 'Unknown'}`)
       setStatus('failed')
@@ -1137,11 +1192,17 @@ export function ChatRoomView({
     })
 
     newPeer.on('disconnected', () => {
-      console.warn('[ChatRoom] Peer disconnected from signaling server')
+      console.warn('[ChatRoom] joinRoom:peer-disconnected', {
+        roomCode: code,
+        joinerPeerId,
+      })
     })
 
     newPeer.on('close', () => {
-      console.warn('[ChatRoom] Peer connection closed')
+      console.warn('[ChatRoom] joinRoom:peer-close', {
+        roomCode: code,
+        joinerPeerId,
+      })
       clearTimeout(connectionTimeout)
     })
   }, [initialUsername, setPeer, setStatus, setRoomCode, setRoomPasswordHash, addSystemMsg, setupConn])
