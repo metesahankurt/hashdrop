@@ -667,7 +667,11 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
       // relay check failed silently — fall through to PeerJS
     }
 
-    // 2. Fall back to PeerJS P2P
+    // 2. Signal that a web receiver is waiting so mobile relay mode can auto-upload.
+    // This must run for both manual code entry and QR/link auto-connect flows.
+    fetch(`/api/relay/${normalized}/claim`, { method: 'POST' }).catch(() => {})
+
+    // 3. Fall back to PeerJS P2P
     if (!peer) {
       toast.error('Initializing connection... Please wait a moment.')
       addLog('Network not ready, please wait', 'warning')
