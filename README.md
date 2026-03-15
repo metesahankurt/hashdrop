@@ -1,336 +1,181 @@
 # HashDrop 🚀
 
-A **secure, peer-to-peer file transfer application** built with Next.js and WebRTC. Share files directly between devices at lightspeed. **No cloud, no limits, no tracking.**
+A **secure, unified ecosystem for peer-to-peer file sharing, video conferencing, and real-time chat** built with Next.js, React Native (Expo), WebRTC, and LiveKit. 
+Sharing data directly and securely between devices at lightning speeds. **No cloud storage, zero data retention, and no tracking.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.0-black?style=flat&logo=next.js)](https://nextjs.org/)
+[![React Native](https://img.shields.io/badge/React_Native-Expo-blue?style=flat&logo=react)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
 
-<img width="1582" height="960" alt="Screenshot 2026-01-10 at 17 23 39" src="https://github.com/user-attachments/assets/b9e1b76d-7ffa-4854-8d49-c4c197cd06ab" />
+<img width="1582" height="960" alt="HashDrop Web UI" src="https://github.com/user-attachments/assets/b9e1b76d-7ffa-4854-8d49-c4c197cd06ab" />
 
-## ✨ Features
+## 🌐 The HashDrop Ecosystem
 
-### 🔒 **Security & Privacy**
-- **End-to-End Encryption**: WebRTC DTLS/SRTP encryption (same as Zoom, Google Meet)
-- **SHA-256 File Verification**: Cryptographic hashing ensures file integrity
-- **No Cloud Storage**: Files never touch our servers or any cloud storage
-- **Zero Data Retention**: No logs, no tracking, no metadata storage
-- **Code-Based Access Control**: Only the person with the unique code can access files
-- **Single Connection Limit**: Prevents unauthorized access even if code is leaked
-- **5-Minute Code Expiry**: Transfer codes automatically expire for security
+HashDrop goes beyond a single web app; it is a full cross-platform suite consisting of a powerful **Web Application** and a fully-featured **Mobile App** (iOS/Android), designed to break down the walls between your devices seamlessly. 
 
-### ⚡ **Performance & Reliability**
-- **Direct P2P Transfer**: Files stream directly between devices via WebRTC
-- **Real-time Progress**: Live progress tracking with speed and ETA
-- **Automatic Download**: Files download automatically when transfer completes
-- **Duplicate Chunk Protection**: Ensures data integrity during transfer
-- **File Size Validation**: Supports files up to 10GB with built-in DoS protection
-- **Resumable Transfers**: Robust chunk-based transfer system
-
-### 🎨 **User Experience**
-- **Human-Readable Codes**: Easy-to-share transfer codes (e.g., "Cosmic-Falcon")
-- **QR Code Sharing**: Instant connection via QR code scanning
-- **Dynamic OG Images**: Beautiful link previews with transfer codes for Discord, Twitter, etc.
-- **Auto-Copy Toggle**: Optional clipboard auto-copy (privacy-first)
-- **Transfer History**: Track your recent transfers with statistics
-- **Image Preview**: Preview images before downloading
-- **Keyboard Shortcuts**: Fast navigation with keyboard commands
-- **Responsive Design**: Works seamlessly on desktop and mobile
-
-### 🌐 **Zero Friction**
-- **No Account Required**: Completely anonymous, no signup
-- **No Installation**: Works directly in the browser
-- **Cross-Platform**: Works on any device with a modern browser
-- **Text Sharing**: Share text and links instantly
+Whether you are dropping a heavy 10GB video file to a colleague, jumping into a high-quality video conference, or sending a quick snippet of text, HashDrop provides a unified, frictionless experience.
 
 ---
 
-## 🛡️ Security Enhancements (Latest)
+## ✨ Core Features
 
-### **Critical Security Fixes**
+### 📁 1. Secure Peer-to-Peer File Transfer
+- **Direct Device-to-Device Stream**: Files are transferred directly between peers via WebRTC. Once sent, it's gone.
+- **Zero Cloud Storage**: Files never touch our backend servers or any intermediary cloud. 
+- **10GB Maximum Capacity**: Extremely high capacity with a chunk-based resumble transfer system.
+- **SHA-256 Verification**: Cryptographic hashing ensures your file arrives exactly as it was sent without corruption.
+- **Duplicate Chunk Protection**: Robust built-in DoS protection during the transfer execution.
 
-✅ **Multi-Connection Prevention**: Only the first peer can connect, preventing unauthorized access
+### 📹 2. High-Capacity Video Conferencing
+- **Powered by LiveKit**: Utilizing the robust LiveKit SDK for low-latency, scalable WebRTC room architecture.
+- **Multi-Participant Support**: Scales effortlessly up to 50 active participants in a single conference.
+- **Cross-Platform Compatibility**: Users can join the same room seamlessly from a web browser or from the native mobile app.
+- **Dynamic Layout Focus**: Smooth horizontal picture-in-picture stream layout, with an interactive zoom view for screen shares or crucial details.
+- **Hardware Optimized**: Fully optimized camera and microphone handling natively on iOS and Android.
 
-✅ **Enhanced Code Entropy**: 6,400 possible combinations (80×80) vs previous 1,600
+### 💬 3. Real-Time Chat Rooms & Text Sharing
+- **Transient Chat Rooms**: Create disposable, secure chat environments instantly. 
+- **Universal Text Sharing**: Send a quick URL, a paragraph of text, or code snippets instantly across devices. 
 
-✅ **Duplicate Chunk Detection**: Protects against data corruption attacks
-
-✅ **File Size Limits**: 10GB maximum file size to prevent DoS
-
-✅ **Chunk Count Limits**: Maximum 1M chunks to prevent memory exhaustion
-
-✅ **Input Validation**: All user inputs sanitized and validated (XSS protection)
-
-✅ **OG Image Security**: Transfer code parameters validated in Open Graph images
-
-### **Privacy-First Design**
-✅ **Auto-Copy Disabled by Default**: Clipboard permission only requested when user enables it
-
-✅ **Transparent Security**: Detailed "How Does It Work?" section educates users
-
-✅ **Warning Messages**: Clear warnings about code sharing best practices
-
----
-
-## 🚀 Tech Stack
-
-| Category | Technology |
-|----------|-----------|
-| **Framework** | Next.js 16 (App Router, Turbopack) |
-| **Language** | TypeScript 5 |
-| **P2P** | PeerJS 1.5.4 (WebRTC wrapper) |
-| **State** | Zustand 5.0.2 |
-| **Styling** | Tailwind CSS v4.1 |
-| **Animations** | Framer Motion 12.23 |
-| **UI Components** | Lucide React (icons), Sonner (toasts) |
-| **File Handling** | JSZip, React Dropzone |
-| **Charts** | Recharts 3.6 |
-| **Testing** | Jest 29, React Testing Library 16 |
+### 📱 4. Native Mobile Application (iOS & Android)
+- **Built with Expo**: 100% native feel utilizing the power of React Native.
+- **Integrated QR Code Scanner**: Utilize your device's camera to join rooms, receive files, or connect instantly by scanning the Web client's QR display.
+- **Haptic Integrations**: Sensorial feedback on successful file transfers or room joins.
 
 ---
 
-## 📦 Getting Started
+## 🔒 Security & Privacy (The "Zero Trust" Approach)
+
+HashDrop is built with absolute privacy as its foundation.
+
+✅ **End-to-End Encryption**: WebRTC DTLS/SRTP encryption is standard (the same protocols used by Zoom and Google Meet). <br/>
+✅ **No Account Required**: Completely anonymous. No emails, no usernames, no tracking, no signups. <br/>
+✅ **Human-Readable, Ephemeral Codes**: Connections utilize secure adjective-noun codes (e.g., "Cosmic-Falcon"). These have 6,400 entropy combinations and **expire automatically in 5 minutes**. <br/>
+✅ **Single Connection Constraint**: Only the *first* peer who types the code connects. This entirely prevents multi-recipient eavesdropping attacks. <br/>
+✅ **No Metadata Storage**: Zero logs on the signaling server. <br/>
+✅ **Opt-In Auto-Copy**: Clipboard interactions are privacy-first and user-initiated.
+
+---
+
+## 🚀 Technical Stack
+
+### Web Platform
+* **Framework**: Next.js 16 (App Router, Turbopack)
+* **Language**: TypeScript 5
+* **State Management**: Zustand 5
+* **P2P Communication**: PeerJS 1.5.4
+* **Video/Audio Streaming**: LiveKit Client (React Components)
+* **Styling & Animation**: Tailwind CSS v4, Framer Motion
+* **Testing**: Jest 29, React Testing Library
+
+### Mobile Platform (iOS/Android)
+* **Framework**: React Native (via Expo 54)
+* **Routing**: Expo Router
+* **Video/Audio**: `@livekit/react-native`
+* **Camera / QR**: `expo-camera`
+* **Storage**: Async Storage
+
+---
+
+## 📦 Getting Started & Installation
 
 ### Prerequisites
 - Node.js 18+ and npm
+- (Optional, for Mobile) Expo Go app on your phone, or iOS Simulator / Android Emulator.
 
-### Installation
-
+### Setting up the Core Web App
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/metesahankurt/hashdrop.git
    cd hashdrop
    ```
-
 2. **Install dependencies**:
    ```bash
    npm install
    ```
-
-3. **Run the development server**:
+3. **Run the Next.js development server**:
    ```bash
    npm run dev
    ```
+   *Available at [http://localhost:3000](http://localhost:3000)*
 
-4. **Open in browser**:
-   - Go to [http://localhost:3000](http://localhost:3000)
-   - Open in **two different browsers** (e.g., Chrome and Firefox) to test file transfer locally
-
-### Build for Production
-
-```bash
-npm run build
-npm run start
-```
-
----
-
-## 🧪 Testing
-
-Run unit tests:
-```bash
-npm run test
-```
-
-Run tests in watch mode:
-```bash
-npm run test:watch
-```
-
-Generate coverage report:
-```bash
-npm run test:coverage
-```
+### Setting up the Mobile App
+1. Navigate to the mobile workspace:
+   ```bash
+   cd mobile
+   ```
+2. **Install mobile dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Run the Expo development client**:
+   ```bash
+   npm start
+   ```
+   *(You can scan the QR code via Expo Go to run on a physical device, or press `i` for iOS simulator / `a` for Android emulator).*
 
 ---
 
-## 📁 Project Structure
+## 📁 System Architecture
 
 ```
 hashdrop/
-├── src/
-│   ├── app/                          # Next.js App Router
-│   │   ├── layout.tsx               # Root layout with metadata
-│   │   ├── page.tsx                 # Home page
-│   │   ├── api/
-│   │   │   └── og/                  # Open Graph image generation
-│   │   ├── privacy/                 # Privacy policy page
-│   │   └── terms/                   # Terms of service page
-│   │
-│   ├── components/
-│   │   ├── layout/                  # Layout components
-│   │   │   ├── minimal-header.tsx   # Header with logo
-│   │   │   └── hamburger-menu.tsx   # Settings menu
-│   │   │
-│   │   ├── transfer/                # Core transfer logic
-│   │   │   ├── connection-manager.tsx   # P2P connection & codes (730 lines)
-│   │   │   ├── transfer-status.tsx      # Progress tracking (430 lines)
-│   │   │   ├── warp-dropzone.tsx        # File upload
-│   │   │   ├── text-share.tsx           # Text/link sharing
-│   │   │   └── qr-code-display.tsx      # QR code generation
-│   │   │
-│   │   └── ui/                      # UI components
-│   │       ├── transfer-history.tsx     # Transfer history modal
-│   │       ├── statistics-dashboard.tsx # Statistics panel
-│   │       ├── image-preview-modal.tsx  # Image preview
-│   │       ├── info-section.tsx         # Informational content
-│   │       └── keyboard-shortcuts-modal.tsx
-│   │
-│   ├── lib/                         # Utilities
-│   │   ├── code-generator.ts        # Secure code generation
-│   │   ├── file-hash.ts             # SHA-256 hashing
-│   │   ├── file-utils.ts            # File helpers
-│   │   ├── storage.ts               # LocalStorage management
-│   │   ├── preferences.ts           # User preferences
-│   │   ├── notifications.ts         # Browser notifications
-│   │   ├── error-handler.ts         # Error handling
-│   │   ├── animations.ts            # Framer Motion configs
-│   │   └── zip-utils.ts             # Multi-file compression
-│   │
-│   └── store/
-│       └── use-warp-store.ts        # Zustand global state
+├── src/                          # NEXT.JS WEB APP
+│   ├── app/                      # App router, API endpoints, LiveKit Webhooks
+│   ├── components/               # Web UI (Transfer UI, Conference UI, Chat UI)
+│   ├── hooks/                    # Custom React Hooks
+│   ├── lib/                      # Cryptography, Hash Validation, P2P Logic, File Mgmt
+│   ├── store/                    # Zustand Global States
+│   └── types/                    # Shared TypeScript interfaces
 │
-├── __tests__/                       # Jest unit tests
-├── public/                          # Static assets
-└── package.json
+├── mobile/                       # EXPO NATIVE APP
+│   ├── app/                      # React Native Navigation Routes
+│   ├── components/               # Mobile specific UI (QR Scanners, Camera Views)
+│   ├── constants/                # Theme, Layout configurations
+│   ├── hooks/                    # Mobile specific hooks
+│   └── ios/ & android/           # Pre-build native directories
+│
+├── __tests__/                    # Jest Test Suites
+└── public/                       # Static Assets
 ```
 
 ---
 
-## 🔐 How It Works
+## 🔐 How It Works Under The Hood
 
-### Transfer Flow
+### The Peer-to-Peer Lifecycle:
+1. **Initiation**: Sender drops a file. HashDrop generates a cryptographically secure phrase (e.g., "Neon-Tiger") via the Web Crypto API.
+2. **Signaling**: The phrase is registered on the signaling server, awaiting a match.
+3. **Discovery**: Receiver inputs "Neon-Tiger" on their Web or Mobile client.
+4. **Handshake**: Both peers negotiate a WebRTC connection. A direct, encrypted data tunnel (DTLS/SRTP) locks them together.
+5. **Drop**: The signaling server steps away. The file is split into 16KB binary chunks, sequenced, and streamed directly across the internet to the receiver.
+6. **Verification**: The receiver reassembles the chunks, computes a final SHA-256 hash, and automatically downloads the verified file.
 
-```
-1. SENDER
-   ↓
-   Drops file → Generates unique code (e.g., "Cosmic-Falcon")
-   ↓
-   Code displayed with QR code
-   ↓
-   Shares code via secure channel (WhatsApp, Signal, email)
-   ↓
-   Waits for receiver to connect
-
-2. RECEIVER
-   ↓
-   Enters code or scans QR code
-   ↓
-   Clicks "Connect"
-
-3. PEER CONNECTION (via PeerJS)
-   ↓
-   Both peers connect to signaling server (only for discovery)
-   ↓
-   WebRTC establishes direct encrypted connection (DTLS/SRTP)
-   ↓
-   Signaling server no longer involved
-
-4. FILE TRANSFER
-   ↓
-   Sender calculates SHA-256 hash
-   ↓
-   Sends metadata (filename, size, hash)
-   ↓
-   File split into 16KB chunks (base64 encoded)
-   ↓
-   Chunks sent with index numbers
-   ↓
-   Receiver reassembles chunks in order
-   ↓
-   Receiver calculates SHA-256 hash
-   ↓
-   Hash verification (match = success ✅)
-   ↓
-   Auto-download triggers (if enabled)
-```
-
-### Security Layers
-
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Transport** | WebRTC DTLS | Encrypts data in transit |
-| **Data Channel** | SRTP | Secure real-time protocol |
-| **Integrity** | SHA-256 | Detects tampering/corruption |
-| **Access Control** | Unique Codes | Prevents unauthorized access |
-| **Connection Limit** | Single Peer | Blocks multi-recipient attacks |
-| **Privacy** | No Logging | Zero data retention |
-
----
-
-## 🎯 Key Features Explained
-
-### 1. **Code Generation**
-- **Format**: Adjective-Noun (e.g., "Cosmic-Falcon", "Stellar-Phoenix")
-- **Entropy**: 12.6 bits (6,400 combinations)
-- **Random Source**: Web Crypto API (cryptographically secure)
-- **Expiry**: 5 minutes automatic expiration
-
-### 2. **File Transfer Protocol**
-- **Chunk Size**: 16KB per chunk
-- **Encoding**: Base64 for binary data
-- **Ordering**: Index-based reassembly
-- **Verification**: SHA-256 hash check
-
-### 3. **Security Mechanisms**
-- **Single Connection**: Only first peer accepted
-- **Duplicate Rejection**: Chunks validated by index
-- **Size Limits**: 10GB max file size
-- **Chunk Limits**: 1M chunks maximum
-- **Hash Mismatch**: Transfer rejected if hash fails
-
-### 4. **User Preferences**
-- **Auto-Copy Code**: Optional (default: OFF)
-- **Auto-Download**: Optional (default: ON)
-- **Error Notifications**: Optional (default: ON)
-
----
-
-## ⚙️ Configuration
-
-### Environment Variables
-No environment variables required! HashDrop is 100% client-side.
-
-### User Preferences
-Accessible via hamburger menu (top-right):
-- **Auto-copy Code**: Automatically copy transfer codes to clipboard
-- **Auto-download Files**: Automatically download files when transfer completes
-- **Error Notifications**: Show browser notifications for errors
-
-### Keyboard Shortcuts
-- `Cmd/Ctrl + K`: Toggle transfer history
-- `Cmd/Ctrl + S`: Toggle statistics dashboard
-- `Cmd/Ctrl + ?`: Show keyboard shortcuts
-- `ESC`: Close all modals
-
----
-
-## 🐛 Known Limitations
-
-1. **NAT Traversal**: Some restrictive firewalls may block WebRTC connections (TURN server not configured)
-2. **Browser Compatibility**: Requires modern browser with WebRTC support
-3. **File Size**: Practical limit ~10GB (browser memory constraints)
-4. **Connection**: Both users must be online simultaneously
+### Video Conferencing Logic:
+1. Powered by a lightweight LiveKit server implementation (`livekit-server-sdk` in Next.js APIs).
+2. Users request a temporary token via API to join a dynamically created room context.
+3. WebRTC handles complex topological mesh networking internally, keeping bandwidth consumption globally low while supporting dozens of cameras simultaneously.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are more than welcome to make HashDrop the definitive open-source P2P utility. Feel free to open a PR!
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create a feature branch (`git checkout -b feature/amazing-expansion`)
+3. Commit your changes (`git commit -m 'Add amazing expansion'`)
+4. Push to the branch (`git push origin feature/amazing-expansion`)
 5. Open a Pull Request
 
 ---
 
-## 📄 License
+## 📄 License & Terms
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** - see the `LICENSE` file for details. Respect user privacy. Always check the `Privacy Policy` within the application layout.
 
 ---
 
@@ -342,47 +187,12 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - 💼 LinkedIn: [linkedin.com/in/mete-sahan-kurt](https://www.linkedin.com/in/mete-sahan-kurt/)
 - 🐙 GitHub: [github.com/metesahankurt](https://github.com/metesahankurt)
 
----
-
-## 🙏 Acknowledgments
-
-- **PeerJS**: Simplified WebRTC wrapper
-- **Next.js**: Amazing React framework
-- **Tailwind CSS**: Utility-first CSS framework
-- **Framer Motion**: Beautiful animations
-- **Vercel**: Hosting and deployment
-
----
-
-## 🔮 Roadmap
-
-- [ ] End-to-end file encryption (AES-256)
-- [ ] Password-protected transfers
-- [ ] TURN server configuration (better NAT traversal)
-- [ ] Transfer resume capability
-- [ ] Mobile app (React Native)
-- [ ] Batch file compression optimization
-- [ ] Custom branding options
-
----
-
-## 📊 Statistics
-
-- **Code Entropy**: 12.6 bits (6,400 combinations)
-- **Max File Size**: 10GB
-- **Chunk Size**: 16KB
-- **Code Expiry**: 5 minutes
-- **Encryption**: DTLS/SRTP (AES-128/256)
-- **Hash Algorithm**: SHA-256
-
----
-
 <div align="center">
+<br/>
 
 **Made with ❤️ by Mete Şahan Kurt**
 
-⭐ Star this repo if you found it useful!
+⭐️ Star this repo if you found it useful!
 
-[Live Demo](https://hashdrop.metesahankurt.cloud) • [Report Bug](https://github.com/metesahankurt/hashdrop/issues) • [Request Feature](https://github.com/metesahankurt/hashdrop/issues)
-
+[Live Demo](https://hashdrop.metesahankurt.cloud) • [Report Bug](https://github.com/metesahankurt/hashdrop/issues)
 </div>
