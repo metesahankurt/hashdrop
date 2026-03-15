@@ -130,6 +130,28 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     }
   }, [initSender, setDisplayCode, setCodeExpiry, setStatus, setError, setFiles, addLog]);
 
+  const refreshCode = useCallback(async () => {
+    setTransport("detecting");
+    setRelayCodeLocal(null);
+    setTimeLeft("");
+    await initSender();
+
+    const afterStatus = useWarpStore.getState().status;
+    if (afterStatus === "error") {
+      const code = generateSecureCode();
+      setDisplayCode(code);
+      setRelayCodeLocal(code);
+      setCodeExpiry(Date.now() + 5 * 60 * 1000);
+      setStatus("waiting");
+      setError(null);
+      addLog(`Code expired. Relay mode refreshed: ${code}`, "info");
+      setTransport("relay");
+    } else {
+      addLog("Code expired. Generated a new transfer code.", "info");
+      setTransport("p2p");
+    }
+  }, [initSender, setDisplayCode, setCodeExpiry, setStatus, setError, addLog]);
+
   // Auto-init on mount
   useEffect(() => {
     let cancelled = false;
@@ -140,11 +162,15 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   // Expiry countdown
   useEffect(() => {
     if (!codeExpiry) return;
+    let refreshing = false;
     const interval = setInterval(() => {
       const rem = codeExpiry - Date.now();
       if (rem <= 0) {
-        setTimeLeft("Expired");
         clearInterval(interval);
+        if (!refreshing && useWarpStore.getState().status !== "completed") {
+          refreshing = true;
+          void refreshCode();
+        }
       } else {
         const m = Math.floor(rem / 60000);
         const s = Math.floor((rem % 60000) / 1000);
@@ -152,7 +178,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [codeExpiry]);
+  }, [codeExpiry, refreshCode]);
 
   const handleSend = async () => {
     if (transport === "relay") {
