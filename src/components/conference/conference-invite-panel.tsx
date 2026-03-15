@@ -24,7 +24,7 @@ export function ConferenceInvitePanel({ onClose }: ConferenceInvitePanelProps) {
     if (!inviteUrl) return
     navigator.clipboard.writeText(inviteUrl)
     setCopied(true)
-    toast.success('Invite link copied!')
+    toast.success('Invite link copied!', { duration: 3000 })
     setTimeout(() => setCopied(false), 2000)
   }
 

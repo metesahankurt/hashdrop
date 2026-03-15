@@ -111,6 +111,7 @@ export function useConferenceLogic() {
           })
           toast(`${data.username || 'Someone'} wants to join`, {
             action: { label: 'View', onClick: () => {} },
+            duration: 5000,
           })
         }
 

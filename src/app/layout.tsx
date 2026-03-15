@@ -125,7 +125,9 @@ export default function RootLayout({
         <Toaster
           theme="dark"
           position="top-center"
+          closeButton
           toastOptions={{
+            duration: 3000,
             style: {
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
