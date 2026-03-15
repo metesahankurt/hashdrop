@@ -17,12 +17,13 @@ export async function POST(req: NextRequest) {
     ttl: '4h',
     metadata: JSON.stringify({ role: 'waiting', username }),
   })
-  // Waiting room: can only send data (join requests), cannot publish/subscribe tracks
+  // Waiting room: can subscribe (ensures full WebRTC connection for signaling/data),
+  // cannot publish tracks until admitted
   at.addGrant({
     roomJoin: true,
     room: roomName,
     canPublish: false,
-    canSubscribe: false,
+    canSubscribe: true,
     canPublishData: true,
   })
 

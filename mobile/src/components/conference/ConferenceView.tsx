@@ -26,6 +26,7 @@ import {
 import Toast from "react-native-toast-message";
 import { useConferenceStore } from "@/store/use-conference-store";
 import { useProfileStore } from "@/mobile/state/use-profile-store";
+import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 import { generateSecureCode } from "@/lib/code-generator";
 import { ConferenceRoom } from "./ConferenceRoom";
 
@@ -439,6 +440,16 @@ function ConferenceSubShell({
 export function ConferenceView({ expoGoBridgeHandlers }: ConferenceViewProps = {}) {
   const { status, reset } = useConferenceStore();
   const [mode, setMode] = useState<ConferenceMode>("hub");
+
+  // Reset stale store state when navigating back to this tab
+  const routeRefreshNonce = useMainNavigationStore((s) => s.routeRefreshNonce);
+  const skipFirstNonce = useRef(true);
+  useEffect(() => {
+    if (skipFirstNonce.current) { skipFirstNonce.current = false; return; }
+    if (status === "idle") return; // already clean
+    reset();
+    setMode("hub");
+  }, [routeRefreshNonce]);
 
   if (status !== "idle") {
     return (
