@@ -73,7 +73,6 @@ export function FloatingDock() {
         {ITEMS.map((item, index) => (
           <DockItem
             key={item.href}
-            href={item.href as MainRoute}
             icon={item.icon as any}
             index={index}
             label={item.label}
@@ -94,23 +93,18 @@ export function FloatingDock() {
 }
 
 function DockItem({
-  href,
   icon: Icon,
   index,
   label,
   onPress,
   progress,
 }: {
-  href: MainRoute;
   icon: any;
   index: number;
   label: string;
   onPress: () => void;
   progress: SharedValue<number>;
 }) {
-  const activeRoute = useMainNavigationStore((state) => state.route);
-  const isActive = activeRoute === href;
-
   const itemStyle = useAnimatedStyle(() => ({
     width: interpolate(
       progress.value,
@@ -143,15 +137,35 @@ function DockItem({
     ),
   }));
 
+  // Animate icon color via two overlaid layers to stay in sync with progress.value
+  const whiteIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [index - 0.5, index, index + 0.5],
+      [1, 0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
+  const darkIconStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [index - 0.5, index, index + 0.5],
+      [0, 1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }));
+
   return (
     <Animated.View style={[styles.item, itemStyle]}>
       <Pressable onPress={onPress} style={styles.pressable}>
         <Animated.View style={[styles.iconWrap, iconBgStyle]}>
-          <Icon
-            size={17}
-            stroke={isActive ? "#08110d" : "rgba(255,255,255,0.65)"}
-            strokeWidth={2.3}
-          />
+          <Animated.View style={[styles.iconLayer, whiteIconStyle]}>
+            <Icon size={17} stroke="rgba(255,255,255,0.65)" strokeWidth={2.3} />
+          </Animated.View>
+          <Animated.View style={[styles.iconLayer, darkIconStyle]}>
+            <Icon size={17} stroke="#08110d" strokeWidth={2.3} />
+          </Animated.View>
         </Animated.View>
         <AnimatedText numberOfLines={1} style={[styles.label, labelStyle]}>
           {label}
@@ -211,6 +225,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconLayer: {
+    position: "absolute",
     alignItems: "center",
     justifyContent: "center",
   },
