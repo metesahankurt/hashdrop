@@ -157,6 +157,12 @@ function ConferenceHub({ onSelect }: { onSelect: (m: ConferenceMode) => void }) 
 // ─────────────────────────────────────────────────────────────────────────────
 // Create (New Meeting) view
 // ─────────────────────────────────────────────────────────────────────────────
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function ConferenceCreateView({
   onBack,
   expoGoBridgeHandlers,
@@ -168,59 +174,92 @@ function ConferenceCreateView({
   const { setRoomInfo, setStatus } = useConferenceStore();
   const isExpoGo = Constants.executionEnvironment === "storeClient";
 
-  const [createdCode, setCreatedCode] = useState("");
+  const [code, setCode] = useState("");
+  const [expiresAt, setExpiresAt] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [fetching, setFetching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const requireDevelopmentBuild = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Toast.show({ type: "error", text1: EXPO_GO_CONFERENCE_ERROR });
+  const fetchCode = async () => {
+    setFetching(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/conference/generate-code`);
+      const data = await res.json() as { code: string; expiresAt: number; ttl: number };
+      setCode(data.code);
+      setExpiresAt(data.expiresAt);
+      setSecondsLeft(data.ttl);
+    } catch {
+      // Fallback to local generation if server unreachable
+      const fallback = generateSecureCode();
+      setCode(fallback);
+      const exp = Date.now() + 300_000;
+      setExpiresAt(exp);
+      setSecondsLeft(300);
+    } finally {
+      setFetching(false);
+    }
   };
 
-  const generateCode = () => {
+  useEffect(() => {
+    void fetchCode();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    const interval = setInterval(() => {
+      const left = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+      setSecondsLeft(left);
+      if (left === 0) void fetchCode();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refreshCode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCreatedCode(generateSecureCode());
+    void fetchCode();
   };
 
   const copyCode = async () => {
-    await Clipboard.setStringAsync(createdCode);
+    if (!code) return;
+    await Clipboard.setStringAsync(code);
     setCopied(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setTimeout(() => setCopied(false), 2200);
   };
 
   const createRoom = async () => {
+    if (!code) return;
     if (expoGoBridgeHandlers) {
-      const roomName = createdCode || generateSecureCode();
-      setCreatedCode(roomName);
-      expoGoBridgeHandlers.onCreate(roomName, { autoEnter: true });
+      expoGoBridgeHandlers.onCreate(code, { autoEnter: true });
       return;
     }
     if (isExpoGo) {
-      const roomName = createdCode || generateSecureCode();
-      setCreatedCode(roomName);
-      requireDevelopmentBuild();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Toast.show({ type: "error", text1: EXPO_GO_CONFERENCE_ERROR });
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
-      const roomName = createdCode || generateSecureCode();
       const res = await fetch(`${API_BASE}/api/conference/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomName, username }),
+        body: JSON.stringify({ roomName: code, username }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create room");
       setRoomInfo({ roomName: data.roomName, token: data.token, identity: data.identity, role: "host", username });
       setStatus("connecting");
-    } catch (err: any) {
-      Toast.show({ type: "error", text1: err.message });
+    } catch (err: unknown) {
+      Toast.show({ type: "error", text1: err instanceof Error ? err.message : "Failed" });
     } finally {
       setLoading(false);
     }
   };
+
+  const expired = secondsLeft === 0 && !!expiresAt;
+  const urgent = secondsLeft > 0 && secondsLeft <= 60;
 
   return (
     <ConferenceSubShell title="New Meeting" onBack={onBack}>
@@ -231,65 +270,49 @@ function ConferenceCreateView({
             <VideoIcon size={18} stroke="#ededed" strokeWidth={1.9} />
           </View>
           <Text style={S.cardLabel}>Meeting code</Text>
+          {secondsLeft > 0 && (
+            <View style={[S.countdownPill, urgent && S.countdownPillUrgent]}>
+              <Text style={[S.countdownText, urgent && S.countdownTextUrgent]}>
+                {formatCountdown(secondsLeft)}
+              </Text>
+            </View>
+          )}
         </View>
 
-        {createdCode ? (
-          <>
-            <TouchableOpacity style={S.codeBox} onPress={copyCode} activeOpacity={0.75}>
-              <Text style={S.codeText}>{createdCode}</Text>
-              <View style={[S.copyBtn, copied && S.copyBtnSuccess]}>
-                {copied
-                  ? <CheckIcon size={15} stroke="#3ecf8e" strokeWidth={2.2} />
-                  : <CopyIcon size={15} stroke="#666" strokeWidth={2.2} />
-                }
-              </View>
-            </TouchableOpacity>
-            <Text style={S.hint}>
-              Share this code — participants will wait for your approval.
-            </Text>
-          </>
+        {fetching || !code ? (
+          <View style={S.codeBoxLoading}>
+            <Text style={S.codeBoxLoadingText}>Generating…</Text>
+          </View>
         ) : (
-          <>
-            <Text style={S.hint}>
-              Generate a code to share with others, or start immediately without one.
-            </Text>
-            <TouchableOpacity style={S.generateBtn} onPress={generateCode} activeOpacity={0.8}>
-              <Text style={S.generateBtnText}>Generate Meeting Code</Text>
-              <RefreshCwIcon size={14} stroke="#a5b4fc" strokeWidth={2} />
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity style={S.codeBox} onPress={copyCode} activeOpacity={0.75}>
+            <Text style={[S.codeText, expired && S.codeTextExpired]}>{code}</Text>
+            <View style={[S.copyBtn, copied && S.copyBtnSuccess]}>
+              {copied
+                ? <CheckIcon size={15} stroke="#3ecf8e" strokeWidth={2.2} />
+                : <CopyIcon size={15} stroke="#666" strokeWidth={2.2} />
+              }
+            </View>
+          </TouchableOpacity>
         )}
+        <Text style={S.hint}>
+          Share this code — participants will wait for your approval.
+        </Text>
       </View>
 
       {/* Actions */}
       <TouchableOpacity
-        style={[S.mainBtn, loading && S.mainBtnDisabled]}
+        style={[S.mainBtn, (loading || !code || fetching) && S.mainBtnDisabled]}
         onPress={createRoom}
-        disabled={loading}
+        disabled={loading || !code || fetching}
         activeOpacity={0.8}
       >
         <Text style={S.mainBtnText}>{loading ? "Starting…" : "Start Meeting"}</Text>
       </TouchableOpacity>
 
-      {!createdCode && (
-        <TouchableOpacity
-          style={[S.secondaryBtn, loading && S.mainBtnDisabled]}
-          onPress={createRoom}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          <Text style={S.secondaryBtnText}>
-            {loading ? "Starting…" : "Start Without Sharing"}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {createdCode && (
-        <TouchableOpacity onPress={generateCode} style={S.regenRow}>
-          <RefreshCwIcon size={12} stroke="#444" strokeWidth={2} />
-          <Text style={S.regenText}>Generate new code</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity onPress={refreshCode} disabled={fetching} style={S.regenRow}>
+        <RefreshCwIcon size={12} stroke="#444" strokeWidth={2} />
+        <Text style={S.regenText}>{fetching ? "Refreshing…" : "New code"}</Text>
+      </TouchableOpacity>
     </ConferenceSubShell>
   );
 }
@@ -675,11 +698,49 @@ const S = StyleSheet.create({
     justifyContent: "center",
   },
   cardLabel: {
+    flex: 1,
     fontSize: 11,
     fontWeight: "700",
     color: "#555",
     textTransform: "uppercase",
     letterSpacing: 0.9,
+  },
+  countdownPill: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  countdownPillUrgent: {
+    backgroundColor: "rgba(239,68,68,0.10)",
+    borderColor: "rgba(239,68,68,0.25)",
+  },
+  countdownText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#555",
+    fontVariant: ["tabular-nums"],
+  },
+  countdownTextUrgent: {
+    color: "#ef4444",
+  },
+  codeBoxLoading: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    alignItems: "center",
+  },
+  codeBoxLoadingText: {
+    color: "#555",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  codeTextExpired: {
+    color: "#555",
   },
 
   // Code display (create)

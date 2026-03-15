@@ -48,6 +48,7 @@
       "favicon": "../public/icon-192.png"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router"
     ],
     "experiments": {

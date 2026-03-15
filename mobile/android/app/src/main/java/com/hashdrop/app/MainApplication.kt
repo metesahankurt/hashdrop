@@ -15,6 +15,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
+import com.livekit.reactnative.LiveKitReactNative
 
 class MainApplication : Application(), ReactApplication {
 
@@ -45,6 +46,7 @@ class MainApplication : Application(), ReactApplication {
     } catch (e: IllegalArgumentException) {
       ReleaseLevel.STABLE
     }
+    LiveKitReactNative.setup(this)
     loadReactNative(this)
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
   }

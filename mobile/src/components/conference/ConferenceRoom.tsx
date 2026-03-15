@@ -197,6 +197,21 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
       if (role === "host") {
         setStatus("in-room");
         setCallStartTime(Date.now());
+        // Check for participants already in the room when host connects
+        for (const [, participant] of room.remoteParticipants) {
+          try {
+            const metadata = JSON.parse(participant.metadata || "{}") as { role?: string; username?: string };
+            if (metadata.role === "waiting") {
+              addWaitingParticipant({
+                identity: participant.identity,
+                username: metadata.username || getParticipantName(participant),
+                joinedAt: Date.now(),
+              });
+            }
+          } catch {
+            // ignore
+          }
+        }
       } else {
         setStatus("waiting");
       }
@@ -219,15 +234,17 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
 
     const handleParticipantConnected = (participant: RemoteParticipant) => {
       const participantName = getParticipantName(participant);
-      let isWaiting = false;
       try {
-        const metadata = JSON.parse(participant.metadata || "{}") as { role?: string };
-        isWaiting = metadata.role === "waiting";
+        const metadata = JSON.parse(participant.metadata || "{}") as { role?: string; username?: string };
+        if (metadata.role === "waiting" && role === "host") {
+          addWaitingParticipant({
+            identity: participant.identity,
+            username: metadata.username || participantName,
+            joinedAt: Date.now(),
+          });
+        }
       } catch {
-        isWaiting = false;
-      }
-      if (!isWaiting) {
-        console.log("[Conference][MOBILE] participant joined:", participantName);
+        // ignore
       }
     };
 

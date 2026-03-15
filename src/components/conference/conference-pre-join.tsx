@@ -24,6 +24,9 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
   const [mode, setMode] = useState<'create' | 'join'>(initialMode ?? (initialCode ? 'join' : 'create'))
   const [joinCode, setJoinCode] = useState(initialCode || '')
   const [createdCode, setCreatedCode] = useState('')
+  const [codeExpiresAt, setCodeExpiresAt] = useState(0)
+  const [secondsLeft, setSecondsLeft] = useState(0)
+  const [codeFetching, setCodeFetching] = useState(false)
   const [showQr, setShowQr] = useState(false)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -45,17 +48,44 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
     return () => { s?.getTracks().forEach((t) => t.stop()) }
   }, [isCameraOff]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const generateRoomCode = () => {
-    const code = generateSecureCode()
-    setCreatedCode(code)
-    return code
+  const fetchRoomCode = async () => {
+    setCodeFetching(true)
+    try {
+      const res = await fetch('/api/conference/generate-code')
+      const data = await res.json() as { code: string; expiresAt: number; ttl: number }
+      setCreatedCode(data.code)
+      setCodeExpiresAt(data.expiresAt)
+      setSecondsLeft(data.ttl)
+    } catch {
+      const fallback = generateSecureCode()
+      setCreatedCode(fallback)
+      setCodeExpiresAt(Date.now() + 300_000)
+      setSecondsLeft(300)
+    } finally {
+      setCodeFetching(false)
+    }
   }
+
+  useEffect(() => {
+    if (mode === 'create') void fetchRoomCode()
+  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!codeExpiresAt) return
+    const interval = setInterval(() => {
+      const left = Math.max(0, Math.floor((codeExpiresAt - Date.now()) / 1000))
+      setSecondsLeft(left)
+      if (left === 0) void fetchRoomCode()
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [codeExpiresAt]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
     if (!username) { toast.error('Please enter a username'); return }
+    if (!createdCode) { toast.error('Generating code, please wait…'); return }
     setLoading(true)
     try {
-      const roomName = createdCode || generateRoomCode()
+      const roomName = createdCode
       const res = await fetch('/api/conference/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,9 +228,20 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
 
             {mode === 'create' ? (
               <div className="space-y-4">
-                {createdCode ? (
-                  <div className="space-y-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                     <p className="text-xs text-muted">Meeting Code</p>
+                    {secondsLeft > 0 && (
+                      <span className={`text-xs font-bold tabular-nums px-2 py-0.5 rounded-full border ${secondsLeft <= 60 ? 'text-red-400 border-red-400/30 bg-red-400/10' : 'text-muted border-white/10 bg-white/5'}`}>
+                        {`${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
+                      </span>
+                    )}
+                  </div>
+                  {codeFetching || !createdCode ? (
+                    <div className="flex items-center justify-center bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-muted text-sm">
+                      Generating…
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
                       <span className="flex-1 font-mono text-lg font-bold text-primary tracking-widest">{createdCode}</span>
                       <button onClick={copyLink} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
@@ -210,28 +251,27 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
                         <QrCode className="w-4 h-4 text-muted" />
                       </button>
                     </div>
-                    {showQr && joinUrl && (
-                      <div className="flex justify-center p-4 bg-white rounded-xl">
-                        <QRCodeSVG value={joinUrl} size={160} />
-                      </div>
-                    )}
-                    <p className="text-xs text-muted text-center">Share this code with participants</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted">Create a new conference room and invite participants.</p>
+                  )}
+                  {showQr && joinUrl && (
+                    <div className="flex justify-center p-4 bg-white rounded-xl">
+                      <QRCodeSVG value={joinUrl} size={160} />
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted">Share this code with participants</p>
                     <button
-                      onClick={() => setCreatedCode(generateRoomCode())}
-                      className="w-full text-sm py-2 rounded-xl border border-white/10 text-muted hover:bg-white/5 hover:text-foreground transition-colors"
+                      onClick={() => void fetchRoomCode()}
+                      disabled={codeFetching}
+                      className="text-xs text-muted hover:text-foreground transition-colors disabled:opacity-40"
                     >
-                      Generate Code
+                      New code
                     </button>
                   </div>
-                )}
+                </div>
 
                 <button
                   onClick={handleCreate}
-                  disabled={loading}
+                  disabled={loading || !createdCode || codeFetching}
                   className="w-full glass-btn-primary py-3 rounded-xl font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? (
