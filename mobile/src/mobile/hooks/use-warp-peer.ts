@@ -162,10 +162,8 @@ export function useWarpPeer() {
       }
 
       conn.send({ type: "done" });
-      setStatus("completed");
       setProgress(100);
-      addLog("All files sent!", "success");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      addLog("All files sent. Waiting for receiver confirmation...", "info");
     } catch (err: any) {
       addLog(`Send error: ${err.message}`, "error");
       setStatus("error");

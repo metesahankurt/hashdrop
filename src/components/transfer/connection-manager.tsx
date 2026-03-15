@@ -429,11 +429,56 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     toast.success('Warp Link Established!')
     notifyConnectionEstablished()
     addLog('Connection established with peer', 'success')
+    console.log('[Transfer][WEB] peer connection established')
 
     // Handshake: connection is already open when this runs
     conn.send({ type: 'ready' })
 
     conn.on('data', (data) => {
+      if (
+        data &&
+        typeof data === 'object' &&
+        'type' in data &&
+        (data as Record<string, unknown>).type === 'file'
+      ) {
+        const legacyFile = data as {
+          type: 'file'
+          name: string
+          size: number
+          mimeType: string
+          data: ArrayBuffer
+        }
+
+        console.log('[Transfer][WEB] legacy file packet received', {
+          name: legacyFile.name,
+          size: legacyFile.size,
+          mimeType: legacyFile.mimeType,
+        })
+        addLog(`Legacy file packet received: ${legacyFile.name}`, 'info')
+
+        const blob = new Blob([legacyFile.data], { type: legacyFile.mimeType })
+        const file = new File([blob], legacyFile.name, { type: legacyFile.mimeType })
+        setMode('receive')
+        setFile(file)
+        setReadyToDownload(file)
+        setProgress(100)
+        setStatus('completed')
+        toast.success(`File received: ${legacyFile.name}`)
+        return
+      }
+
+      if (
+        data &&
+        typeof data === 'object' &&
+        'type' in data &&
+        (data as Record<string, unknown>).type === 'done'
+      ) {
+        console.log('[Transfer][WEB] legacy transfer complete signal received')
+        addLog('Legacy transfer complete signal received', 'success')
+        conn.send({ type: 'ack' })
+        return
+      }
+
       handleReceiveData(data)
     })
 
@@ -669,6 +714,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
 
     // 2. Signal that a web receiver is waiting so mobile relay mode can auto-upload.
     // This must run for both manual code entry and QR/link auto-connect flows.
+    console.log('[Transfer][WEB] relay claim sent', normalized)
     fetch(`/api/relay/${normalized}/claim`, { method: 'POST' }).catch(() => {})
 
     // 3. Fall back to PeerJS P2P
@@ -689,6 +735,7 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
     let hasConnected = false
     let relayPollInterval: NodeJS.Timeout | null = null
     let relayFound = false
+    console.log('[Transfer][WEB] relay poll started', normalized)
 
     // Poll relay every 2s while P2P is connecting.
     // Handles the case where mobile uploads AFTER web started connecting.
