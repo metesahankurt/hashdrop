@@ -890,15 +890,37 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
               /* Spinner while waiting */
               <div className="glass-card rounded-2xl p-8 md:p-12 text-center space-y-6">
                 <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
-                  <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                  {status === 'connected' ? (
+                    <div className="w-16 h-16 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center">
+                      <Check className="w-8 h-8 text-primary" />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold text-foreground">Connecting...</h3>
+                  <h3 className="text-2xl font-semibold text-foreground">
+                    {status === 'connected' ? 'Connected!' : 'Connecting...'}
+                  </h3>
                   <p className="text-sm text-muted max-w-md mx-auto">
-                    Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
+                    {status === 'connected'
+                      ? (
+                        <>
+                          Secure peer connection established. The sender can now tap <strong className="text-foreground">Send files</strong> in the mobile app.
+                        </>
+                      )
+                      : (
+                        <>
+                          Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
+                        </>
+                      )}
                   </p>
                 </div>
-                <div className="text-xs text-muted">Checking relay and peer-to-peer connection</div>
+                <div className="text-xs text-muted">
+                  {status === 'connected'
+                    ? 'Waiting for incoming file data'
+                    : 'Checking relay and peer-to-peer connection'}
+                </div>
               </div>
             )}
           </motion.div>
