@@ -316,6 +316,18 @@ export function ChatRoomView() {
     reset(); setMode("select"); setJoinCode(""); setPassword(""); setJoinPassword(""); setWebPassword("");
   };
 
+  const confirmLeave = () => {
+    Alert.alert(
+      "Leave Chat?",
+      "Are you sure you want to leave this chat room?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Leave", style: "destructive", onPress: handleLeave },
+      ],
+      { cancelable: true }
+    );
+  };
+
   // ── Active chat room → WebView
   if (status === "connected") {
     const displayName = username || `User-${roomName.slice(-4)}`;
@@ -328,7 +340,7 @@ export function ChatRoomView() {
         password={webPassword}
         topPx={Math.round(insets.top)}
         dockClearance={dockClearance}
-        onLeave={handleLeave}
+        onLeave={confirmLeave}
       />
     );
   }
