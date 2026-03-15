@@ -2,7 +2,6 @@ import { useCallback, useRef, useState } from "react";
 
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import * as Sharing from "expo-sharing";
 
@@ -21,6 +20,7 @@ const CODE_EXPIRY_MS = 5 * 60 * 1000;
 const RELAY_BASE =
   process.env.EXPO_PUBLIC_WEB_URL?.replace(/\/$/, "") ??
   "https://hashdrop.metesahankurt.cloud";
+const FileSystem = require("expo-file-system/legacy") as any;
 
 export interface ReceivedFile {
   name: string;
@@ -34,14 +34,15 @@ async function createPeer(peerId: string) {
   // It requires a native module that is NOT available in Expo Go —
   // a custom dev build is needed: `npx expo run:ios` or `npx expo run:android`.
   try {
-    const { registerGlobals } = await import("react-native-webrtc");
+    const { registerGlobals } = require("react-native-webrtc");
     registerGlobals();
   } catch {
     throw new Error(
       "WebRTC is not available in Expo Go.\n\nRun a development build to use file transfer:\n  npx expo run:ios\n  npx expo run:android",
     );
   }
-  const { default: Peer } = await import("peerjs");
+  const peerModule = require("peerjs");
+  const Peer = peerModule.default ?? peerModule;
   return new (Peer as any)(peerId, {
     host: PEERJS_HOST,
     port: 443,
@@ -414,14 +415,12 @@ export function useWarpPeer() {
   const saveFile = useCallback(async (file: ReceivedFile) => {
     try {
       const uint8 = new Uint8Array(file.data);
-      // Convert to base64 for writing via classic FileSystem API
       let binary = "";
       const chunkSize = 8192;
       for (let i = 0; i < uint8.byteLength; i += chunkSize) {
         binary += String.fromCharCode(...uint8.subarray(i, i + chunkSize));
       }
       const base64 = btoa(binary);
-
       const fileUri = (FileSystem.cacheDirectory ?? "") + file.name;
       await FileSystem.writeAsStringAsync(fileUri, base64, {
         encoding: FileSystem.EncodingType.Base64,

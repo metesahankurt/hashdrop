@@ -20,7 +20,7 @@ import Animated, {
 
 const ITEMS = [
   { href: "/", label: "Home", icon: House },
-  { href: "/transfer", label: "Transfer", icon: ArrowUpFromLine },
+  { href: "/transfer", label: "File", icon: ArrowUpFromLine },
   { href: "/conference", label: "Meet", icon: Video },
   { href: "/chatroom", label: "Chat", icon: MessageSquare },
 ];
@@ -35,11 +35,11 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
 export function FloatingDock() {
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(insets.bottom, 10);
+  const dockHidden = useMainNavigationStore((state) => state.dockHidden);
   const setRoute = useMainNavigationStore((state) => state.setRoute);
   const refreshRoute = useMainNavigationStore((state) => state.refreshRoute);
   const activeRoute = useMainNavigationStore((state) => state.route);
   const { progress } = useMainNavigationAnimation();
-
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [
       {
@@ -52,6 +52,10 @@ export function FloatingDock() {
       },
     ],
   }));
+
+  if (dockHidden) {
+    return null;
+  }
 
   return (
     <View

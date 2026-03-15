@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { relayStore as store, RelayEntry, RelayFile, TTL_MS } from "../store";
-
-function sweep() {
-  const now = Date.now();
-  for (const [key, entry] of store.entries()) {
-    if (entry.expiresAt < now) store.delete(key);
-  }
-}
+import {
+  deleteRelayEntry,
+  getRelayEntry,
+  type RelayFile,
+  setRelayEntry,
+  sweepRelayEntries,
+  TTL_MS,
+} from "../store";
 
 // POST /api/relay/[code]
 // Body: multipart/form-data with one or more "file" fields.
@@ -15,7 +15,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> },
 ) {
-  sweep();
+  sweepRelayEntries();
   const { code } = await params;
   const key = code.toUpperCase();
 
@@ -41,11 +41,16 @@ export async function POST(
   );
 
   // Append to existing entry if code is already active (multiple POSTs)
-  const existing = store.get(key);
+  const existing = getRelayEntry(key);
   if (existing && existing.expiresAt > Date.now()) {
     existing.files.push(...files);
+    setRelayEntry(key, existing);
   } else {
-    store.set(key, { files, expiresAt: Date.now() + TTL_MS, claimed: existing?.claimed ?? false });
+    setRelayEntry(key, {
+      files,
+      expiresAt: Date.now() + TTL_MS,
+      claimed: existing?.claimed ?? false,
+    });
   }
 
   return NextResponse.json({ success: true, count: files.length });
@@ -58,9 +63,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> },
 ) {
+  sweepRelayEntries();
   const { code } = await params;
   const key = code.toUpperCase();
-  const entry = store.get(key);
+  const entry = getRelayEntry(key);
 
   if (!entry || entry.expiresAt < Date.now()) {
     return NextResponse.json({ error: "Not found", files: [], claimed: false }, { status: 404 });
@@ -104,6 +110,6 @@ export async function DELETE(
   { params }: { params: Promise<{ code: string }> },
 ) {
   const { code } = await params;
-  store.delete(code.toUpperCase());
+  deleteRelayEntry(code.toUpperCase());
   return NextResponse.json({ success: true });
 }

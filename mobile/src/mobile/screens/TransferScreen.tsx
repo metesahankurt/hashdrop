@@ -4,7 +4,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,8 +13,8 @@ import {
   ArrowLeft,
   CheckCircle,
   Copy,
-  FileText,
   FileUp,
+  Link as LinkIconRaw,
   ScanLine,
   Send,
   X,
@@ -23,7 +22,7 @@ import {
 import QRCode from "react-native-qrcode-svg";
 
 import { useWarpStore } from "@/store/use-warp-store";
-import { isValidCode } from "@/lib/code-generator";
+import { generateSecureCode, isValidCode } from "@/lib/code-generator";
 import { formatFileSize, getFileIcon } from "@/lib/file-utils";
 import {
   useWarpPeer,
@@ -34,19 +33,20 @@ import { AppShell } from "@/mobile/components/AppShell";
 import { PrimaryButton } from "@/mobile/components/PrimaryButton";
 import { TextField } from "@/mobile/components/TextField";
 import { QRScanner } from "@/mobile/components/QRScanner";
+import { useProfileStore } from "@/mobile/state/use-profile-store";
 
 // Cast lucide icons to avoid TS strict type errors with react-native-svg
 const SendIcon = Send as any;
 const ReceiveIcon = ArrowDownToLine as any;
-const TextIcon = FileText as any;
 const CopyIcon = Copy as any;
+const LinkIcon = LinkIconRaw as any;
 const ScanIcon = ScanLine as any;
 const BackIcon = ArrowLeft as any;
 const FileUpIcon = FileUp as any;
 const XIcon = X as any;
 const CheckIcon = CheckCircle as any;
 
-type TransferMode = "hub" | "send" | "receive" | "text";
+type TransferMode = "hub" | "send" | "receive";
 const RELAY_PREFERRED_FILE_BYTES = 4 * 1024 * 1024;
 const RELAY_PREFERRED_TOTAL_BYTES = 10 * 1024 * 1024;
 
@@ -90,22 +90,6 @@ function TransferHub({ onSelect }: { onSelect: (m: TransferMode) => void }) {
           Enter the sender's code or scan a QR to download files instantly.
         </Text>
       </Pressable>
-
-      {/* Text share */}
-      <Pressable style={styles.card} onPress={() => onSelect("text")}>
-        <View style={styles.cardTop}>
-          <View style={[styles.iconWrap, styles.iconAmber]}>
-            <TextIcon size={20} stroke="#f59e0b" strokeWidth={2.2} />
-          </View>
-          <View style={[styles.badge, styles.badgeAmber]}>
-            <Text style={[styles.badgeText, { color: "#f59e0b" }]}>TEXT</Text>
-          </View>
-        </View>
-        <Text style={styles.cardTitle}>Quick text share</Text>
-        <Text style={styles.cardDesc}>
-          Send a link, note, or snippet to another device over a secure channel.
-        </Text>
-      </Pressable>
     </AppShell>
   );
 }
@@ -117,6 +101,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   const { files, displayCode, status, progress, codeExpiry, error, setStatus, setProgress, setError, setDisplayCode, setCodeExpiry, setFiles, addLog } = useWarpStore();
   const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } =
     useWarpPeer();
+  const { username } = useProfileStore();
 
   const [timeLeft, setTimeLeft] = useState("");
   // "p2p" = WebRTC PeerJS, "relay" = HTTP relay (works in Expo Go)
@@ -132,7 +117,6 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
 
     const afterStatus = useWarpStore.getState().status;
     if (afterStatus === "error") {
-      const { generateSecureCode } = await import("@/lib/code-generator");
       const code = generateSecureCode();
       setDisplayCode(code);
       setRelayCodeLocal(code);
@@ -226,6 +210,9 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
   const isRelay = transport === "relay";
   const statusColor = getStatusColor(status);
   const relayRecommended = shouldPreferRelay(files);
+  const shareUrl = displayCode
+    ? `https://hashdrop.metesahankurt.cloud/transfer?code=${encodeURIComponent(displayCode)}&from=${encodeURIComponent(username || "Someone")}`
+    : null;
 
   const handlePickFiles = useCallback(async () => {
     await pickFiles();
@@ -264,7 +251,7 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
           <Text style={styles.sectionLabel}>Your transfer code</Text>
           <View style={styles.qrWrap}>
             <QRCode
-              value={displayCode}
+              value={shareUrl ?? displayCode}
               size={160}
               backgroundColor="transparent"
               color="#3ecf8e"
@@ -275,7 +262,17 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
             onPress={() => copyToClipboard(displayCode)}
           >
             <Text style={styles.codeText}>{displayCode}</Text>
-            <CopyIcon size={16} stroke="#3ecf8e" strokeWidth={2.2} />
+            <View style={styles.codeActions}>
+              {shareUrl ? (
+                <TouchableOpacity
+                  onPress={() => copyToClipboard(shareUrl)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <LinkIcon size={16} stroke="#a5b4fc" strokeWidth={2.2} />
+                </TouchableOpacity>
+              ) : null}
+              <CopyIcon size={16} stroke="#3ecf8e" strokeWidth={2.2} />
+            </View>
           </TouchableOpacity>
           {timeLeft ? (
             <Text style={styles.expiry}>Expires in {timeLeft}</Text>
@@ -489,142 +486,6 @@ function TransferReceiveView({ onBack }: { onBack: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Text share screen
-// ---------------------------------------------------------------------------
-function TransferTextView({ onBack }: { onBack: () => void }) {
-  const { status, displayCode } = useWarpStore();
-  const { initTextSender, connectForText, copyToClipboard, cleanup } =
-    useWarpPeer();
-
-  const [tab, setTab] = useState<"send" | "receive">("send");
-  const [text, setText] = useState("");
-  const [receiveCode, setReceiveCode] = useState("");
-  const [receivedText, setReceivedText] = useState("");
-
-  useEffect(() => () => cleanup(), []);
-
-  const canSend = text.trim().length > 0 && status === "idle";
-  const canReceive =
-    receiveCode.trim().length > 0 &&
-    isValidCode(receiveCode.toUpperCase()) &&
-    status === "idle";
-
-  return (
-    <SubShell title="Text Share" onBack={onBack}>
-      {/* Tab switcher */}
-      <View style={styles.tabs}>
-        <Pressable
-          style={[styles.tab, tab === "send" && styles.tabActive]}
-          onPress={() => { cleanup(); setTab("send"); }}
-        >
-          <Text style={[styles.tabText, tab === "send" && styles.tabTextActive]}>
-            Send
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, tab === "receive" && styles.tabActive]}
-          onPress={() => { cleanup(); setTab("receive"); }}
-        >
-          <Text
-            style={[styles.tabText, tab === "receive" && styles.tabTextActive]}
-          >
-            Receive
-          </Text>
-        </Pressable>
-      </View>
-
-      {tab === "send" ? (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Your text or link</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Paste or type here..."
-              placeholderTextColor="#8b8b8b"
-              value={text}
-              onChangeText={setText}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-            <PrimaryButton
-              disabled={!canSend}
-              onPress={() => initTextSender(text)}
-            >
-              Generate code & share
-            </PrimaryButton>
-          </View>
-
-          {displayCode && status !== "idle" && (
-            <View style={styles.codeCard}>
-              <Text style={styles.sectionLabel}>Share this code</Text>
-              <View style={styles.qrWrap}>
-                <QRCode
-                  value={displayCode}
-                  size={140}
-                  backgroundColor="transparent"
-                  color="#f59e0b"
-                />
-              </View>
-              <TouchableOpacity
-                style={[styles.codeRow, styles.codeRowAmber]}
-                onPress={() => copyToClipboard(displayCode)}
-              >
-                <Text style={[styles.codeText, { color: "#f59e0b" }]}>
-                  {displayCode}
-                </Text>
-                <CopyIcon size={16} stroke="#f59e0b" strokeWidth={2.2} />
-              </TouchableOpacity>
-              <Text style={styles.expiry}>
-                {status === "waiting"
-                  ? "Waiting for receiver..."
-                  : "Text delivered!"}
-              </Text>
-            </View>
-          )}
-        </>
-      ) : (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Enter sender's code</Text>
-            <TextField
-              label=""
-              placeholder="COSMIC-FALCON"
-              value={receiveCode.toUpperCase()}
-              onChangeText={(v) => setReceiveCode(v.toUpperCase())}
-              autoCapitalize="characters"
-                />
-            <PrimaryButton
-              disabled={!canReceive}
-              onPress={() =>
-                connectForText(receiveCode, (t) => setReceivedText(t))
-              }
-            >
-              Receive text
-            </PrimaryButton>
-          </View>
-
-          {receivedText ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Received</Text>
-              <View style={styles.receivedTextBox}>
-                <Text style={styles.receivedTextContent}>{receivedText}</Text>
-              </View>
-              <PrimaryButton
-                tone="secondary"
-                onPress={() => copyToClipboard(receivedText)}
-              >
-                Copy to clipboard
-              </PrimaryButton>
-            </View>
-          ) : null}
-        </>
-      )}
-    </SubShell>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Sub-screen shell (back button + scroll + safe area)
 // ---------------------------------------------------------------------------
 function SubShell({
@@ -664,7 +525,6 @@ export function TransferScreen() {
 
   if (mode === "send") return <TransferSendView onBack={() => setMode("hub")} />;
   if (mode === "receive") return <TransferReceiveView onBack={() => setMode("hub")} />;
-  if (mode === "text") return <TransferTextView onBack={() => setMode("hub")} />;
   return <TransferHub onSelect={setMode} />;
 }
 
@@ -740,10 +600,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(129,140,248,0.12)",
     borderColor: "rgba(129,140,248,0.24)",
   },
-  iconAmber: {
-    backgroundColor: "rgba(245,158,11,0.1)",
-    borderColor: "rgba(245,158,11,0.24)",
-  },
   badge: {
     borderRadius: 999,
     borderWidth: 1,
@@ -757,10 +613,6 @@ const styles = StyleSheet.create({
   badgeBlue: {
     backgroundColor: "rgba(129,140,248,0.12)",
     borderColor: "rgba(129,140,248,0.18)",
-  },
-  badgeAmber: {
-    backgroundColor: "rgba(245,158,11,0.12)",
-    borderColor: "rgba(245,158,11,0.18)",
   },
   badgeText: {
     fontSize: 10,
@@ -838,11 +690,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(62,207,142,0.2)",
   },
-  codeRowAmber: {
-    backgroundColor: "rgba(245,158,11,0.06)",
-    borderColor: "rgba(245,158,11,0.2)",
-  },
   codeText: { fontSize: 18, fontWeight: "700", color: "#3ecf8e", letterSpacing: 1 },
+  codeActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   expiry: { fontSize: 12, color: "#8b8b8b" },
 
   // Section
@@ -895,7 +748,19 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
   },
-  fileEmoji: { fontSize: 20 },
+  fileEmoji: {
+    minWidth: 38,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
+    overflow: "hidden",
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    color: "#cfcfcf",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
   fileName: { fontSize: 13, fontWeight: "500", color: "#ededed" },
   fileSize: { fontSize: 11, color: "#8b8b8b", marginTop: 2 },
 
@@ -943,42 +808,4 @@ const styles = StyleSheet.create({
   dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" },
   dividerLabel: { fontSize: 12, color: "#8b8b8b" },
 
-  // Tabs (text share)
-  tabs: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  tabActive: { backgroundColor: "rgba(255,255,255,0.08)" },
-  tabText: { fontSize: 14, fontWeight: "600", color: "#8b8b8b" },
-  tabTextActive: { color: "#ededed" },
-
-  // Text share
-  textArea: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 12,
-    padding: 14,
-    color: "#ededed",
-    fontSize: 15,
-    minHeight: 120,
-  },
-  receivedTextBox: {
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 14,
-  },
-  receivedTextContent: { color: "#ededed", fontSize: 15, lineHeight: 22 },
 });

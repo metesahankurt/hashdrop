@@ -10,16 +10,16 @@ export function formatFileSize(bytes: number): string {
 }
 
 export function getFileIcon(mimeType: string): string {
-  if (mimeType.startsWith("image/")) return "🖼️";
-  if (mimeType.startsWith("video/")) return "🎬";
-  if (mimeType.startsWith("audio/")) return "🎵";
-  if (mimeType.includes("pdf")) return "📄";
-  if (mimeType.includes("zip") || mimeType.includes("rar")) return "📦";
-  if (mimeType.includes("text")) return "📝";
-  if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "📊";
-  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "📊";
-  if (mimeType.includes("word") || mimeType.includes("document")) return "📃";
-  return "📁";
+  if (mimeType.startsWith("image/")) return "IMG";
+  if (mimeType.startsWith("video/")) return "VID";
+  if (mimeType.startsWith("audio/")) return "AUD";
+  if (mimeType.includes("pdf")) return "PDF";
+  if (mimeType.includes("zip") || mimeType.includes("rar")) return "ZIP";
+  if (mimeType.includes("text")) return "TXT";
+  if (mimeType.includes("spreadsheet") || mimeType.includes("excel")) return "XLS";
+  if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "PPT";
+  if (mimeType.includes("word") || mimeType.includes("document")) return "DOC";
+  return "FILE";
 }
 
 export function formatSpeed(bytesPerSecond: number): string {

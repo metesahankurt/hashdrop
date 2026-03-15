@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { X } from "lucide-react-native";
+import { useMainNavigationStore } from "@/mobile/navigation/use-main-navigation-store";
 
 interface QRScannerProps {
   onScan: (code: string) => void;
@@ -16,6 +17,12 @@ const CORNER_WIDTH = 3;
 export function QRScanner({ onScan, onClose }: QRScannerProps) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const setDockHidden = useMainNavigationStore((state) => state.setDockHidden);
+
+  useEffect(() => {
+    setDockHidden(true);
+    return () => setDockHidden(false);
+  }, [setDockHidden]);
 
   if (!permission) {
     return <View style={styles.container} />;

@@ -561,14 +561,14 @@ function ChatWebView({
   dockClearance: number;
   onLeave: () => void;
 }) {
-  const [webLoaded, setWebLoaded] = useState(false);
+  const [webReady, setWebReady] = useState(false);
   const injectedJavaScript = createAutofillScript(password, topPx);
 
   return (
     <View style={{ flex: 1, paddingBottom: dockClearance, backgroundColor: "#0d0d0d" }}>
       <WebView
         source={{ uri: chatUrl }}
-        style={{ flex: 1, opacity: webLoaded ? 1 : 0 }}
+        style={{ flex: 1, opacity: webReady ? 1 : 0 }}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
         scrollEnabled={false}
@@ -576,11 +576,13 @@ function ChatWebView({
         overScrollMode="never"
         injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
         injectedJavaScript={injectedJavaScript}
-        onLoadEnd={() => setWebLoaded(true)}
         onMessage={(event) => {
           try {
-            const data = JSON.parse(event.nativeEvent.data) as { type: string };
+            const data = JSON.parse(event.nativeEvent.data) as { type: string; step?: string };
             if (data.type === "leave") onLeave();
+            if (data.type === "chat-status") {
+              setWebReady(data.step === "chatting");
+            }
           } catch {}
         }}
         onNavigationStateChange={(state) => {
@@ -588,11 +590,11 @@ function ChatWebView({
         }}
       />
 
-      {!webLoaded && (
+      {!webReady && (
         <View style={loadingStyles.overlay}>
           <View style={loadingStyles.card}>
             <ActivityIndicator size="large" color="#3ecf8e" />
-            <Text style={loadingStyles.text}>Connecting to room…</Text>
+            <Text style={loadingStyles.text}>Preparing room…</Text>
           </View>
         </View>
       )}

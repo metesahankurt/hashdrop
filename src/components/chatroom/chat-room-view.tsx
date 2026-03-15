@@ -43,6 +43,10 @@ declare global {
   }
 }
 
+function postNativeChatStatus(step: Step) {
+  window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'chat-status', step }))
+}
+
 function getParticipantUsername(participant?: { metadata?: string; identity?: string }) {
   try {
     const metadata = JSON.parse(participant?.metadata || '{}') as { username?: string }
@@ -688,6 +692,10 @@ export function ChatRoomView({
   const roomRef = useRef<Room | null>(null)
   const pendingFilesRef = useRef<Map<string, PendingChatFile>>(new Map())
   const expiryRef = useRef(0)
+
+  useEffect(() => {
+    postNativeChatStatus(step)
+  }, [step])
 
   useEffect(() => {
     mountedRef.current = true
