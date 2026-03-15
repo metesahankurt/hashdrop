@@ -69,6 +69,7 @@ interface ConferenceState {
   setCallDuration: (d: number) => void
   setPinnedIdentity: (id: string | null) => void
   addWaitingParticipant: (p: WaitingParticipant) => void
+  setWaitingParticipants: (participants: WaitingParticipant[]) => void
   removeWaitingParticipant: (identity: string) => void
   addChatMessage: (m: ConferenceChatMessage) => void
   resetUnread: () => void
@@ -123,6 +124,8 @@ export const useConferenceStore = create<ConferenceState>((set, get) => ({
     if (get().waitingParticipants.find((w) => w.identity === p.identity)) return
     set({ waitingParticipants: [...get().waitingParticipants, p] })
   },
+
+  setWaitingParticipants: (participants) => set({ waitingParticipants: participants }),
 
   removeWaitingParticipant: (identity) =>
     set({

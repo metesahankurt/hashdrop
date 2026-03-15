@@ -191,17 +191,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     if (!room || !localParticipant) return;
     let cancelled = false;
 
-    const sendJoinRequest = async () => {
-      try {
-        const payload = new TextEncoder().encode(
-          JSON.stringify({ type: "join-request", identity, username }),
-        );
-        await localParticipant.publishData(payload, { reliable: true });
-      } catch (error) {
-        console.error("[Conference][MOBILE] join-request error:", error);
-      }
-    };
-
     const handleConnected = async () => {
       if (cancelled || inRoomHandledRef.current) return;
       inRoomHandledRef.current = true;
@@ -210,9 +199,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
         setCallStartTime(Date.now());
       } else {
         setStatus("waiting");
-        setTimeout(() => {
-          void sendJoinRequest();
-        }, 500);
       }
     };
 
@@ -318,7 +304,6 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
 
     return () => {
       cancelled = true;
-      inRoomHandledRef.current = false;
       room.off(RoomEvent.Connected, handleConnected);
       room.off(RoomEvent.Disconnected, handleDisconnected);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
@@ -333,14 +318,33 @@ function RoomContent({ onLeave }: { onLeave: () => void }) {
     room,
     localParticipant,
     role,
-    identity,
-    username,
     setStatus,
     setCallStartTime,
     addWaitingParticipant,
     removeWaitingParticipant,
     addChatMessage,
   ]);
+
+  // Retry join-request every 5s while in waiting state (in case initial message was lost)
+  useEffect(() => {
+    if (status !== "waiting" || role === "host" || !localParticipant || !identity || !username) return;
+    const send = async () => {
+      try {
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: "join-request", identity, username }),
+        );
+        await localParticipant.publishData(payload, { reliable: true });
+      } catch {
+        // ignore
+      }
+    };
+    const timer = setTimeout(send, 500);
+    const interval = setInterval(send, 5000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [status, role, localParticipant, identity, username]);
 
   useEffect(() => {
     if (role !== "host" || !roomName) return;

@@ -36,22 +36,11 @@ export function useConferenceLogic() {
   const pendingFilesRef = useRef<Map<string, PendingFile>>(new Map())
 
   const {
-    role, username, identity,
+    role, username, identity, roomName, status,
     isMicMuted, isCameraOff,
-    setStatus, addWaitingParticipant, removeWaitingParticipant,
+    setStatus, addWaitingParticipant, setWaitingParticipants, removeWaitingParticipant,
     addChatMessage, setCallStartTime,
   } = useConferenceStore()
-
-  // Send join-request data message to all connected participants (host)
-  const sendJoinRequest = useCallback(async () => {
-    if (!localParticipant || !identity || !username) return
-    try {
-      const data = new TextEncoder().encode(
-        JSON.stringify({ type: 'join-request', identity, username })
-      )
-      await localParticipant.publishData(data, { reliable: true })
-    } catch { /* ignore */ }
-  }, [localParticipant, identity, username])
 
   // Initialize tracks when admitted/host
   const publishTracks = useCallback(async () => {
@@ -73,10 +62,8 @@ export function useConferenceLogic() {
         setCallStartTime(Date.now())
         await publishTracks()
       } else {
-        // Participant joins waiting room
+        // Participant joins waiting room — join-request is sent by the retry effect
         setStatus('waiting')
-        // Send join request after a short delay to ensure connection is stable
-        setTimeout(sendJoinRequest, 500)
       }
     }
 
@@ -197,7 +184,44 @@ export function useConferenceLogic() {
       room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected)
       room.off(RoomEvent.DataReceived, handleDataReceived)
     }
-  }, [room, role, sendJoinRequest, publishTracks, setStatus, addWaitingParticipant, removeWaitingParticipant, addChatMessage])
+  }, [room, role, publishTracks, setStatus, addWaitingParticipant, removeWaitingParticipant, addChatMessage, setCallStartTime])
+
+  // Poll waiting participants every 2s (host only — fallback for missed data messages)
+  useEffect(() => {
+    if (role !== 'host' || !roomName) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/conference/waiting?roomName=${encodeURIComponent(roomName)}`)
+        if (!res.ok || cancelled) return
+        const data = await res.json() as { participants?: Array<{ identity: string; username: string }> }
+        if (!cancelled) {
+          setWaitingParticipants(
+            (data.participants || []).map((p) => ({ identity: p.identity, username: p.username, joinedAt: Date.now() }))
+          )
+        }
+      } catch { /* ignore */ }
+    }
+    poll()
+    const interval = setInterval(poll, 2000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [role, roomName, setWaitingParticipants])
+
+  // Retry join-request every 5s while in waiting state (in case initial message was lost)
+  useEffect(() => {
+    if (status !== 'waiting' || role === 'host' || !localParticipant || !identity || !username) return
+    const send = async () => {
+      try {
+        const data = new TextEncoder().encode(
+          JSON.stringify({ type: 'join-request', identity, username })
+        )
+        await localParticipant.publishData(data, { reliable: true })
+      } catch { /* ignore */ }
+    }
+    const timer = setTimeout(send, 500)
+    const interval = setInterval(send, 5000)
+    return () => { clearTimeout(timer); clearInterval(interval) }
+  }, [status, localParticipant, identity, username, role])
 
   // Handle permission changes (waiting → admitted)
   useEffect(() => {
