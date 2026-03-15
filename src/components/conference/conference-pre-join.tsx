@@ -23,7 +23,7 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [mode, setMode] = useState<'create' | 'join'>(initialMode ?? (initialCode ? 'join' : 'create'))
   const [joinCode, setJoinCode] = useState(initialCode || '')
-  const [createdCode, setCreatedCode] = useState('')
+  const [createdCode, setCreatedCode] = useState(initialMode === 'create' && initialCode ? initialCode : '')
   const [codeExpiresAt, setCodeExpiresAt] = useState(0)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [codeFetching, setCodeFetching] = useState(false)
@@ -67,7 +67,8 @@ export function ConferencePreJoin({ initialCode, initialMode, autoEnter, isMobil
   }
 
   useEffect(() => {
-    if (mode === 'create') void fetchRoomCode()
+    // Only fetch from server if no code was provided via URL (web standalone)
+    if (mode === 'create' && !createdCode) void fetchRoomCode()
   }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
