@@ -255,9 +255,15 @@ export function ConferenceScreen() {
         )}
         {!webError && !conferenceReady ? (
           <View style={styles.loaderOverlay} pointerEvents="auto">
-            <View style={styles.loader}>
-              <ActivityIndicator color="#3ecf8e" />
-              <Text style={styles.loaderText}>Loading conference...</Text>
+            <View style={styles.loaderCard}>
+              <View style={styles.loaderOrb} />
+              <View style={styles.loaderIconWrap}>
+                <ActivityIndicator color="#a5b4fc" size="small" />
+              </View>
+              <View style={styles.loaderTextBlock}>
+                <Text style={styles.loaderTitle}>Setting up conference</Text>
+                <Text style={styles.loaderSub}>Connecting to room…</Text>
+              </View>
             </View>
           </View>
         ) : null}
@@ -288,25 +294,57 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0d0d0d",
   },
-  loader: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#111111",
-    gap: 10,
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    minWidth: 180,
-  },
   loaderOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#0d0d0d",
   },
-  loaderText: {
-    color: "#8b8b8b",
-    fontSize: 13,
+  loaderCard: {
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 36,
+    paddingVertical: 32,
+    borderRadius: 28,
+    backgroundColor: "#111111",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
+    minWidth: 220,
+  },
+  loaderOrb: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(165,180,252,0.07)",
+    top: -60,
+    right: -50,
+  },
+  loaderIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "rgba(165,180,252,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(165,180,252,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loaderTextBlock: {
+    alignItems: "center",
+    gap: 4,
+  },
+  loaderTitle: {
+    color: "#ededed",
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  loaderSub: {
+    color: "#444",
+    fontSize: 12,
+    fontWeight: "500",
   },
   errorState: {
     flex: 1,

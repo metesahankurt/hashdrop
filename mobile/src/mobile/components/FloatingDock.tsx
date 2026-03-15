@@ -24,22 +24,26 @@ const ITEMS = [
   { href: "/conference", label: "Meet", icon: Video },
   { href: "/chatroom", label: "Chat", icon: MessageSquare },
 ];
-const DOCK_HORIZONTAL_PADDING = 10;
-const ITEM_COLLAPSED_WIDTH = 46;
-const ITEM_EXPANDED_WIDTH = 108;
-const ITEM_GAP = 8;
-const INDICATOR_X = [10, 64, 118, 172];
-const INDICATOR_WIDTH = 108;
+
+const DOCK_HORIZONTAL_PADDING = 8;
+const ITEM_COLLAPSED_WIDTH = 48;
+const ITEM_EXPANDED_WIDTH = 112;
+const ITEM_GAP = 6;
+// Indicator x positions align with each item's left edge
+const INDICATOR_X = [8, 62, 116, 170];
+const INDICATOR_WIDTH = 112;
+
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
 export function FloatingDock() {
   const insets = useSafeAreaInsets();
-  const dockBottom = Math.max(insets.bottom, 10);
+  const dockBottom = Math.max(insets.bottom, 12);
   const dockHidden = useMainNavigationStore((state) => state.dockHidden);
   const setRoute = useMainNavigationStore((state) => state.setRoute);
   const refreshRoute = useMainNavigationStore((state) => state.refreshRoute);
   const activeRoute = useMainNavigationStore((state) => state.route);
   const { progress } = useMainNavigationAnimation();
+
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [
       {
@@ -53,9 +57,7 @@ export function FloatingDock() {
     ],
   }));
 
-  if (dockHidden) {
-    return null;
-  }
+  if (dockHidden) return null;
 
   return (
     <View
@@ -64,8 +66,10 @@ export function FloatingDock() {
         { bottom: dockBottom, pointerEvents: "box-none" as any },
       ]}
     >
-      <BlurView intensity={16} tint="dark" style={styles.dock}>
+      <BlurView intensity={20} tint="dark" style={styles.dock}>
+        {/* Active tab highlight */}
         <Animated.View style={[styles.indicator, indicatorStyle]} />
+
         {ITEMS.map((item, index) => (
           <DockItem
             key={item.href}
@@ -74,12 +78,12 @@ export function FloatingDock() {
             index={index}
             label={item.label}
             onPress={() => {
-              const nextRoute = item.href as MainRoute;
-              if (activeRoute === nextRoute) {
-                refreshRoute(nextRoute);
+              const next = item.href as MainRoute;
+              if (activeRoute === next) {
+                refreshRoute(next);
                 return;
               }
-              setRoute(nextRoute);
+              setRoute(next);
             }}
             progress={progress}
           />
@@ -116,25 +120,25 @@ function DockItem({
     ),
   }));
 
-  const iconStyle = useAnimatedStyle(() => ({
+  const iconBgStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       progress.value,
       [index - 1, index, index + 1],
-      ["rgba(255,255,255,0.02)", "#3ecf8e", "rgba(255,255,255,0.02)"],
+      ["rgba(255,255,255,0.00)", "#3ecf8e", "rgba(255,255,255,0.00)"],
     ),
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       progress.value,
-      [index - 0.55, index, index + 0.55],
+      [index - 0.5, index, index + 0.5],
       [0, 1, 0],
       Extrapolation.CLAMP,
     ),
     width: interpolate(
       progress.value,
-      [index - 0.55, index, index + 0.55],
-      [0, 42, 0],
+      [index - 0.5, index, index + 0.5],
+      [0, 44, 0],
       Extrapolation.CLAMP,
     ),
   }));
@@ -142,30 +146,18 @@ function DockItem({
   return (
     <Animated.View style={[styles.item, itemStyle]}>
       <Pressable onPress={onPress} style={styles.pressable}>
-        <Animated.View style={[styles.icon, iconStyle]}>
-          <DockIcon Icon={Icon} isActive={isActive} />
+        <Animated.View style={[styles.iconWrap, iconBgStyle]}>
+          <Icon
+            size={17}
+            stroke={isActive ? "#08110d" : "rgba(255,255,255,0.65)"}
+            strokeWidth={2.3}
+          />
         </Animated.View>
         <AnimatedText numberOfLines={1} style={[styles.label, labelStyle]}>
           {label}
         </AnimatedText>
       </Pressable>
     </Animated.View>
-  );
-}
-
-function DockIcon({
-  Icon,
-  isActive,
-}: {
-  Icon: any;
-  isActive: boolean;
-}) {
-  return (
-    <Icon
-      size={16}
-      stroke={isActive ? "#08110d" : "#ffffff"}
-      strokeWidth={2.4}
-    />
   );
 }
 
@@ -179,54 +171,53 @@ const styles = StyleSheet.create({
   dock: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: ITEM_GAP,
     overflow: "hidden",
     paddingHorizontal: DOCK_HORIZONTAL_PADDING,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: "rgba(10,10,10,0.62)",
+    backgroundColor: "rgba(8,8,8,0.72)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: "rgba(255,255,255,0.09)",
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.24,
-    shadowRadius: 28,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.30,
+    shadowRadius: 32,
+    elevation: 24,
   },
   indicator: {
     position: "absolute",
     left: 0,
-    top: 9,
+    top: 8,
     width: INDICATOR_WIDTH,
-    height: 46,
+    height: 48,
     borderRadius: 999,
-    backgroundColor: "rgba(62,207,142,0.16)",
+    backgroundColor: "rgba(62,207,142,0.14)",
   },
   item: {
-    height: 46,
+    height: 48,
     borderRadius: 999,
   },
   pressable: {
     flex: 1,
-    height: 46,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: ITEM_GAP,
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
-  icon: {
+  iconWrap: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.02)",
   },
   label: {
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "800",
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
 });

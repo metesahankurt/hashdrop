@@ -4,10 +4,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowDownToLine,
   ArrowLeft,
@@ -29,13 +30,10 @@ import {
   sendViaRelay,
   type ReceivedFile,
 } from "@/mobile/hooks/use-warp-peer";
-import { AppShell } from "@/mobile/components/AppShell";
 import { PrimaryButton } from "@/mobile/components/PrimaryButton";
-import { TextField } from "@/mobile/components/TextField";
 import { QRScanner } from "@/mobile/components/QRScanner";
 import { useProfileStore } from "@/mobile/state/use-profile-store";
 
-// Cast lucide icons to avoid TS strict type errors with react-native-svg
 const SendIcon = Send as any;
 const ReceiveIcon = ArrowDownToLine as any;
 const CopyIcon = Copy as any;
@@ -43,78 +41,133 @@ const LinkIcon = LinkIconRaw as any;
 const ScanIcon = ScanLine as any;
 const BackIcon = ArrowLeft as any;
 const FileUpIcon = FileUp as any;
-const XIcon = X as any;
 const CheckIcon = CheckCircle as any;
 
 type TransferMode = "hub" | "send" | "receive";
 const RELAY_PREFERRED_FILE_BYTES = 4 * 1024 * 1024;
 const RELAY_PREFERRED_TOTAL_BYTES = 10 * 1024 * 1024;
+const DOCK_HEIGHT = 64;
+const DOCK_GAP = 24;
 
 // ---------------------------------------------------------------------------
-// Hub screen
+// Hub
 // ---------------------------------------------------------------------------
 function TransferHub({ onSelect }: { onSelect: (m: TransferMode) => void }) {
-  return (
-    <AppShell
-      title="File Transfer"
-      subtitle="P2P encrypted transfers — no cloud, no tracking."
-    >
-      {/* Send */}
-      <Pressable style={styles.card} onPress={() => onSelect("send")}>
-        <View style={styles.cardTop}>
-          <View style={[styles.iconWrap, styles.iconGreen]}>
-            <SendIcon size={20} stroke="#3ecf8e" strokeWidth={2.2} />
-          </View>
-          <View style={[styles.badge, styles.badgeGreen]}>
-            <Text style={[styles.badgeText, { color: "#3ecf8e" }]}>SEND</Text>
-          </View>
-        </View>
-        <Text style={styles.cardTitle}>Send files</Text>
-        <Text style={styles.cardDesc}>
-          Generate a one-time code and share your files with any device.
-        </Text>
-      </Pressable>
+  const insets = useSafeAreaInsets();
+  const scrollPaddingBottom = Math.max(insets.bottom, 12) + DOCK_HEIGHT + DOCK_GAP;
 
-      {/* Receive */}
-      <Pressable style={styles.card} onPress={() => onSelect("receive")}>
-        <View style={styles.cardTop}>
-          <View style={[styles.iconWrap, styles.iconBlue]}>
-            <ReceiveIcon size={20} stroke="#a5b4fc" strokeWidth={2.2} />
+  return (
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.hubContent, { paddingBottom: scrollPaddingBottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* Hero */}
+        <View style={styles.hero}>
+          <View style={styles.heroOrb} />
+          <View style={styles.heroTopBar}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandDot} />
+              <Text style={styles.brandText}>FILE TRANSFER</Text>
+            </View>
+            <View style={styles.heroPill}>
+              <Text style={styles.heroPillText}>P2P</Text>
+            </View>
           </View>
-          <View style={[styles.badge, styles.badgeBlue]}>
-            <Text style={[styles.badgeText, { color: "#a5b4fc" }]}>RECEIVE</Text>
-          </View>
+          <Text style={styles.heroTitle}>Send & receive any file.</Text>
+          <Text style={styles.heroSubtitle}>
+            Direct device-to-device. No cloud, no tracking, no limits.
+          </Text>
         </View>
-        <Text style={styles.cardTitle}>Receive files</Text>
-        <Text style={styles.cardDesc}>
-          Enter the sender's code or scan a QR to download files instantly.
-        </Text>
-      </Pressable>
-    </AppShell>
+
+        {/* Mode label */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Choose mode</Text>
+          <Text style={styles.sectionMeta}>2 options</Text>
+        </View>
+
+        {/* Send card */}
+        <Pressable
+          style={({ pressed }) => [styles.modeCard, pressed && styles.modeCardPressed]}
+          onPress={() => onSelect("send")}
+        >
+          <View style={styles.modeCardInner}>
+            <View style={styles.modeCardTop}>
+              <View style={styles.modeIconWrap}>
+                <SendIcon size={22} stroke="#ededed" strokeWidth={1.9} />
+              </View>
+              <View style={styles.modeBadge}>
+                <Text style={styles.modeBadgeText}>SEND</Text>
+              </View>
+            </View>
+            <View style={styles.modeCardBody}>
+              <Text style={styles.modeTitle}>Send files</Text>
+              <Text style={styles.modeDesc}>
+                Generate a one-time code and share your files with any device.
+              </Text>
+            </View>
+            <View style={styles.modeFooter}>
+              <Text style={styles.modeCtaText}>Open sender</Text>
+              <ArrowRightSmall />
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Receive card */}
+        <Pressable
+          style={({ pressed }) => [styles.modeCard, pressed && styles.modeCardPressed]}
+          onPress={() => onSelect("receive")}
+        >
+          <View style={styles.modeCardInner}>
+            <View style={styles.modeCardTop}>
+              <View style={styles.modeIconWrap}>
+                <ReceiveIcon size={22} stroke="#ededed" strokeWidth={1.9} />
+              </View>
+              <View style={styles.modeBadge}>
+                <Text style={styles.modeBadgeText}>RECEIVE</Text>
+              </View>
+            </View>
+            <View style={styles.modeCardBody}>
+              <Text style={styles.modeTitle}>Receive files</Text>
+              <Text style={styles.modeDesc}>
+                Enter a sender's code or scan a QR to download files instantly.
+              </Text>
+            </View>
+            <View style={styles.modeFooter}>
+              <Text style={styles.modeCtaText}>Open receiver</Text>
+              <ArrowRightSmall />
+            </View>
+          </View>
+        </Pressable>
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Send screen
+// Send view
 // ---------------------------------------------------------------------------
 function TransferSendView({ onBack }: { onBack: () => void }) {
-  const { files, displayCode, status, progress, codeExpiry, error, setStatus, setProgress, setError, setDisplayCode, setCodeExpiry, setFiles, addLog } = useWarpStore();
-  const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } =
-    useWarpPeer();
+  const {
+    files, displayCode, status, progress, codeExpiry, error,
+    setStatus, setProgress, setError, setDisplayCode, setCodeExpiry,
+    setFiles, addLog,
+  } = useWarpStore();
+  const { initSender, sendFiles, pickFiles, copyToClipboard, cleanup } = useWarpPeer();
   const { username } = useProfileStore();
 
   const [timeLeft, setTimeLeft] = useState("");
-  // "p2p" = WebRTC PeerJS, "relay" = HTTP relay (works in Expo Go)
   const [transport, setTransport] = useState<"p2p" | "relay" | "detecting">("detecting");
   const [relayCode, setRelayCodeLocal] = useState<string | null>(null);
 
-  // Shared init logic — used on mount and on "New transfer"
   const initWithFallback = useCallback(async () => {
     setTransport("detecting");
     setRelayCodeLocal(null);
     setFiles([]);
     await initSender();
-
     const afterStatus = useWarpStore.getState().status;
     if (afterStatus === "error") {
       const code = generateSecureCode();
@@ -135,7 +188,6 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     setRelayCodeLocal(null);
     setTimeLeft("");
     await initSender();
-
     const afterStatus = useWarpStore.getState().status;
     if (afterStatus === "error") {
       const code = generateSecureCode();
@@ -152,14 +204,12 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     }
   }, [initSender, setDisplayCode, setCodeExpiry, setStatus, setError, addLog]);
 
-  // Auto-init on mount
   useEffect(() => {
     let cancelled = false;
     initWithFallback().then(() => { if (cancelled) {} });
     return () => { cancelled = true; cleanup(); };
   }, []);
 
-  // Expiry countdown
   useEffect(() => {
     if (!codeExpiry) return;
     let refreshing = false;
@@ -202,34 +252,21 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     }
   };
 
-  // Poll /claim endpoint — auto-upload when web receiver enters the code
   useEffect(() => {
     if (transport !== "relay" || !relayCode || files.length === 0) return;
     if (status !== "waiting") return;
-
     const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL ?? "https://hashdrop.metesahankurt.cloud").replace(/\/$/, "");
     let stopped = false;
-
     const interval = setInterval(async () => {
-      if (stopped || useWarpStore.getState().status !== "waiting") {
-        clearInterval(interval);
-        return;
-      }
+      if (stopped || useWarpStore.getState().status !== "waiting") { clearInterval(interval); return; }
       try {
         const res = await fetch(`${WEB_URL}/api/relay/${relayCode}/claim`);
         if (res.ok) {
           const json = await res.json();
-          if (json.claimed) {
-            stopped = true;
-            clearInterval(interval);
-            handleSend();
-          }
+          if (json.claimed) { stopped = true; clearInterval(interval); handleSend(); }
         }
-      } catch {
-        // ignore network errors, keep polling
-      }
+      } catch { /* ignore */ }
     }, 2000);
-
     return () => { stopped = true; clearInterval(interval); };
   }, [transport, relayCode, files.length, status]);
 
@@ -244,7 +281,6 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
     await pickFiles();
     const selectedFiles = useWarpStore.getState().files;
     if (!selectedFiles.length) return;
-
     if (shouldPreferRelay(selectedFiles)) {
       setTransport("relay");
       setRelayCodeLocal(useWarpStore.getState().displayCode || null);
@@ -254,35 +290,43 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
 
   return (
     <SubShell title="Send Files" onBack={onBack}>
-      {/* Status */}
+
+      {/* Status card */}
       {status !== "idle" && (
         <View style={styles.statusCard}>
           <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: statusColor }]} />
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {statusLabel(status, progress)}
             </Text>
           </View>
           {status === "transferring" && (
-            <View style={styles.progressBg}>
+            <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress}%` as any }]} />
             </View>
           )}
         </View>
       )}
 
-      {/* Code + QR */}
+      {/* Code + QR card */}
       {displayCode ? (
         <View style={styles.codeCard}>
-          <Text style={styles.sectionLabel}>Your transfer code</Text>
-          <View style={styles.qrWrap}>
+          <View style={styles.codeCardHeader}>
+            <Text style={styles.cardLabel}>Transfer code</Text>
+            {timeLeft ? (
+              <Text style={styles.expiryText}>Expires {timeLeft}</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.qrBox}>
             <QRCode
               value={shareUrl ?? displayCode}
-              size={160}
+              size={152}
               backgroundColor="transparent"
-              color="#3ecf8e"
+              color="#ededed"
             />
           </View>
+
           <TouchableOpacity
             style={styles.codeRow}
             onPress={() => copyToClipboard(displayCode)}
@@ -294,36 +338,35 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
                   onPress={() => copyToClipboard(shareUrl)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <LinkIcon size={16} stroke="#a5b4fc" strokeWidth={2.2} />
+                  <LinkIcon size={15} stroke="#a5b4fc" strokeWidth={2.2} />
                 </TouchableOpacity>
               ) : null}
-              <CopyIcon size={16} stroke="#3ecf8e" strokeWidth={2.2} />
+              <CopyIcon size={15} stroke="#ededed" strokeWidth={2.2} />
             </View>
           </TouchableOpacity>
-          {timeLeft ? (
-            <Text style={styles.expiry}>Expires in {timeLeft}</Text>
-          ) : null}
         </View>
       ) : null}
 
       {/* File picker */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Files to send</Text>
+        <Text style={styles.cardLabel}>Files to send</Text>
         <TouchableOpacity style={styles.dropzone} onPress={handlePickFiles}>
-          <FileUpIcon size={28} stroke="#8b8b8b" strokeWidth={2} />
+          <View style={styles.dropzoneIconWrap}>
+            <FileUpIcon size={24} stroke="#ededed" strokeWidth={1.8} />
+          </View>
           <Text style={styles.dropzoneTitle}>Tap to select files</Text>
-          <Text style={styles.dropzoneHint}>Any format, up to 10 GB</Text>
+          <Text style={styles.dropzoneHint}>Any format · up to 10 GB</Text>
         </TouchableOpacity>
 
         {files.length > 0 && (
           <View style={styles.fileList}>
             {files.map((f, i) => (
               <View key={i} style={styles.fileRow}>
-                <Text style={styles.fileEmoji}>{getFileIcon(f.type)}</Text>
+                <View style={styles.fileIconBadge}>
+                  <Text style={styles.fileIconText}>{getFileIcon(f.type)}</Text>
+                </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    {f.name}
-                  </Text>
+                  <Text style={styles.fileName} numberOfLines={1}>{f.name}</Text>
                   <Text style={styles.fileSize}>{formatFileSize(f.size)}</Text>
                 </View>
               </View>
@@ -332,35 +375,30 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
         )}
       </View>
 
-      {relayRecommended && (
-        <View style={styles.relayBadge}>
-          <Text style={styles.relayBadgeText}>
-            Photo optimization active: this transfer will use faster relay upload.
+      {/* Info banners */}
+      {(relayRecommended || (isRelay && status === "waiting")) && (
+        <View style={styles.infoBanner}>
+          <View style={styles.infoBannerDot} />
+          <Text style={styles.infoBannerText}>
+            {relayRecommended
+              ? "Photo optimization active — using faster relay upload."
+              : "Cloud Relay — open this code on the web app to download."}
           </Text>
         </View>
       )}
 
-      {/* Relay badge */}
-      {isRelay && status === "waiting" && (
-        <View style={styles.relayBadge}>
-          <Text style={styles.relayBadgeText}>
-            Cloud Relay — open this code on the web app to download
-          </Text>
-        </View>
-      )}
-
-      {/* Send button — P2P only; relay auto-uploads when receiver enters the code */}
+      {/* Primary action */}
       {transport === "p2p" && status === "connected" && files.length > 0 && (
         <PrimaryButton onPress={handleSend}>Send files</PrimaryButton>
       )}
 
-      {/* Relay: manual upload button + hint */}
       {isRelay && status === "waiting" && files.length > 0 && (
         <>
-          <PrimaryButton onPress={handleSend}>Upload &amp; share</PrimaryButton>
-          <View style={styles.relayBadge}>
-            <Text style={styles.relayBadgeText}>
-              Tap above, then enter the code on the web app to download — or wait for the recipient to enter the code first.
+          <PrimaryButton onPress={handleSend}>Upload & share</PrimaryButton>
+          <View style={styles.infoBanner}>
+            <View style={styles.infoBannerDot} />
+            <Text style={styles.infoBannerText}>
+              Tap above, then enter the code on the web app — or wait for the recipient to enter it first.
             </Text>
           </View>
         </>
@@ -369,13 +407,14 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
       {/* Success */}
       {status === "completed" && (
         <View style={styles.successRow}>
-          <CheckIcon size={18} stroke="#3ecf8e" strokeWidth={2.2} />
+          <CheckIcon size={17} stroke="#3ecf8e" strokeWidth={2.2} />
           <Text style={styles.successText}>
             {isRelay ? "Files uploaded — recipient can now download!" : "Files delivered!"}
           </Text>
         </View>
       )}
 
+      {/* Error */}
       {status === "error" && error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorBoxText}>{error}</Text>
@@ -392,12 +431,11 @@ function TransferSendView({ onBack }: { onBack: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Receive screen
+// Receive view
 // ---------------------------------------------------------------------------
 function TransferReceiveView({ onBack }: { onBack: () => void }) {
   const { status, progress, error } = useWarpStore();
-  const { connect, saveFile, copyToClipboard, cleanup, receivedFiles } =
-    useWarpPeer();
+  const { connect, saveFile, copyToClipboard, cleanup, receivedFiles } = useWarpPeer();
 
   const [code, setCode] = useState("");
   const [showScanner, setShowScanner] = useState(false);
@@ -429,11 +467,12 @@ function TransferReceiveView({ onBack }: { onBack: () => void }) {
 
   return (
     <SubShell title="Receive Files" onBack={onBack}>
+
       {/* Status */}
       {status !== "idle" && (
         <View style={styles.statusCard}>
           <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: statusColor }]} />
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {statusLabel(status, progress)}
             </Text>
@@ -441,61 +480,76 @@ function TransferReceiveView({ onBack }: { onBack: () => void }) {
         </View>
       )}
 
-      {/* Code input */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Enter transfer code</Text>
-        <TextField
-          label=""
+      {/* Code entry card */}
+      <View style={styles.receiveCard}>
+        <View style={styles.receiveCardHeader}>
+          <View style={styles.receiveIconWrap}>
+            <ReceiveIcon size={20} stroke="#ededed" strokeWidth={1.9} />
+          </View>
+          <Text style={styles.cardLabel}>Transfer code</Text>
+        </View>
+
+        <TextInput
+          style={styles.codeInput}
           placeholder="COSMIC-FALCON"
+          placeholderTextColor="#2e2e2e"
           value={normalizedCode}
           onChangeText={(v) => setCode(v.toUpperCase())}
           autoCapitalize="characters"
+          autoCorrect={false}
         />
         {!codeValid && (
-          <Text style={styles.errorText}>Use the WORD-WORD format.</Text>
+          <Text style={styles.inputError}>Use the WORD-WORD format.</Text>
         )}
-        <PrimaryButton
-          disabled={!canConnect}
-          onPress={() => connect(normalizedCode)}
-        >
+
+        <PrimaryButton disabled={!canConnect} onPress={() => connect(normalizedCode)}>
           Connect
         </PrimaryButton>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerLabel}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <PrimaryButton tone="secondary" onPress={() => setShowScanner(true)}>
-          <ScanIcon size={15} stroke="#ededed" strokeWidth={2.2} />{"  "}
-          Scan QR code
-        </PrimaryButton>
       </View>
+
+      {/* QR scan — standalone row */}
+      <View style={styles.dividerRow}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerLabel}>or scan</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.scanBtn, pressed && styles.scanBtnPressed]}
+        onPress={() => setShowScanner(true)}
+      >
+        <View style={styles.scanBtnIcon}>
+          <ScanIcon size={18} stroke="#ededed" strokeWidth={2} />
+        </View>
+        <Text style={styles.scanBtnText}>Scan QR code</Text>
+      </Pressable>
 
       {/* Received files */}
       {receivedFiles.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Received files</Text>
+          <Text style={styles.cardLabel}>Received files</Text>
           {receivedFiles.map((file: ReceivedFile, i: number) => (
             <TouchableOpacity
               key={i}
               style={styles.receivedFileRow}
               onPress={() => saveFile(file)}
             >
-              <Text style={styles.fileEmoji}>{getFileIcon(file.mimeType)}</Text>
+              <View style={styles.fileIconBadge}>
+                <Text style={styles.fileIconText}>{getFileIcon(file.mimeType)}</Text>
+              </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fileName} numberOfLines={1}>
-                  {file.name}
-                </Text>
+                <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
                 <Text style={styles.fileSize}>{formatFileSize(file.size)}</Text>
               </View>
-              <ReceiveIcon size={16} stroke="#3ecf8e" strokeWidth={2.2} />
+              <View style={styles.downloadBtn}>
+                <ReceiveIcon size={14} stroke="#ededed" strokeWidth={2.2} />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
       )}
 
+      {/* Error */}
       {status === "error" && error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorBoxText}>{error}</Text>
@@ -512,7 +566,7 @@ function TransferReceiveView({ onBack }: { onBack: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Sub-screen shell (back button + scroll + safe area)
+// SubShell — responsive padding
 // ---------------------------------------------------------------------------
 function SubShell({
   title,
@@ -523,19 +577,24 @@ function SubShell({
   onBack: () => void;
   children: React.ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
+  const scrollPaddingBottom = Math.max(insets.bottom, 12) + DOCK_HEIGHT + DOCK_GAP;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.subContent, { paddingBottom: scrollPaddingBottom }]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <View style={styles.subHeader}>
           <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-            <BackIcon size={20} stroke="#ededed" strokeWidth={2.2} />
+            <BackIcon size={18} stroke="#ededed" strokeWidth={2.2} />
           </TouchableOpacity>
           <Text style={styles.subTitle}>{title}</Text>
-          <View style={{ width: 36 }} />
+          <View style={styles.backBtnPlaceholder} />
         </View>
         {children}
       </ScrollView>
@@ -544,11 +603,10 @@ function SubShell({
 }
 
 // ---------------------------------------------------------------------------
-// Root screen — mode controller
+// Root
 // ---------------------------------------------------------------------------
 export function TransferScreen() {
   const [mode, setMode] = useState<TransferMode>("hub");
-
   if (mode === "send") return <TransferSendView onBack={() => setMode("hub")} />;
   if (mode === "receive") return <TransferReceiveView onBack={() => setMode("hub")} />;
   return <TransferHub onSelect={setMode} />;
@@ -557,6 +615,11 @@ export function TransferScreen() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+function ArrowRightSmall() {
+  const ArrowRight = require("lucide-react-native").ArrowRight as any;
+  return <ArrowRight size={13} stroke="#666" strokeWidth={2.2} />;
+}
+
 function getStatusColor(status: string) {
   if (status === "completed") return "#3ecf8e";
   if (status === "error") return "#ef4444";
@@ -578,17 +641,13 @@ function statusLabel(status: string, progress: number) {
 
 function shouldPreferRelay(files: Array<{ size: number; type: string }>) {
   if (!files.length) return false;
-
   let totalBytes = 0;
   for (const file of files) {
     totalBytes += file.size || 0;
     const mime = (file.type || "").toLowerCase();
     const isMedia = mime.startsWith("image/") || mime.startsWith("video/");
-    if (isMedia && (file.size || 0) >= RELAY_PREFERRED_FILE_BYTES) {
-      return true;
-    }
+    if (isMedia && (file.size || 0) >= RELAY_PREFERRED_FILE_BYTES) return true;
   }
-
   return totalBytes >= RELAY_PREFERRED_TOTAL_BYTES;
 }
 
@@ -596,62 +655,170 @@ function shouldPreferRelay(files: Array<{ size: number; type: string }>) {
 // Styles
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  // Hub cards
-  card: {
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    padding: 18,
+  safeArea: { flex: 1, backgroundColor: "#0d0d0d" },
+  scroll: { flex: 1, backgroundColor: "#0d0d0d" },
+
+  // ── HUB
+  hubContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
     gap: 12,
   },
-  cardTop: {
+  hero: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "#101010",
+    padding: 24,
+    paddingBottom: 28,
+    gap: 14,
+    overflow: "hidden",
+  },
+  heroOrb: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "rgba(62,207,142,0.08)",
+    top: -80,
+    right: -70,
+  },
+  heroTopBar: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
-  iconWrap: {
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  brandDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#3ecf8e",
+  },
+  brandText: {
+    color: "#3ecf8e",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 2,
+  },
+  heroPill: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  heroPillText: {
+    color: "#666",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    color: "#ededed",
+    fontSize: 32,
+    fontWeight: "800",
+    lineHeight: 38,
+    letterSpacing: -0.6,
+  },
+  heroSubtitle: {
+    color: "#5c5c5c",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    color: "#ededed",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  sectionMeta: {
+    color: "#444",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  modeCard: {
+    borderRadius: 22,
+    backgroundColor: "#111111",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  modeCardPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.984 }],
+  },
+  modeCardInner: {
+    padding: 20,
+    gap: 14,
+  },
+  modeCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modeIconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.07)",
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
     alignItems: "center",
     justifyContent: "center",
   },
-  iconGreen: {
-    backgroundColor: "rgba(62,207,142,0.1)",
-    borderColor: "rgba(62,207,142,0.22)",
-  },
-  iconBlue: {
-    backgroundColor: "rgba(129,140,248,0.12)",
-    borderColor: "rgba(129,140,248,0.24)",
-  },
-  badge: {
-    borderRadius: 999,
+  modeBadge: {
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
-  badgeGreen: {
-    backgroundColor: "rgba(62,207,142,0.12)",
-    borderColor: "rgba(62,207,142,0.18)",
-  },
-  badgeBlue: {
-    backgroundColor: "rgba(129,140,248,0.12)",
-    borderColor: "rgba(129,140,248,0.18)",
-  },
-  badgeText: {
+  modeBadgeText: {
+    color: "#555",
     fontSize: 10,
     fontWeight: "800",
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
-  cardTitle: { color: "#ededed", fontSize: 18, fontWeight: "700" },
-  cardDesc: { color: "#8b8b8b", fontSize: 13, lineHeight: 19 },
+  modeCardBody: { gap: 5 },
+  modeTitle: {
+    color: "#ededed",
+    fontSize: 19,
+    fontWeight: "700",
+  },
+  modeDesc: {
+    color: "#5a5a5a",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  modeFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  modeCtaText: {
+    color: "#555",
+    fontSize: 13,
+    fontWeight: "600",
+  },
 
-  // Sub-screen shell
-  safeArea: { flex: 1, backgroundColor: "#0d0d0d" },
-  scroll: { flex: 1, backgroundColor: "#0d0d0d" },
-  scrollContent: { padding: 20, paddingBottom: 220, gap: 18 },
+  // ── SUBSHELL
+  subContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 14,
+  },
   subHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -659,138 +826,300 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
-  subTitle: { fontSize: 17, fontWeight: "700", color: "#ededed" },
+  backBtnPlaceholder: { width: 38 },
+  subTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#ededed",
+    letterSpacing: -0.2,
+  },
 
-  // Status
+  // ── STATUS
   statusCard: {
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 14,
-    gap: 8,
+    backgroundColor: "#111111",
+    padding: 16,
+    gap: 10,
   },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 9 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 14, fontWeight: "600" },
-  progressBg: {
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 2,
+  progressTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderRadius: 999,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", backgroundColor: "#a5b4fc", borderRadius: 2 },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#a5b4fc",
+    borderRadius: 999,
+  },
 
-  // Code / QR
+  // ── CODE / QR
   codeCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 18,
-    gap: 14,
+    backgroundColor: "#111111",
+    padding: 20,
+    gap: 16,
     alignItems: "center",
   },
-  qrWrap: {
-    padding: 14,
+  codeCardHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardLabel: {
+    fontSize: 11,
+    color: "#555",
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.9,
+  },
+  expiryText: {
+    fontSize: 11,
+    color: "#444",
+    fontWeight: "600",
+  },
+  qrBox: {
+    padding: 16,
     backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.06)",
   },
   codeRow: {
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 10,
-    backgroundColor: "rgba(62,207,142,0.06)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.2)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  codeText: { fontSize: 18, fontWeight: "700", color: "#3ecf8e", letterSpacing: 1 },
+  codeText: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#ededed",
+    letterSpacing: 0.5,
+  },
   codeActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  expiry: { fontSize: 12, color: "#8b8b8b" },
-
-  // Section
-  section: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 18,
     gap: 12,
   },
-  sectionLabel: {
-    fontSize: 11,
-    color: "#8b8b8b",
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+
+  // ── SECTION (file picker / code input)
+  section: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#111111",
+    padding: 20,
+    gap: 14,
   },
 
-  // Dropzone
+  // ── DROPZONE
   dropzone: {
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
     borderStyle: "dashed",
-    borderRadius: 14,
-    padding: 28,
+    borderRadius: 16,
+    paddingVertical: 28,
     alignItems: "center",
     gap: 8,
   },
-  dropzoneTitle: { fontSize: 15, fontWeight: "600", color: "#ededed" },
-  dropzoneHint: { fontSize: 12, color: "#8b8b8b" },
+  dropzoneIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
+  dropzoneTitle: { fontSize: 14, fontWeight: "600", color: "#c0c0c0" },
+  dropzoneHint: { fontSize: 12, color: "#444" },
 
-  // File list
+  // ── FILE LIST
   fileList: { gap: 8 },
   fileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     backgroundColor: "rgba(255,255,255,0.03)",
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
   },
+  fileIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fileIconText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#aaa",
+    letterSpacing: 0.2,
+  },
+  fileName: { fontSize: 13, fontWeight: "500", color: "#d4d4d4" },
+  fileSize: { fontSize: 11, color: "#444", marginTop: 2 },
+
   receivedFileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(62,207,142,0.04)",
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
     borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.12)",
+    borderColor: "rgba(255,255,255,0.07)",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
   },
-  fileEmoji: {
-    minWidth: 38,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+  downloadBtn: {
+    width: 32,
+    height: 32,
     borderRadius: 10,
-    overflow: "hidden",
-    textAlign: "center",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.4,
-    color: "#cfcfcf",
     backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  fileName: { fontSize: 13, fontWeight: "500", color: "#ededed" },
-  fileSize: { fontSize: 11, color: "#8b8b8b", marginTop: 2 },
 
-  // Success
+  // ── RECEIVE CARD
+  receiveCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#111111",
+    padding: 20,
+    gap: 14,
+  },
+  receiveCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  receiveIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ── CODE INPUT
+  codeInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    color: "#ededed",
+    fontSize: 18,
+    fontWeight: "700",
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    letterSpacing: 1,
+  },
+  inputError: { fontSize: 12, color: "#f87171" },
+
+  // ── DIVIDER ROW
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+
+  // ── SCAN BUTTON
+  scanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#111111",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  scanBtnPressed: {
+    opacity: 0.75,
+    transform: [{ scale: 0.984 }],
+  },
+  scanBtnIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scanBtnText: {
+    color: "#c0c0c0",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  // ── INFO BANNER
+  infoBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: 14,
+    backgroundColor: "rgba(165,180,252,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(165,180,252,0.14)",
+    padding: 14,
+  },
+  infoBannerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#a5b4fc",
+    marginTop: 4,
+    flexShrink: 0,
+  },
+  infoBannerText: {
+    flex: 1,
+    color: "#8899cc",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+
+  // ── SUCCESS / ERROR
   successRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -798,40 +1127,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   successText: { fontSize: 14, color: "#3ecf8e", fontWeight: "500" },
-
-  // Relay badge
-  relayBadge: {
-    borderRadius: 12,
-    backgroundColor: "rgba(165,180,252,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(165,180,252,0.2)",
-    padding: 12,
-  },
-  relayBadgeText: {
-    color: "#a5b4fc",
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: "center",
-  },
-
-  // Error
-  errorText: { fontSize: 12, color: "#f87171" },
   errorBox: {
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.2)",
-    backgroundColor: "rgba(248,113,113,0.06)",
+    borderColor: "rgba(248,113,113,0.18)",
+    backgroundColor: "rgba(248,113,113,0.05)",
     padding: 14,
   },
-  errorBoxText: {
-    color: "#f87171",
-    fontSize: 13,
-    lineHeight: 20,
-  },
+  errorBoxText: { color: "#f87171", fontSize: 13, lineHeight: 20 },
 
-  // Divider
-  divider: { flexDirection: "row", alignItems: "center", gap: 10 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" },
-  dividerLabel: { fontSize: 12, color: "#8b8b8b" },
-
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.07)" },
+  dividerLabel: { fontSize: 12, color: "#444", fontWeight: "600" },
 });

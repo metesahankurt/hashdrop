@@ -7,23 +7,21 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
+  Pressable,
+  ScrollView,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BlurView } from "expo-blur";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import {
-  Video,
   Plus,
   LogIn,
   Copy,
   Check,
-  ArrowRight,
-  Lock,
-  Users,
-  MessageSquare,
+  ArrowLeft,
+  RefreshCw,
+  Video,
 } from "lucide-react-native";
 import Toast from "react-native-toast-message";
 import { useConferenceStore } from "@/store/use-conference-store";
@@ -31,50 +29,147 @@ import { useProfileStore } from "@/mobile/state/use-profile-store";
 import { generateSecureCode } from "@/lib/code-generator";
 import { ConferenceRoom } from "./ConferenceRoom";
 
+const PlusIcon = Plus as any;
+const LogInIcon = LogIn as any;
+const CopyIcon = Copy as any;
+const CheckIcon = Check as any;
+const ArrowLeftIcon = ArrowLeft as any;
+const RefreshCwIcon = RefreshCw as any;
+const VideoIcon = Video as any;
+
 const LIVEKIT_URL =
   process.env.EXPO_PUBLIC_LIVEKIT_URL || "wss://your-project.livekit.cloud";
 const API_BASE =
   process.env.EXPO_PUBLIC_API_URL || "https://your-hashdrop-domain.com";
 const EXPO_GO_CONFERENCE_ERROR =
   "Conference requires a development build.\n\nRun:\n  npx expo run:ios\n  npx expo run:android";
-const FLOATING_DOCK_HEIGHT = 74;
 
-type Tab = "create" | "join";
+const DOCK_HEIGHT = 64;
+const DOCK_GAP = 24;
+
+type ConferenceMode = "hub" | "create" | "join";
 
 interface ExpoGoBridgeHandlers {
   onCreate: (code: string, options?: { autoEnter?: boolean }) => void;
   onJoin: (code: string, options?: { autoEnter?: boolean }) => void;
 }
-
 interface ConferenceViewProps {
   expoGoBridgeHandlers?: ExpoGoBridgeHandlers;
 }
 
-export function ConferenceView({
-  expoGoBridgeHandlers,
-}: ConferenceViewProps = {}) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Hub
+// ─────────────────────────────────────────────────────────────────────────────
+function ConferenceHub({ onSelect }: { onSelect: (m: ConferenceMode) => void }) {
   const insets = useSafeAreaInsets();
-  const { username } = useProfileStore();
-  const { status, setRoomInfo, setStatus, reset } = useConferenceStore();
+  const scrollPaddingBottom = Math.max(insets.bottom, 12) + DOCK_HEIGHT + DOCK_GAP;
 
-  const [tab, setTab] = useState<Tab>("create");
-  const [joinCode, setJoinCode] = useState("");
+  return (
+    <SafeAreaView edges={["top"]} style={S.safeArea}>
+      <ScrollView
+        style={S.scroll}
+        contentContainerStyle={[S.hubContent, { paddingBottom: scrollPaddingBottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View style={S.hero}>
+          <View style={S.heroOrb} />
+          <View style={S.heroTopBar}>
+            <View style={S.brandRow}>
+              <View style={S.brandDot} />
+              <Text style={S.brandText}>CONFERENCE</Text>
+            </View>
+            <View style={S.heroPill}>
+              <Text style={S.heroPillText}>MEET</Text>
+            </View>
+          </View>
+          <Text style={S.heroTitle}>Meet up to{"\n"}50 people.</Text>
+          <Text style={S.heroSubtitle}>
+            End-to-end encrypted. No sign-up required.
+          </Text>
+        </View>
+
+        {/* Section header */}
+        <View style={S.sectionHeader}>
+          <Text style={S.sectionTitle}>Choose mode</Text>
+          <Text style={S.sectionMeta}>2 options</Text>
+        </View>
+
+        {/* New Meeting card */}
+        <Pressable
+          style={({ pressed }) => [S.modeCard, pressed && S.modeCardPressed]}
+          onPress={() => onSelect("create")}
+        >
+          <View style={S.modeCardInner}>
+            <View style={S.modeCardTop}>
+              <View style={S.modeIconWrap}>
+                <PlusIcon size={22} stroke="#ededed" strokeWidth={1.9} />
+              </View>
+              <View style={S.modeBadge}>
+                <Text style={S.modeBadgeText}>HOST</Text>
+              </View>
+            </View>
+            <View style={S.modeCardBody}>
+              <Text style={S.modeTitle}>New Meeting</Text>
+              <Text style={S.modeDesc}>
+                Create a room and invite others with a one-time code.
+              </Text>
+            </View>
+            <View style={S.modeFooter}>
+              <Text style={S.modeCtaText}>Start meeting</Text>
+              <ArrowRightSmall />
+            </View>
+          </View>
+        </Pressable>
+
+        {/* Join Meeting card */}
+        <Pressable
+          style={({ pressed }) => [S.modeCard, pressed && S.modeCardPressed]}
+          onPress={() => onSelect("join")}
+        >
+          <View style={S.modeCardInner}>
+            <View style={S.modeCardTop}>
+              <View style={S.modeIconWrap}>
+                <LogInIcon size={22} stroke="#ededed" strokeWidth={1.9} />
+              </View>
+              <View style={S.modeBadge}>
+                <Text style={S.modeBadgeText}>JOIN</Text>
+              </View>
+            </View>
+            <View style={S.modeCardBody}>
+              <Text style={S.modeTitle}>Join Meeting</Text>
+              <Text style={S.modeDesc}>
+                Enter a host's code to request access and wait in the lobby.
+              </Text>
+            </View>
+            <View style={S.modeFooter}>
+              <Text style={S.modeCtaText}>Join meeting</Text>
+              <ArrowRightSmall />
+            </View>
+          </View>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Create (New Meeting) view
+// ─────────────────────────────────────────────────────────────────────────────
+function ConferenceCreateView({
+  onBack,
+  expoGoBridgeHandlers,
+}: {
+  onBack: () => void;
+  expoGoBridgeHandlers?: ExpoGoBridgeHandlers;
+}) {
+  const { username } = useProfileStore();
+  const { setRoomInfo, setStatus } = useConferenceStore();
+  const isExpoGo = Constants.executionEnvironment === "storeClient";
+
   const [createdCode, setCreatedCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const isExpoGo = Constants.executionEnvironment === "storeClient";
-  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
-  const autoJoinedRef = useRef(false);
-
-  // Auto-join when a complete WORD-WORD code is typed/pasted in the join tab
-  useEffect(() => {
-    if (tab !== "join" || loading || autoJoinedRef.current) return;
-    const parts = joinCode.trim().toUpperCase().split("-");
-    if (parts.length === 2 && parts[0].length >= 3 && parts[1].length >= 3) {
-      autoJoinedRef.current = true;
-      joinRoom();
-    }
-  }, [joinCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const requireDevelopmentBuild = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -97,9 +192,7 @@ export function ConferenceView({
     if (expoGoBridgeHandlers) {
       const roomName = createdCode || generateSecureCode();
       setCreatedCode(roomName);
-      expoGoBridgeHandlers.onCreate(roomName, {
-        autoEnter: true,
-      });
+      expoGoBridgeHandlers.onCreate(roomName, { autoEnter: true });
       return;
     }
     if (isExpoGo) {
@@ -119,13 +212,7 @@ export function ConferenceView({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create room");
-      setRoomInfo({
-        roomName: data.roomName,
-        token: data.token,
-        identity: data.identity,
-        role: "host",
-        username,
-      });
+      setRoomInfo({ roomName: data.roomName, token: data.token, identity: data.identity, role: "host", username });
       setStatus("connecting");
     } catch (err: any) {
       Toast.show({ type: "error", text1: err.message });
@@ -134,20 +221,115 @@ export function ConferenceView({
     }
   };
 
+  return (
+    <ConferenceSubShell title="New Meeting" onBack={onBack}>
+      {/* Meeting code card */}
+      <View style={S.section}>
+        <View style={S.sectionTopRow}>
+          <View style={S.sectionIconWrap}>
+            <VideoIcon size={18} stroke="#ededed" strokeWidth={1.9} />
+          </View>
+          <Text style={S.cardLabel}>Meeting code</Text>
+        </View>
+
+        {createdCode ? (
+          <>
+            <TouchableOpacity style={S.codeBox} onPress={copyCode} activeOpacity={0.75}>
+              <Text style={S.codeText}>{createdCode}</Text>
+              <View style={[S.copyBtn, copied && S.copyBtnSuccess]}>
+                {copied
+                  ? <CheckIcon size={15} stroke="#3ecf8e" strokeWidth={2.2} />
+                  : <CopyIcon size={15} stroke="#666" strokeWidth={2.2} />
+                }
+              </View>
+            </TouchableOpacity>
+            <Text style={S.hint}>
+              Share this code — participants will wait for your approval.
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={S.hint}>
+              Generate a code to share with others, or start immediately without one.
+            </Text>
+            <TouchableOpacity style={S.generateBtn} onPress={generateCode} activeOpacity={0.8}>
+              <Text style={S.generateBtnText}>Generate Meeting Code</Text>
+              <RefreshCwIcon size={14} stroke="#a5b4fc" strokeWidth={2} />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
+      {/* Actions */}
+      <TouchableOpacity
+        style={[S.mainBtn, loading && S.mainBtnDisabled]}
+        onPress={createRoom}
+        disabled={loading}
+        activeOpacity={0.8}
+      >
+        <Text style={S.mainBtnText}>{loading ? "Starting…" : "Start Meeting"}</Text>
+      </TouchableOpacity>
+
+      {!createdCode && (
+        <TouchableOpacity
+          style={[S.secondaryBtn, loading && S.mainBtnDisabled]}
+          onPress={createRoom}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          <Text style={S.secondaryBtnText}>
+            {loading ? "Starting…" : "Start Without Sharing"}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {createdCode && (
+        <TouchableOpacity onPress={generateCode} style={S.regenRow}>
+          <RefreshCwIcon size={12} stroke="#444" strokeWidth={2} />
+          <Text style={S.regenText}>Generate new code</Text>
+        </TouchableOpacity>
+      )}
+    </ConferenceSubShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Join Meeting view
+// ─────────────────────────────────────────────────────────────────────────────
+function ConferenceJoinView({
+  onBack,
+  expoGoBridgeHandlers,
+}: {
+  onBack: () => void;
+  expoGoBridgeHandlers?: ExpoGoBridgeHandlers;
+}) {
+  const { username } = useProfileStore();
+  const { setRoomInfo, setStatus } = useConferenceStore();
+  const isExpoGo = Constants.executionEnvironment === "storeClient";
+
+  const [joinCode, setJoinCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const autoJoinedRef = useRef(false);
+
+  const requireDevelopmentBuild = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Toast.show({ type: "error", text1: EXPO_GO_CONFERENCE_ERROR });
+  };
+
+  useEffect(() => {
+    if (loading || autoJoinedRef.current) return;
+    const parts = joinCode.trim().toUpperCase().split("-");
+    if (parts.length === 2 && parts[0].length >= 3 && parts[1].length >= 3) {
+      autoJoinedRef.current = true;
+      joinRoom();
+    }
+  }, [joinCode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const joinRoom = async () => {
     const code = joinCode.trim().toUpperCase();
-    if (!code) {
-      Toast.show({ type: "error", text1: "Enter a room code" });
-      return;
-    }
-    if (expoGoBridgeHandlers) {
-      expoGoBridgeHandlers.onJoin(code, { autoEnter: true });
-      return;
-    }
-    if (isExpoGo) {
-      requireDevelopmentBuild();
-      return;
-    }
+    if (!code) { Toast.show({ type: "error", text1: "Enter a room code" }); return; }
+    if (expoGoBridgeHandlers) { expoGoBridgeHandlers.onJoin(code, { autoEnter: true }); return; }
+    if (isExpoGo) { requireDevelopmentBuild(); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
@@ -158,13 +340,7 @@ export function ConferenceView({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Room not found");
-      setRoomInfo({
-        roomName: data.roomName || code,
-        token: data.token,
-        identity: data.identity,
-        role: "participant",
-        username,
-      });
+      setRoomInfo({ roomName: data.roomName || code, token: data.token, identity: data.identity, role: "participant", username });
       setStatus("connecting");
     } catch (err: any) {
       Toast.show({ type: "error", text1: err.message });
@@ -173,356 +349,377 @@ export function ConferenceView({
     }
   };
 
+  return (
+    <ConferenceSubShell title="Join Meeting" onBack={onBack}>
+      {/* Code entry card */}
+      <View style={S.section}>
+        <View style={S.sectionTopRow}>
+          <View style={S.sectionIconWrap}>
+            <LogInIcon size={18} stroke="#ededed" strokeWidth={1.9} />
+          </View>
+          <Text style={S.cardLabel}>Meeting code</Text>
+        </View>
+
+        <TextInput
+          style={S.codeInput}
+          placeholder="WORD-WORD"
+          placeholderTextColor="#2e2e2e"
+          value={joinCode}
+          onChangeText={(t) => {
+            autoJoinedRef.current = false;
+            setJoinCode(t.toUpperCase());
+          }}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          returnKeyType="join"
+          onSubmitEditing={joinRoom}
+          autoFocus
+        />
+        <Text style={S.hint}>
+          You'll wait in the lobby until the host admits you.
+        </Text>
+      </View>
+
+      <TouchableOpacity
+        style={[S.mainBtn, (!joinCode.trim() || loading) && S.mainBtnDisabled]}
+        onPress={joinRoom}
+        disabled={!joinCode.trim() || loading}
+        activeOpacity={0.8}
+      >
+        <Text style={S.mainBtnText}>{loading ? "Joining…" : "Join Meeting"}</Text>
+      </TouchableOpacity>
+    </ConferenceSubShell>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-shell (back button + scroll)
+// ─────────────────────────────────────────────────────────────────────────────
+function ConferenceSubShell({
+  title,
+  onBack,
+  children,
+}: {
+  title: string;
+  onBack: () => void;
+  children: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const scrollPaddingBottom = Math.max(insets.bottom, 12) + DOCK_HEIGHT + DOCK_GAP;
+
+  return (
+    <SafeAreaView style={S.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          style={S.scroll}
+          contentContainerStyle={[S.subContent, { paddingBottom: scrollPaddingBottom }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={S.subHeader}>
+            <TouchableOpacity onPress={onBack} style={S.backBtn}>
+              <ArrowLeftIcon size={18} stroke="#ededed" strokeWidth={2.2} />
+            </TouchableOpacity>
+            <Text style={S.subTitle}>{title}</Text>
+            <View style={S.backBtnPlaceholder} />
+          </View>
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Root
+// ─────────────────────────────────────────────────────────────────────────────
+export function ConferenceView({ expoGoBridgeHandlers }: ConferenceViewProps = {}) {
+  const { status, reset } = useConferenceStore();
+  const [mode, setMode] = useState<ConferenceMode>("hub");
+
   if (status !== "idle") {
     return (
       <ConferenceRoom
         livekitUrl={LIVEKIT_URL}
-        onLeave={() => {
-          reset();
-          setCreatedCode("");
-          setJoinCode("");
-        }}
+        onLeave={() => { reset(); setMode("hub"); }}
       />
     );
   }
 
-  return (
-    <View style={S.screen}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+  if (mode === "create") {
+    return (
+      <ConferenceCreateView
+        onBack={() => setMode("hub")}
+        expoGoBridgeHandlers={expoGoBridgeHandlers}
+      />
+    );
+  }
 
-      {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <View style={S.hero} pointerEvents="none">
-        <View style={S.heroIconRing}>
-          <View style={S.heroIcon}>
-            <Video size={32} color="#3ecf8e" />
-          </View>
-        </View>
-        <Text style={S.heroTitle}>Conference</Text>
-        <Text style={S.heroSub}>
-          Encrypted · up to 50 participants
-        </Text>
+  if (mode === "join") {
+    return (
+      <ConferenceJoinView
+        onBack={() => setMode("hub")}
+        expoGoBridgeHandlers={expoGoBridgeHandlers}
+      />
+    );
+  }
 
-        {/* Feature pills */}
-        <View style={S.pills}>
-          {[
-            { icon: <Lock size={11} color="#3ecf8e" />, label: "End-to-end encrypted" },
-            { icon: <Users size={11} color="#818cf8" />, label: "50 people" },
-            { icon: <MessageSquare size={11} color="#fb923c" />, label: "In-call chat" },
-          ].map((p) => (
-            <View key={p.label} style={S.pill}>
-              {p.icon}
-              <Text style={S.pillText}>{p.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* ── Bottom Card ───────────────────────────────────────────────── */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={S.cardWrapper}
-      >
-        <BlurView
-          intensity={60}
-          tint="dark"
-          style={[
-            S.card,
-            {
-              paddingBottom:
-                (Platform.OS === "ios" ? 32 : 20) + dockClearance,
-            },
-          ]}
-        >
-          {/* Handle bar */}
-          <View style={S.handle} />
-
-          {/* Tabs */}
-          <View style={S.tabRow}>
-            {(["create", "join"] as Tab[]).map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[S.tab, tab === t && S.tabActive]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setTab(t);
-                  if (t === "join") autoJoinedRef.current = false;
-                }}
-                activeOpacity={0.8}
-              >
-                {t === "create" ? (
-                  <Plus size={14} color={tab === t ? "#3ecf8e" : "#666"} />
-                ) : (
-                  <LogIn size={14} color={tab === t ? "#3ecf8e" : "#666"} />
-                )}
-                <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                  {t === "create" ? "New Meeting" : "Join Meeting"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── Create tab ─────────────────────────────────────── */}
-          {tab === "create" && (
-            <View style={S.tabContent}>
-              {createdCode ? (
-                <>
-                  <Text style={S.fieldLabel}>Meeting Code</Text>
-                  <TouchableOpacity
-                    style={S.codeBox}
-                    onPress={copyCode}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={S.codeText}>{createdCode}</Text>
-                    <View style={[S.copyBtn, copied && S.copyBtnSuccess]}>
-                      {copied ? (
-                        <Check size={16} color="#3ecf8e" />
-                      ) : (
-                        <Copy size={16} color="#8b8b8b" />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                  <Text style={S.hint}>
-                    Share this code — participants will wait for your approval.
-                  </Text>
-                  <TouchableOpacity
-                    style={[S.mainBtn, loading && S.mainBtnDisabled]}
-                    onPress={createRoom}
-                    disabled={loading}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={S.mainBtnText}>
-                      {loading ? "Starting…" : "Start Meeting"}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={generateCode} style={S.regenBtn}>
-                    <Text style={S.regenText}>Generate a new code</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Text style={S.hint}>
-                    Generate a meeting code to share with others, or start immediately.
-                  </Text>
-                  <TouchableOpacity
-                    style={S.generateBtn}
-                    onPress={generateCode}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={S.generateBtnText}>Generate Meeting Code</Text>
-                    <ArrowRight size={16} color="#3ecf8e" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[S.mainBtn, S.mainBtnSecondary, loading && S.mainBtnDisabled]}
-                    onPress={createRoom}
-                    disabled={loading}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[S.mainBtnText, S.mainBtnTextSecondary]}>
-                      {loading ? "Starting…" : "Start Without Sharing"}
-                    </Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          )}
-
-          {/* ── Join tab ────────────────────────────────────────── */}
-          {tab === "join" && (
-            <View style={S.tabContent}>
-              <Text style={S.fieldLabel}>Meeting Code</Text>
-              <TextInput
-                style={S.codeInput}
-                placeholder="WORD-WORD"
-                placeholderTextColor="#444"
-                value={joinCode}
-                onChangeText={(t) => setJoinCode(t.toUpperCase())}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                returnKeyType="join"
-                onSubmitEditing={joinRoom}
-              />
-              <Text style={S.hint}>
-                You'll wait in the waiting room until the host admits you.
-              </Text>
-              <TouchableOpacity
-                style={[
-                  S.mainBtn,
-                  (!joinCode.trim() || loading) && S.mainBtnDisabled,
-                ]}
-                onPress={joinRoom}
-                disabled={!joinCode.trim() || loading}
-                activeOpacity={0.8}
-              >
-                <Text style={S.mainBtnText}>
-                  {loading ? "Joining…" : "Join Meeting"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </BlurView>
-      </KeyboardAvoidingView>
-    </View>
-  );
+  return <ConferenceHub onSelect={setMode} />;
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function ArrowRightSmall() {
+  const { ArrowRight } = require("lucide-react-native");
+  const Icon = ArrowRight as any;
+  return <Icon size={13} stroke="#555" strokeWidth={2.2} />;
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0a0a0a" },
+  safeArea: { flex: 1, backgroundColor: "#0d0d0d" },
+  scroll: { flex: 1, backgroundColor: "#0d0d0d" },
 
-  // Hero
+  // ── Hub
+  hubContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 12,
+  },
   hero: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
-    gap: 10,
-  },
-  heroIconRing: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "rgba(62,207,142,0.07)",
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.15)",
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "#101010",
+    padding: 24,
+    paddingBottom: 28,
+    gap: 14,
+    overflow: "hidden",
+  },
+  heroOrb: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(165,180,252,0.08)",
+    top: -80,
+    right: -70,
+  },
+  heroTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
   },
-  heroIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(62,207,142,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#ededed",
-    letterSpacing: -0.5,
-  },
-  heroSub: { fontSize: 14, color: "#666", textAlign: "center" },
-  pills: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8, marginTop: 4 },
-  pill: {
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 8,
+  },
+  brandDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#a5b4fc",
+  },
+  brandText: {
+    color: "#a5b4fc",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 2,
+  },
+  heroPill: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 20,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  heroPillText: {
+    color: "#555",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  heroTitle: {
+    color: "#ededed",
+    fontSize: 38,
+    fontWeight: "800",
+    lineHeight: 44,
+    letterSpacing: -0.8,
+    marginTop: 4,
+  },
+  heroSubtitle: {
+    color: "#5c5c5c",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  // ── Section header
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 4,
+  },
+  sectionTitle: { color: "#ededed", fontSize: 17, fontWeight: "800" },
+  sectionMeta: { color: "#444", fontSize: 12, fontWeight: "700" },
+
+  // ── Mode cards
+  modeCard: {
+    borderRadius: 22,
+    backgroundColor: "#111111",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  modeCardPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.984 }],
+  },
+  modeCardInner: { padding: 20, gap: 14 },
+  modeCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modeIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modeBadge: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  pillText: { fontSize: 11, color: "#888" },
+  modeBadgeText: { color: "#555", fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  modeCardBody: { gap: 5 },
+  modeTitle: { color: "#ededed", fontSize: 19, fontWeight: "700" },
+  modeDesc: { color: "#5a5a5a", fontSize: 13, lineHeight: 19 },
+  modeFooter: { flexDirection: "row", alignItems: "center", gap: 5 },
+  modeCtaText: { color: "#555", fontSize: 13, fontWeight: "600" },
 
-  // Bottom card
-  cardWrapper: { flexShrink: 0 },
-  card: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 20,
+  // ── SubShell
+  subContent: {
+    paddingHorizontal: 16,
     paddingTop: 12,
-    gap: 16,
+    gap: 14,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    alignSelf: "center",
-    marginBottom: 4,
-  },
-
-  // Tabs
-  tabRow: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    padding: 3,
-    gap: 3,
-  },
-  tab: {
-    flex: 1,
+  subHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  tabActive: {
-    backgroundColor: "rgba(62,207,142,0.1)",
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.2)",
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  tabText: { fontSize: 13, fontWeight: "600", color: "#666" },
-  tabTextActive: { color: "#3ecf8e" },
+  backBtnPlaceholder: { width: 38 },
+  subTitle: { fontSize: 16, fontWeight: "700", color: "#ededed", letterSpacing: -0.2 },
 
-  // Tab content
-  tabContent: { gap: 12 },
-  fieldLabel: {
+  // ── Section card
+  section: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#111111",
+    padding: 20,
+    gap: 14,
+  },
+  sectionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  sectionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardLabel: {
     fontSize: 11,
-    fontWeight: "600",
-    color: "#666",
+    fontWeight: "700",
+    color: "#555",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
   },
 
   // Code display (create)
   codeBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.09)",
     borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
   },
   codeText: {
     flex: 1,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     color: "#ededed",
-    letterSpacing: 4,
+    letterSpacing: 3,
   },
   copyBtn: {
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
-  copyBtnSuccess: { backgroundColor: "rgba(62,207,142,0.12)" },
+  copyBtnSuccess: {
+    backgroundColor: "rgba(62,207,142,0.10)",
+    borderColor: "rgba(62,207,142,0.18)",
+  },
 
   // Code input (join)
   codeInput: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.09)",
     borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     color: "#ededed",
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
-    letterSpacing: 4,
+    letterSpacing: 3,
   },
 
-  hint: { fontSize: 12, color: "#555", lineHeight: 18 },
+  hint: { fontSize: 12, color: "#4a4a4a", lineHeight: 18 },
 
   // Generate button
   generateBtn: {
@@ -530,15 +727,15 @@ const S = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "rgba(62,207,142,0.2)",
+    borderColor: "rgba(165,180,252,0.16)",
     borderRadius: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    backgroundColor: "rgba(62,207,142,0.05)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "rgba(165,180,252,0.05)",
   },
-  generateBtnText: { fontSize: 15, fontWeight: "600", color: "#3ecf8e" },
+  generateBtnText: { fontSize: 14, fontWeight: "600", color: "#a5b4fc" },
 
-  // Main action button
+  // Main button
   mainBtn: {
     backgroundColor: "#3ecf8e",
     borderRadius: 14,
@@ -546,15 +743,26 @@ const S = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mainBtnSecondary: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
-  },
-  mainBtnDisabled: { opacity: 0.45 },
-  mainBtnText: { fontSize: 16, fontWeight: "700", color: "#0a0a0a" },
-  mainBtnTextSecondary: { color: "#ededed" },
+  mainBtnDisabled: { opacity: 0.4 },
+  mainBtnText: { fontSize: 15, fontWeight: "700", color: "#08110d" },
 
-  regenBtn: { alignItems: "center", paddingVertical: 2 },
-  regenText: { fontSize: 12, color: "#555" },
+  // Secondary button
+  secondaryBtn: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryBtnText: { fontSize: 15, fontWeight: "600", color: "#888" },
+
+  regenRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  regenText: { fontSize: 12, color: "#444" },
 });
