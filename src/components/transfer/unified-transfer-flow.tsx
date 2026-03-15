@@ -30,7 +30,7 @@ interface UnifiedTransferFlowProps {
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
 
 export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChange }: UnifiedTransferFlowProps) {
-  const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode, relayFiles, setRelayFiles, relayCode, setRelayCode } = useWarpStore()
+  const { files, setFiles, status, setStatus, setMode, setCodeExpiry, codeExpiry, addLog, textContent, setTextContent, error, displayCode, setDisplayCode, setClientInputCode, readyToDownload, relayFiles, setRelayFiles, relayCode, setRelayCode } = useWarpStore()
 
   const searchParams = useSearchParams()
   const codeFromUrl = searchParams.get('code') || ''
@@ -839,7 +839,7 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
         )}
 
         {/* Step 5: Connecting / Relay Download */}
-        {currentStep === 'connecting' && (
+        {currentStep === 'connecting' && status !== 'completed' && !readyToDownload && (
           <motion.div
             key="connecting"
             variants={cardVariants}
