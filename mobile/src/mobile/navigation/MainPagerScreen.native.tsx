@@ -50,7 +50,9 @@ export function MainPagerScreen({ route }: MainPagerScreenProps) {
           event.nativeEvent.position + event.nativeEvent.offset;
       }}
       onPageSelected={(event) => {
-        const nextRoute = ROUTES[event.nativeEvent.position] ?? "/";
+        const idx = event.nativeEvent.position;
+        const nextRoute = ROUTES[idx] ?? "/";
+        progress.value = idx;
         setRoute(nextRoute);
       }}
       overdrag={false}

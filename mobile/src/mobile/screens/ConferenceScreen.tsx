@@ -51,7 +51,7 @@ export function ConferenceScreen() {
   const [reloadKey, setReloadKey] = useState(0);
   const [conferenceReady, setConferenceReady] = useState(false);
 
-  const dockClearance = Math.max(insets.bottom, 10) + FLOATING_DOCK_HEIGHT;
+  const dockClearance = Math.max(insets.bottom, 16) + FLOATING_DOCK_HEIGHT;
   const canFallbackToProd =
     bridgeBaseUrl !== PROD_WEB_APP_URL && WEB_APP_URL !== PROD_WEB_APP_URL;
 
