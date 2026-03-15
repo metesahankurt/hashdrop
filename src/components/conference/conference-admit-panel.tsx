@@ -22,9 +22,9 @@ export function ConferenceAdmitPanel() {
       })
       if (!res.ok) throw new Error()
       removeWaitingParticipant(identity)
-      toast.success(`${username} was admitted to the meeting`)
+      toast.success(`${username} admitted`, { duration: 2500 })
     } catch {
-      toast.error('Failed to admit participant')
+      toast.error('Failed to admit participant', { duration: 3000 })
       setLoading((p) => ({ ...p, [identity]: false }))
     }
   }
@@ -39,9 +39,9 @@ export function ConferenceAdmitPanel() {
       })
       if (!res.ok) throw new Error()
       removeWaitingParticipant(identity)
-      toast(`${username} was denied`)
+      toast(`${username} denied`, { duration: 2500 })
     } catch {
-      toast.error('Operation failed')
+      toast.error('Operation failed', { duration: 3000 })
       setLoading((p) => ({ ...p, [identity]: false }))
     }
   }

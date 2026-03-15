@@ -80,13 +80,13 @@ export function ConferenceRoomInner({ onLeave, isMobileEmbed }: ConferenceRoomPr
         <div className={`flex-1 min-h-0 flex flex-col ${isMobileEmbed ? 'gap-1.5 p-1.5 pb-[6.75rem]' : 'gap-3 p-3 md:p-4'}`}>
           {/* Admit panel — host only */}
           {role === 'host' && waitingParticipants.length > 0 && (
-            <div className={isMobileEmbed ? 'absolute inset-x-1.5 top-1.5 z-30 max-h-[24vh] overflow-y-auto' : 'shrink-0'}>
+            <div className="shrink-0">
               <ConferenceAdmitPanel />
             </div>
           )}
 
           {/* Main area */}
-          <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? `gap-1.5 flex-col ${role === 'host' && waitingParticipants.length > 0 ? 'pt-[6rem]' : ''}` : 'gap-3'}`}>
+          <div className={`flex-1 min-h-0 flex ${isMobileEmbed ? 'gap-1.5 flex-col' : 'gap-3'}`}>
             {/* Video grid */}
             <div className={isMobileEmbed ? 'w-full flex-1 min-h-0' : 'flex-1 min-w-0 min-h-0'}>
               <div className={isMobileEmbed ? 'h-full min-h-0 w-full' : 'h-full'}>
