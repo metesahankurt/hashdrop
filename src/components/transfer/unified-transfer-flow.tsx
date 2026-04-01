@@ -301,9 +301,6 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
     setCurrentStep('connecting')
     setClientInputCode(trimmedCode)
     setStatus('connecting')
-    // Signal the relay that a web receiver has claimed this code —
-    // mobile polls this to know when to auto-upload.
-    fetch(`/api/relay/${trimmedCode.trim().toUpperCase()}/claim`, { method: 'POST' }).catch(() => {})
   }
 
   // Update step based on status
@@ -904,16 +901,8 @@ export function UnifiedTransferFlow({ initialAction, onFilesSelected, onModeChan
                   </h3>
                   <p className="text-sm text-muted max-w-md mx-auto">
                     {status === 'connected'
-                      ? (
-                        <>
-                          Secure peer connection established. The sender can now tap <strong className="text-foreground">Send files</strong> in the mobile app.
-                        </>
-                      )
-                      : (
-                        <>
-                          Waiting for the sender. If sending from the mobile app, tap <strong className="text-foreground">Upload &amp; share</strong> to make the files available.
-                        </>
-                      )}
+                      ? 'Secure connection established. Waiting for the sender to start the transfer.'
+                      : 'Waiting for the sender to connect...'}
                   </p>
                 </div>
                 <div className="text-xs text-muted">

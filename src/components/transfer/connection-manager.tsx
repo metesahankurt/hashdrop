@@ -124,9 +124,27 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         const json = await res.json()
         if (!json.claimed) return
 
-        // Mobile claimed the code — upload files to relay
+        // Receiver detected — wait briefly to let P2P establish first.
+        // Web receivers also post a claim, so we wait to distinguish them.
         stopped = true
         clearInterval(poll)
+        addLog('Receiver detected — checking connection type...', 'info')
+
+        await new Promise(resolve => setTimeout(resolve, 5000))
+
+        // If P2P connected during the delay, skip relay upload entirely
+        const currentState = useWarpStore.getState()
+        if (
+          currentState.conn !== null ||
+          currentState.status === 'connected' ||
+          currentState.status === 'transferring' ||
+          currentState.status === 'completed'
+        ) {
+          addLog('P2P connection established — skipping relay upload', 'info')
+          return
+        }
+
+        // P2P didn't connect — mobile receiver, upload files to relay
         addLog('Mobile receiver detected — uploading to relay...', 'info')
         toast.info('Mobile receiver connected — uploading files...')
 
