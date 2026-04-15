@@ -1,5 +1,7 @@
 # HashDrop 🚀
 
+DOCS: https://mintlify.wiki/metesahankurt/hashdrop/
+
 A **secure, unified ecosystem for peer-to-peer file sharing, video conferencing, and real-time chat** built with Next.js, React Native (Expo), WebRTC, and LiveKit. 
 Sharing data directly and securely between devices at lightning speeds. **No cloud storage, zero data retention, and no tracking.**
 
