@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  appendRelayFiles,
   deleteRelayEntry,
   getRelayEntry,
   type RelayFile,
-  setRelayEntry,
+  stageRelayChunk,
   sweepRelayEntries,
-  TTL_MS,
 } from "../store";
 
 // POST /api/relay/[code]
@@ -27,6 +27,47 @@ export async function POST(
   }
 
   const incoming = formData.getAll("file") as File[];
+  const chunk = formData.get("chunk");
+
+  if (chunk instanceof File) {
+    const fileId = formData.get("fileId");
+    const fileName = formData.get("fileName");
+    const mimeType = formData.get("mimeType");
+    const fileSize = Number(formData.get("fileSize"));
+    const chunkIndex = Number(formData.get("chunkIndex"));
+    const totalChunks = Number(formData.get("totalChunks"));
+
+    if (
+      typeof fileId !== "string" ||
+      typeof fileName !== "string" ||
+      typeof mimeType !== "string" ||
+      !Number.isFinite(fileSize) ||
+      !Number.isInteger(chunkIndex) ||
+      !Number.isInteger(totalChunks) ||
+      chunkIndex < 0 ||
+      totalChunks <= 0 ||
+      chunkIndex >= totalChunks
+    ) {
+      return NextResponse.json({ error: "Invalid chunk metadata" }, { status: 400 });
+    }
+
+    const result = stageRelayChunk(
+      key,
+      fileId,
+      chunkIndex,
+      Buffer.from(await chunk.arrayBuffer()),
+      { fileName, mimeType, fileSize, totalChunks },
+    );
+
+    return NextResponse.json({
+      success: true,
+      chunked: true,
+      complete: result.complete,
+      chunkIndex,
+      totalChunks,
+    });
+  }
+
   if (!incoming.length) {
     return NextResponse.json({ error: "No files" }, { status: 400 });
   }
@@ -40,18 +81,7 @@ export async function POST(
     })),
   );
 
-  // Append to existing entry if code is already active (multiple POSTs)
-  const existing = getRelayEntry(key);
-  if (existing && existing.expiresAt > Date.now()) {
-    existing.files.push(...files);
-    setRelayEntry(key, existing);
-  } else {
-    setRelayEntry(key, {
-      files,
-      expiresAt: Date.now() + TTL_MS,
-      claimed: existing?.claimed ?? false,
-    });
-  }
+  appendRelayFiles(key, files);
 
   return NextResponse.json({ success: true, count: files.length });
 }

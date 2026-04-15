@@ -37,10 +37,50 @@ function isFileMetaData(data: unknown): data is FileMetaData {
 }
 
 const CODE_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
+const RELAY_UPLOAD_CHUNK_BYTES = 2 * 1024 * 1024 // 2MB per request to avoid 413 proxy limits
 
 // SECURITY: File size and chunk limits to prevent DoS attacks
 const MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024 // 10GB max file size
 const MAX_CHUNKS = 1000000 // Maximum number of chunks (10GB / 16KB ≈ 655,360 chunks)
+
+async function uploadFilesToRelay(code: string, files: File[]) {
+  for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+    const file = files[fileIndex]
+    const fileId = `${file.name}:${file.size}:${file.lastModified}:${fileIndex}`
+
+    if (file.size <= RELAY_UPLOAD_CHUNK_BYTES) {
+      const formData = new FormData()
+      formData.append('file', file, file.name)
+
+      const response = await fetch(`/api/relay/${code}`, { method: 'POST', body: formData })
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+      continue
+    }
+
+    const totalChunks = Math.ceil(file.size / RELAY_UPLOAD_CHUNK_BYTES)
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+      const start = chunkIndex * RELAY_UPLOAD_CHUNK_BYTES
+      const end = Math.min(start + RELAY_UPLOAD_CHUNK_BYTES, file.size)
+      const chunk = file.slice(start, end)
+      const formData = new FormData()
+
+      formData.append('chunk', chunk, file.name)
+      formData.append('fileId', fileId)
+      formData.append('fileName', file.name)
+      formData.append('mimeType', file.type || 'application/octet-stream')
+      formData.append('fileSize', String(file.size))
+      formData.append('chunkIndex', String(chunkIndex))
+      formData.append('totalChunks', String(totalChunks))
+
+      const response = await fetch(`/api/relay/${code}`, { method: 'POST', body: formData })
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+    }
+  }
+}
 
 interface ConnectionManagerProps {
   onOpenHistory?: () => void
@@ -148,17 +188,15 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
         addLog('Mobile receiver detected — uploading to relay...', 'info')
         toast.info('Mobile receiver connected — uploading files...')
 
-        const formData = new FormData()
-        for (const f of files) {
-          formData.append('file', f, f.name)
-        }
-        const uploadRes = await fetch(`/api/relay/${displayCode}`, { method: 'POST', body: formData })
-        if (uploadRes.ok) {
+        try {
+          await uploadFilesToRelay(displayCode, files)
           addLog('Files uploaded to relay for mobile receiver', 'success')
           toast.success('Files ready for mobile download!')
-        } else {
+        } catch (error) {
           addLog('Relay upload failed', 'error')
-          toast.error('Failed to upload files to relay')
+          toast.error('Failed to upload files to relay', {
+            description: error instanceof Error ? error.message : undefined,
+          })
         }
       } catch {
         // ignore transient errors
@@ -617,23 +655,17 @@ export function ConnectionManager({ onOpenHistory, onOpenStats, initialAction, h
               const { files: filesToUpload, displayCode: code } = useWarpStore.getState()
               if (filesToUpload.length > 0 && code) {
                 const toastId = toast.loading('Direct connection failed. Uploading files to server...')
-                const formData = new FormData()
-                for (const f of filesToUpload) formData.append('file', f, f.name)
-                fetch(`/api/relay/${code}`, { method: 'POST', body: formData })
-                  .then(res => {
-                    if (res.ok) {
+                uploadFilesToRelay(code, filesToUpload)
+                  .then(() => {
                       toast.dismiss(toastId)
                       toast.success('Files uploaded to server! Receiver will download automatically.')
                       addLog('Files uploaded to relay — receiver can download via server', 'success')
-                    } else {
-                      toast.dismiss(toastId)
-                      toast.error('Server upload failed. Ask receiver to try again.')
-                      setStatus('failed')
-                    }
                   })
-                  .catch(() => {
+                  .catch((error) => {
                     toast.dismiss(toastId)
-                    toast.error('Connection failed. Please try again.')
+                    toast.error('Connection failed. Please try again.', {
+                      description: error instanceof Error ? error.message : undefined,
+                    })
                     setStatus('failed')
                   })
               } else {
